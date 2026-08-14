@@ -37,8 +37,14 @@ def test_backend_dependency_direction() -> None:
         for target in _imports(path):
             if owner.startswith("src.domain.") and not target.startswith("src.domain"):
                 violations.append(f"{owner} -> {target}: domain must remain independent")
-            if owner.startswith("src.services.") and target.startswith(("src.application", "src.api", "src.cli", "src.graph")):
-                violations.append(f"{owner} -> {target}: infrastructure cannot depend on upper layers")
+            if (
+                owner.startswith("src.services.")
+                and target.startswith("src.application")
+                and not target.startswith(("src.application.contracts", "src.application.ports"))
+            ):
+                violations.append(f"{owner} -> {target}: infrastructure may only implement inward ports/contracts")
+            if owner.startswith("src.services.") and target.startswith(("src.api", "src.cli", "src.graph")):
+                violations.append(f"{owner} -> {target}: infrastructure cannot depend on adapters or orchestration")
             if owner.startswith("src.application.") and target.startswith(("src.api", "src.cli")):
                 violations.append(f"{owner} -> {target}: application cannot depend on adapters")
             if owner.startswith("src.graph.") and target.startswith(("src.application", "src.api", "src.cli")):
@@ -79,9 +85,13 @@ def test_skeleton_has_expected_boundaries() -> None:
         "src/api/factory.py",
         "src/api/routes/health.py",
         "src/application/errors.py",
+        "src/application/contracts/persistence.py",
+        "src/application/ports/persistence.py",
         "src/cli/serve.py",
         "src/graph/__init__.py",
         "src/domain/__init__.py",
         "src/services/__init__.py",
+        "src/services/persistence/database.py",
+        "src/services/persistence/models.py",
     ):
         assert (ROOT / relative).is_file(), relative

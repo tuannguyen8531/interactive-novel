@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -24,7 +25,12 @@ class Settings(BaseSettings):
     api_port: int = Field(default=8000, ge=1, le=65535)
     api_log_level: str = "info"
     cors_origins: str = "http://localhost:5173"
-    debug: bool = False
+    # Avoid colliding with deployment environments that reserve DEBUG for a
+    # non-boolean release/profile label. Use INTERACTIVE_NOVEL_DEBUG instead.
+    debug: bool = Field(default=False, validation_alias="INTERACTIVE_NOVEL_DEBUG")
+    runtime_dir: Path = Path("runtime")
+    database_busy_timeout_ms: int = Field(default=5_000, ge=0)
+    database_echo: bool = False
 
     def cors_origin_list(self) -> list[str]:
         """Return configured exact CORS origins in stable order."""

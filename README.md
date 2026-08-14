@@ -1,8 +1,7 @@
 # Interactive Novel
 
-Local-first AI-powered interactive visual novel/RPG engine. Phase 1 provides a
-minimal FastAPI backend, Vue 3 frontend shell, typed REST client and SSE
-abstraction.
+Local-first AI-powered interactive visual novel/RPG engine. Phase 2 adds the
+SQLite persistence foundation without coupling the domain layer to SQLAlchemy.
 
 ## Development
 
@@ -29,7 +28,11 @@ Validation commands:
 ```bash
 uv run test
 uv run build
+uv run migrate
 cd web && npm run test:unit
 ```
 
-`uv run migrate` is currently a Phase 1 no-op. Persistence belongs to Phase 2.
+`uv run migrate` upgrades the canonical database at `runtime/game.db`. Use
+`uv run migrate --database /path/to/game.db` for a test or alternate runtime.
+The separate `runtime/checkpoints.db` path is reserved for LangGraph execution
+state and is not a save-game database.
