@@ -5,9 +5,15 @@ build/
 dist/
 wheels/
 *.egg-info
+.cache/
 
 # Virtual environments
 .venv
+
+# Frontend-generated files
+web/node_modules/
+web/dist/
+*.tsbuildinfo
 
 # Environment variables
 .env

@@ -1,0 +1,1 @@
+"""Interactive novel application package."""

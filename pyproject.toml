@@ -1,14 +1,61 @@
 [project]
 name = "interactive-novel"
 version = "0.1.0"
-description = "Add your description here"
+description = "Local-first AI-powered interactive visual novel engine"
 readme = "README.md"
 authors = [
     { name = "SeventhS", email = "tuannguyen8531@gmail.com" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "fastapi==0.138.1",
+    "httpx==0.28.1",
+    "pydantic==2.13.4",
+    "pydantic-settings>=2.7.1,<3.0.0",
+    "sse-starlette==3.4.5",
+    "uvicorn[standard]==0.49.0",
+]
+
+[project.scripts]
+serve = "src.cli.serve:main"
+test = "src.cli.test:main"
+build = "src.cli.build:main"
+migrate = "src.cli.migrate:main"
 
 [build-system]
-requires = ["uv_build>=0.12.0,<0.13.0"]
-build-backend = "uv_build"
+requires = ["hatchling>=1.27,<2.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.411,<2.0.0",
+    "pytest>=9.1.1,<10.0.0",
+    "pytest-asyncio>=1.0,<2.0",
+    "ruff>=0.15.20,<0.16.0",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.pytest.ini_options]
+cache_dir = ".cache/pytest"
+testpaths = ["tests"]
+addopts = "-ra"
+asyncio_mode = "auto"
+
+[tool.ruff]
+cache-dir = ".cache/ruff"
+target-version = "py314"
+line-length = 130
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.14"
+venvPath = "."
+venv = ".venv"
