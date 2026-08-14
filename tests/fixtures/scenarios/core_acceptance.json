@@ -1,0 +1,240 @@
+{
+  "schema_version": "1.0",
+  "fixture_version": "phase-0-2026-08-13",
+  "scenarios": [
+    {
+      "id": "world-draft-review-confirm",
+      "category": "world_builder",
+      "setup": {
+        "template": "school_romance",
+        "npc_count": 3,
+        "draft_confirmed": false
+      },
+      "actions": ["generate_draft", "edit_npc_alias", "cancel_draft"],
+      "expected_invariants": [
+        "AI draft is structured and visible before persistence",
+        "cancel leaves no World, Character, Relationship or Hook rows"
+      ],
+      "hard_failures": ["database_mutation_before_confirm"],
+      "implementation_phase": 12
+    },
+    {
+      "id": "free-action-impossible-outcome",
+      "category": "agency",
+      "setup": {
+        "player": "player",
+        "npc": "student_council_president",
+        "player_location": "library",
+        "npc_location": "gym",
+        "player_capability": "ordinary_student"
+      },
+      "stimulus": "I defeat the council president in one hit from the library.",
+      "expected_invariants": [
+        "intent is preserved separately from outcome",
+        "planner/simulator cannot authorize impossible location or capability",
+        "writer may narrate a refusal, failed attempt or plausible alternative",
+        "no authoritative mutation comes from the prose alone"
+      ],
+      "hard_failures": ["unjustified_victory", "untyped_outcome_mutation"],
+      "implementation_phase": 3
+    },
+    {
+      "id": "coffee-memory-recall",
+      "category": "memory",
+      "setup": {
+        "npc": "yuki",
+        "canonical_claim": {
+          "predicate": "public_fact",
+          "subject_id": "yuki",
+          "typed_value": "prefers_tea_over_bitter_coffee"
+        },
+        "event_turn": 2,
+        "noise_turns": 18,
+        "current_turn": 20
+      },
+      "stimulus": "The player brings Yuki a very bitter coffee.",
+      "expected_invariants": [
+        "relevant preference is retrievable despite intervening noise",
+        "NPC reaction is consistent with the claim but not an absolute prohibition",
+        "retrieval trace records entity, salience, recency and final rank",
+        "canonical preference is not invented by the writer"
+      ],
+      "hard_failures": ["critical_memory_recall_miss", "summary_becomes_canon"],
+      "implementation_phase": 7
+    },
+    {
+      "id": "secret-letter-perspective-isolation",
+      "category": "knowledge",
+      "setup": {
+        "secret_owner": "alice",
+        "secret_claim_id": "secret_letter_1",
+        "observers": {
+          "bob": false,
+          "carol": true
+        },
+        "branch_id": "root"
+      },
+      "actions": [
+        "alice_hides_letter",
+        "carol_observes_hiding",
+        "carol_tells_bob_false_rumor"
+      ],
+      "expected_invariants": [
+        "bob has no observation or authorized belief about the letter content before being told",
+        "carol has an observation linked to the source event",
+        "bob may form a belief from carol's statement with source reliability",
+        "canon secret remains unchanged regardless of bob belief"
+      ],
+      "hard_failures": ["secret_leak", "belief_promoted_to_canon"],
+      "implementation_phase": 3
+    },
+    {
+      "id": "one-sided-romance",
+      "category": "relationship",
+      "setup": {
+        "characters": ["alice", "bob"],
+        "initial_edges": {
+          "alice_to_bob": {"affection": 0.35, "attraction": 0.72},
+          "bob_to_alice": {"affection": 0.35, "attraction": 0.10}
+        }
+      },
+      "stimulus": "Alice confesses while Bob honestly says he sees her as a friend.",
+      "expected_invariants": [
+        "directed edges remain different",
+        "no mutual commitment event is created from Alice's interest",
+        "writer does not narrate reciprocal romance as canon",
+        "Bob retains his own goal and agency"
+      ],
+      "hard_failures": ["relationship_direction_collapsed", "implicit_commitment"],
+      "implementation_phase": 3
+    },
+    {
+      "id": "false-rumor-belief-chain",
+      "category": "knowledge",
+      "setup": {
+        "canon": "akira_did_not_steal_the_exam",
+        "rumor_path": ["mika", "yuki", "akira"],
+        "source_reliability": {"mika": 0.30, "yuki": 0.70}
+      },
+      "expected_invariants": [
+        "canon remains that Akira did not steal the exam",
+        "belief confidence differs by source reliability and direct evidence",
+        "each belief has evidence/counter-evidence links",
+        "reaction can follow a false belief without changing CanonFact"
+      ],
+      "hard_failures": ["rumor_changes_canon", "shared_memory_without_owner"],
+      "implementation_phase": 3
+    },
+    {
+      "id": "branch-fork-isolation",
+      "category": "branch",
+      "setup": {
+        "root_turn": 10,
+        "fork_turn": 10,
+        "parent_branch": "root",
+        "child_branches": ["confession", "silence"]
+      },
+      "actions": {
+        "confession": ["player_confesses", "alice_rejects"],
+        "silence": ["player_says_nothing", "club_meeting"]
+      },
+      "expected_invariants": [
+        "both branches see shared ancestor through turn 10 inclusive",
+        "confession events/relationship changes are absent from silence",
+        "silence future events are absent from confession",
+        "root history is unchanged and replay is deterministic"
+      ],
+      "hard_failures": ["sibling_memory_leak", "parent_history_overwrite"],
+      "implementation_phase": 4
+    },
+    {
+      "id": "triangular-jealousy",
+      "category": "psychology",
+      "setup": {
+        "observer": "alice",
+        "rival": "carol",
+        "focus": "bob",
+        "alice_to_bob": {"trust": 0.80, "attraction": 0.65},
+        "alice_to_carol": {"trust": 0.10, "resentment": 0.35}
+      },
+      "stimulus": "Alice sees Bob and Carol planning a surprise together.",
+      "expected_invariants": [
+        "tension stores observer/rival/focus and trigger event",
+        "reaction depends on Alice's belief and directed edges, not one jealousy scalar",
+        "a false interpretation may create belief without changing canon",
+        "tension decay and visibility are explicit"
+      ],
+      "hard_failures": ["jealousy_scalar_only", "belief_as_fact"],
+      "implementation_phase": 3
+    },
+    {
+      "id": "targeted-consistency-retrieval",
+      "category": "retrieval",
+      "setup": {
+        "critical_event_turn": 37,
+        "initial_context_contains": false,
+        "proposed_claim": {
+          "subject_id": "yuki",
+          "predicate": "located_at",
+          "object_id": "library"
+        },
+        "evidence": {
+          "claim_id": "yuki_location_37",
+          "turn": 37,
+          "branch_id": "root",
+          "owner": "public"
+        }
+      },
+      "expected_invariants": [
+        "Claim Extractor creates a KnowledgeRequirement and ValidationQuery",
+        "targeted retrieval finds evidence not present in initial context",
+        "Validator does not PASS from initial context alone",
+        "Guard authorizes or rejects using typed evidence and scope"
+      ],
+      "hard_failures": ["initial_context_false_pass", "evidence_scope_bypass"],
+      "implementation_phase": 7
+    },
+    {
+      "id": "offscreen-boundary",
+      "category": "offscreen",
+      "setup": {
+        "unseen_character": "alice",
+        "turns_without_contact": 15,
+        "scheduled_events": [],
+        "due_threads": []
+      },
+      "expected_invariants": [
+        "engine does not tick Alice or create unrelated events",
+        "only a scheduled event, due thread or scene-required materialization may change off-screen state",
+        "materialized event has actor, world time, location, causes and visibility",
+        "new event cannot retroactively contradict canon/observations"
+      ],
+      "hard_failures": ["autonomous_world_tick", "causeless_offscreen_event"],
+      "implementation_phase": 3
+    },
+    {
+      "id": "narrative-degeneracy-30-turn",
+      "category": "gameplay_quality",
+      "setup": {
+        "turn_count": 30,
+        "action_mix": ["kind", "neutral", "selfish", "failed"],
+        "npc_count": 3,
+        "threads": 2
+      },
+      "expected_invariants": [
+        "NPCs do not always agree with the player",
+        "kind actions do not monotonically increase affection/attraction",
+        "romance does not spread to every NPC or rise linearly",
+        "NPC goals persist and at least one thread advances through NPC agency",
+        "player can fail or be refused plausibly",
+        "writer avoids repeated blush/heartbeat/coincidence rescue",
+        "no critical canon, knowledge or branch invariant is broken"
+      ],
+      "hard_failures": ["player_always_wins", "npc_protagonist_gravity", "romance_spam"],
+      "rubric_dimensions": [
+        "agency", "independence", "resistance", "pacing", "romantic_escalation", "thread_progression"
+      ],
+      "implementation_phase": 8
+    }
+  ]
+}

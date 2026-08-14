@@ -1,0 +1,93 @@
+{
+  "schema_version": "1.0",
+  "fixture_version": "phase-0-2026-08-13",
+  "purpose": "Khóa metadata và target trước khi đo baseline; không giả định số đo trước Phase 3.",
+  "dataset": {
+    "id": "interactive-novel-reference-v1",
+    "scenarios": [
+      "coffee-memory-recall",
+      "secret-letter-perspective-isolation",
+      "targeted-consistency-retrieval",
+      "narrative-degeneracy-30-turn",
+      "teen-14-explicit-denied"
+    ],
+    "turn_lengths": [1, 10, 30, 50, 100]
+  },
+  "matrix": [
+    {
+      "id": "linux-local-ollama",
+      "execution": "local",
+      "provider": "ollama",
+      "model": "to_be_filled",
+      "hardware_profile": "to_be_filled",
+      "network_region": "none",
+      "privacy_mode": "local_only",
+      "status": "baseline_pending_phase_3"
+    },
+    {
+      "id": "gemini-cloud-default",
+      "execution": "cloud",
+      "provider": "gemini",
+      "model": "to_be_filled",
+      "hardware_profile": "client_cpu_only",
+      "network_region": "to_be_filled",
+      "privacy_mode": "explicit_cloud_opt_in",
+      "status": "baseline_pending_phase_3"
+    },
+    {
+      "id": "openrouter-cloud-default",
+      "execution": "cloud",
+      "provider": "openrouter",
+      "model": "to_be_filled",
+      "hardware_profile": "client_cpu_only",
+      "network_region": "to_be_filled",
+      "privacy_mode": "explicit_cloud_opt_in",
+      "status": "baseline_pending_phase_3"
+    }
+  ],
+  "record_for_each_run": [
+    "hardware_profile",
+    "provider",
+    "model_and_version",
+    "dataset_version",
+    "prompt_version_and_hash",
+    "config_snapshot_id",
+    "mode",
+    "context_size",
+    "network_region",
+    "raw_structured_outputs_or_redacted_reference",
+    "final_state_diff",
+    "latency_by_node_and_logical_role",
+    "physical_call_count_and_fusion",
+    "token_usage_and_cost",
+    "human_rubric_scores"
+  ],
+  "hard_gates": {
+    "branch_sibling_memory_leak": 0,
+    "unauthorized_knowledge_leak": 0,
+    "replay_mismatch": 0,
+    "double_commit": 0,
+    "partial_canonical_commit": 0,
+    "untyped_authoritative_mutation": 0
+  },
+  "soft_gates": {
+    "structured_output_failure_after_repair_or_fallback_percent_max": 1,
+    "guard_unrecovered_malformed_proposal_percent_max": 2,
+    "guard_repair_rate_percent_max": 15,
+    "critical_memory_recall_at_5_min": 0.95,
+    "overall_memory_recall_at_5_min": 0.85,
+    "targeted_evidence_recall_at_5_min": 1.0,
+    "agency_independence_resistance_pacing_average_min": 4,
+    "fast_cloud_p95_time_to_first_draft_seconds_max": 5,
+    "fast_cloud_p95_final_turn_seconds_max": 15,
+    "quality_cloud_p95_final_turn_seconds_max": 45,
+    "fast_cloud_average_cost_per_turn_usd_max": 0.03,
+    "quality_cloud_average_cost_per_turn_usd_max": 0.1
+  },
+  "measurement_policy": [
+    "Run deterministic/property hard gates on every reference matrix entry.",
+    "Run provider-real tests only when explicitly opted in.",
+    "Do not compare latency or cost across different dataset/context/prompt versions without labeling the change.",
+    "Any gate regression over 10 percent before M6 requires an ADR or waiver with evidence."
+  ]
+}

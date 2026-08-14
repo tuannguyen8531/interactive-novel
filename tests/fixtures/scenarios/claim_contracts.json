@@ -1,0 +1,120 @@
+{
+  "schema_version": "1.0",
+  "fixture_version": "phase-0-2026-08-13",
+  "cases": [
+    {
+      "id": "valid-romantic-interest",
+      "proposal": {
+        "kind": "knowledge_claim",
+        "claim_type": "canon_fact",
+        "subject_id": "yuki",
+        "predicate": "romantic_interest",
+        "object_id": "akira",
+        "polarity": "positive",
+        "qualifiers": {"context": "school_festival"},
+        "valid_time": {"start": 120, "end": null},
+        "branch_scope": "branch-root",
+        "schema_version": "claim-1"
+      },
+      "expected": {"authoritative": true, "fingerprint_stable": true}
+    },
+    {
+      "id": "same-fact-different-key-order",
+      "proposals": [
+        {
+          "subject_id": "yuki",
+          "predicate": "public_fact",
+          "typed_value": {"preference": "tea", "strength": 0.7},
+          "polarity": "positive",
+          "qualifiers": {"context": "clubroom", "location": "school"},
+          "valid_time": {"start": 10, "end": 20},
+          "branch_scope": "root"
+        },
+        {
+          "branch_scope": "root",
+          "valid_time": {"end": 20, "start": 10},
+          "qualifiers": {"location": "school", "context": "clubroom"},
+          "polarity": "positive",
+          "typed_value": {"strength": 0.7, "preference": "tea"},
+          "predicate": "public_fact",
+          "subject_id": "yuki"
+        }
+      ],
+      "expected": {"same_normalized_fingerprint": true}
+    },
+    {
+      "id": "unknown-predicate",
+      "proposal": {
+        "kind": "knowledge_claim",
+        "subject_id": "yuki",
+        "predicate": "probably_has_a_crush",
+        "object_id": "akira",
+        "polarity": "positive"
+      },
+      "expected": {
+        "authoritative": false,
+        "reason_code": "predicate_not_registered"
+      }
+    },
+    {
+      "id": "free-prose-fact",
+      "proposal": {
+        "kind": "narrative_text",
+        "text": "Yuki secretly loves Akira and has decided to confess tomorrow."
+      },
+      "expected": {
+        "authoritative": false,
+        "reason_code": "prose_has_no_mutation_authority"
+      }
+    },
+    {
+      "id": "typed-relationship-operation",
+      "proposal": {
+        "kind": "state_operation",
+        "operation_type": "relationship_delta",
+        "source_id": "yuki",
+        "target_id": "akira",
+        "dimension": "trust",
+        "proposed_delta": -0.2,
+        "cause_event_id": "event-betrayal-1",
+        "reason": "Yuki saw Akira break a promise"
+      },
+      "expected": {
+        "authoritative_after_guard": true,
+        "requires_policy_validation": true,
+        "requires_before_after_provenance": true
+      }
+    },
+    {
+      "id": "knowledge-without-owner",
+      "proposal": {
+        "kind": "observation",
+        "observer_id": "bob",
+        "observed_claim_id": "secret-letter-1",
+        "source_event_id": "alice-hid-letter",
+        "method": "saw",
+        "branch_scope": "root",
+        "observer_witnessed_event": false
+      },
+      "expected": {
+        "authoritative": false,
+        "reason_code": "observation_owner_or_source_invalid"
+      }
+    },
+    {
+      "id": "future-evidence",
+      "proposal": {
+        "kind": "belief",
+        "believer_id": "bob",
+        "claim_id": "event-42-future-claim",
+        "evidence": [{"event_id": "event-42-future", "world_time": 200}],
+        "belief_world_time": 100,
+        "branch_scope": "root"
+      },
+      "expected": {
+        "authoritative": false,
+        "reason_code": "future_evidence_not_authorized"
+      }
+    }
+  ]
+}
