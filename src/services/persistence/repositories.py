@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.contracts.persistence import PlaythroughRecord, WorldRecord
@@ -106,6 +106,16 @@ class SqlAlchemyPlaythroughRepository:
         result = await self._session.execute(select(PlaythroughModel).where(PlaythroughModel.id == playthrough_id))
         model = result.scalar_one_or_none()
         return None if model is None else _playthrough_record(model)
+
+    async def set_root_branch(self, playthrough_id: str, branch_id: str) -> None:
+        result = await self._session.execute(
+            update(PlaythroughModel)
+            .where(PlaythroughModel.id == playthrough_id)
+            .values(root_branch_id=branch_id, updated_at=datetime.now(UTC))
+        )
+        if getattr(result, "rowcount", None) != 1:
+            raise ValueError(f"Playthrough {playthrough_id} does not exist.")
+        await self._session.flush()
 
 
 __all__ = ["SqlAlchemyPlaythroughRepository", "SqlAlchemyWorldRepository"]

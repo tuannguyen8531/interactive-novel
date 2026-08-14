@@ -42,9 +42,25 @@ class ResourceConflictError(ApplicationError):
     status_code = 409
 
 
+class StaleBranchRevisionError(ResourceConflictError):
+    """The proposed turn was based on a branch head that has moved."""
+
+    code = "stale_branch_revision"
+    public_message = "The branch head has changed; this turn must be retried."
+
+
+class IdempotencyConflictError(ResourceConflictError):
+    """An idempotency key was reused for a different canonical command."""
+
+    code = "idempotency_conflict"
+    public_message = "The idempotency key is already associated with another turn."
+
+
 __all__ = [
     "ApplicationError",
     "ApplicationValidationError",
+    "IdempotencyConflictError",
     "ResourceConflictError",
     "ResourceNotFoundError",
+    "StaleBranchRevisionError",
 ]

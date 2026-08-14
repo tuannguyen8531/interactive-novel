@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.application.ports.persistence import PlaythroughRepository, UowFactory, WorldRepository
+from src.application.ports.persistence import CanonicalRepository, PlaythroughRepository, UowFactory, WorldRepository
 
+from .canonical import SqlAlchemyCanonicalRepository
 from .database import Database
 from .repositories import SqlAlchemyPlaythroughRepository, SqlAlchemyWorldRepository
 
@@ -18,6 +19,7 @@ class SqlAlchemyUnitOfWork:
         self._completed = False
         self.worlds: WorldRepository = SqlAlchemyWorldRepository(self._session)
         self.playthroughs: PlaythroughRepository = SqlAlchemyPlaythroughRepository(self._session)
+        self.canonical: CanonicalRepository = SqlAlchemyCanonicalRepository(self._session)
 
     async def __aenter__(self) -> SqlAlchemyUnitOfWork:
         await self._session.begin()
