@@ -1,0 +1,224 @@
+{
+  "world_builder": {
+    "schema_version": "world-seed-1",
+    "role": "world_builder",
+    "run_id": "world-run-1",
+    "prompt_version": "1.0.0",
+    "physical_call_id": "call-world-1",
+    "title": "The Quiet Courtyard",
+    "premise": "A school club prepares for its first cultural festival.",
+    "genre": "school_romance",
+    "tone": "gentle",
+    "content_boundaries": {
+      "rating": "teen_14_plus",
+      "topic_boundaries": {"adult_explicit": "excluded"},
+      "violence_ceiling": "non_graphic",
+      "adult_explicit_opt_in": false
+    },
+    "locations": [
+      {"location_id": "library", "name": "Library", "description": "A quiet room near the courtyard."},
+      {"location_id": "courtyard", "name": "Courtyard", "description": "A sunny meeting place."}
+    ],
+    "player_character": {
+      "character_id": "player",
+      "name": "Mina",
+      "aliases": [],
+      "age": 17,
+      "role": "student",
+      "background": "A new member of the culture club.",
+      "voice": "curious and direct",
+      "traits": ["observant"],
+      "values": ["honesty"],
+      "goal_ids": [],
+      "private_claim_ids": []
+    },
+    "npc_profiles": [
+      {
+        "character_id": "alice",
+        "name": "Alice",
+        "aliases": ["Aki"],
+        "age": 17,
+        "role": "club president",
+        "background": "She keeps the festival plans organized.",
+        "voice": "warm but precise",
+        "traits": ["diligent", "reserved"],
+        "values": ["reliability"],
+        "goal_ids": ["goal_alice"],
+        "private_claim_ids": []
+      },
+      {
+        "character_id": "bob",
+        "name": "Bob",
+        "aliases": [],
+        "age": 17,
+        "role": "club treasurer",
+        "background": "He is practical and notices small inconsistencies.",
+        "voice": "dry and thoughtful",
+        "traits": ["practical"],
+        "values": ["fairness"],
+        "goal_ids": [],
+        "private_claim_ids": []
+      }
+    ],
+    "initial_claims": [
+      {
+        "schema_version": "knowledge-claim-proposal-1",
+        "proposal_id": "claim-alice-tea",
+        "source_role": "world_builder",
+        "source_run_id": "world-run-1",
+        "claim_type": "knowledge_claim",
+        "subject_id": "alice",
+        "predicate": "public_fact",
+        "typed_value": "prefers tea",
+        "polarity": "positive",
+        "qualifiers": {},
+        "valid_time": {"start": 0},
+        "branch_scope": "public",
+        "provenance": {
+          "source_type": "world_seed",
+          "source_id": "world-run-1",
+          "run_id": "world-run-1",
+          "prompt_version": "1.0.0",
+          "model_metadata": {}
+        }
+      }
+    ],
+    "initial_relationships": [
+      {"source_id": "alice", "target_id": "player", "values": {"affection": 0.2, "trust": 0.3}}
+    ],
+    "initial_beliefs": [],
+    "goals": [
+      {"goal_id": "goal_alice", "owner_id": "alice", "description": "Finish the festival plan.", "priority": 0.8}
+    ],
+    "tensions": [],
+    "threads": [
+      {
+        "thread_id": "thread_club",
+        "premise": "The culture club must finish its festival display.",
+        "participant_ids": ["player", "alice"],
+        "stakes": "The display may be cancelled."
+      }
+    ],
+    "opening_scene": {
+      "schema_version": "scene-spec-1",
+      "scene_id": "opening-scene",
+      "source_role": "world_builder",
+      "source_run_id": "world-run-1",
+      "guard_approved": false,
+      "world_time": 0,
+      "tags": ["romantic_affection"],
+      "participants": {"player": 17, "alice": 17},
+      "consent": {},
+      "approved_beats": ["meet-alice"],
+      "visible_actions": ["enter library"],
+      "allowed_dialogue_intents": ["greeting"],
+      "pov": "second_person",
+      "tone": "gentle",
+      "continuity_details": [],
+      "allowed_claims": [],
+      "forbidden_claims": [],
+      "length_target": 300
+    }
+  },
+  "planner": {
+    "schema_version": "turn-plan-1",
+    "role": "planner",
+    "run_id": "turn-run-1",
+    "prompt_version": "1.0.0",
+    "physical_call_id": "call-plan-1",
+    "interpreted_player_intent": "Offer to help Alice with the festival display.",
+    "candidate_beats": [
+      {"beat_id": "beat-offer-help", "description": "The player offers practical help.", "actor_ids": ["player", "alice"], "location_id": "library", "required": true}
+    ],
+    "intended_focus": ["alice", "club festival"],
+    "thread_directives": [{"thread_id": "thread_club", "action": "advance", "reason": "The task receives a concrete next step."}],
+    "characters_involved": ["player", "alice"],
+    "stakes": ["The display deadline is close."],
+    "required_checks": [{"check_id": "check-location", "check_type": "location", "subject_id": "alice", "rationale": "Alice must be able to meet the player."}],
+    "possible_outcomes": [{"outcome_id": "outcome-cooperate", "description": "Alice accepts a bounded offer of help.", "likelihood": 0.7, "risk_flags": []}],
+    "pacing_note": "Advance the club thread without resolving the relationship.",
+    "safety_constraints": ["Keep the scene teen-safe."]
+  },
+  "simulator": {
+    "schema_version": "simulation-result-1",
+    "role": "simulator",
+    "run_id": "turn-run-1",
+    "prompt_version": "1.0.0",
+    "physical_call_id": "call-sim-1",
+    "npc_reactions": [{"character_id": "alice", "immediate_reaction": "She considers the offer.", "agency_goal": "Finish the display.", "resistance_or_agreement": "She agrees to a small task.", "confidence": 0.8}],
+    "proposed_outcome": "Alice assigns the player a manageable preparation task.",
+    "claim_proposals": [
+      {
+        "schema_version": "knowledge-claim-proposal-1",
+        "proposal_id": "claim-alice-library",
+        "source_role": "simulator",
+        "source_run_id": "turn-run-1",
+        "claim_type": "knowledge_claim",
+        "subject_id": "alice",
+        "predicate": "located_at",
+        "object_id": "library",
+        "polarity": "positive",
+        "qualifiers": {},
+        "valid_time": {"start": 0},
+        "branch_scope": "root",
+        "provenance": {
+          "source_type": "simulation",
+          "source_id": "turn-run-1",
+          "run_id": "turn-run-1",
+          "prompt_version": "1.0.0",
+          "model_metadata": {}
+        }
+      }
+    ],
+    "state_patch": {
+      "schema_version": "state-patch-proposal-1",
+      "patch_id": "patch-1",
+      "branch_id": "root",
+      "base_world_time": 0,
+      "operations": [{"operation_type": "set_character_location", "character_id": "alice", "location_id": "library"}],
+      "provenance": {
+        "source_type": "simulation",
+        "source_id": "turn-run-1",
+        "run_id": "turn-run-1",
+        "prompt_version": "1.0.0",
+        "model_metadata": {}
+      }
+    },
+    "knowledge_requirements": [{"schema_version": "knowledge-requirement-1", "requirement_id": "req-alice-location", "actor_id": "player", "subject_id": "alice", "predicate": "located_at", "object_id": "library", "purpose": "authorize the meeting", "branch_scope": "root", "world_time": 0, "minimum_confidence": 0.5}],
+    "uncertainties": [{"subject_id": "alice", "statement": "Alice may be distracted by the deadline.", "confidence": 0.6}]
+  },
+  "context_validator": {
+    "schema_version": "consistency-report-1",
+    "role": "context_validator",
+    "run_id": "turn-run-1",
+    "prompt_version": "1.0.0",
+    "physical_call_id": "call-validate-1",
+    "status": "pass",
+    "violations": [],
+    "evidence_manifest_ids": ["manifest-1"],
+    "recommended_corrections": []
+  },
+  "writer": {
+    "schema_version": "narrative-draft-1",
+    "role": "writer",
+    "run_id": "turn-run-1",
+    "prompt_version": "1.0.0",
+    "physical_call_id": "call-write-1",
+    "scene_id": "scene-1",
+    "narrative_text": "Alice looked up from the festival sketches and offered you a stack of colored paper.",
+    "paragraph_mappings": [{"paragraph_index": 0, "beat_id": "beat-offer-help"}],
+    "disclosed_claim_ids": ["claim-alice-library"]
+  },
+  "critic": {
+    "schema_version": "critique-result-1",
+    "role": "critic",
+    "run_id": "turn-run-1",
+    "prompt_version": "1.0.0",
+    "physical_call_id": "call-critic-1",
+    "scene_id": "scene-1",
+    "decision": "accept",
+    "issues": [],
+    "revision_instructions": [],
+    "checked_scene_spec_version": "scene-spec-1"
+  }
+}

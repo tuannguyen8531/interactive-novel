@@ -1,0 +1,33 @@
+{
+  "validation_query": {
+    "schema_version": "validation-query-1",
+    "query_id": "query-1",
+    "requirement_id": "req-alice-location",
+    "actor_id": "player",
+    "query_type": "authorization",
+    "question": "Can the player know that Alice is in the library?",
+    "branch_scope": "root",
+    "world_time": 0,
+    "target_claim_ids": ["claim-alice-library"]
+  },
+  "targeted_evidence_manifest": {
+    "schema_version": "targeted-evidence-manifest-1",
+    "query_id": "query-1",
+    "branch_scope": "root",
+    "world_time": 0,
+    "evidence": [
+      {
+        "evidence_id": "evidence-1",
+        "claim_id": "claim-alice-library",
+        "source_event_id": "event-1",
+        "owner_id": "public",
+        "branch_scope": "root",
+        "world_time": 0,
+        "score": 0.95,
+        "match_reason": "exact claim fingerprint"
+      }
+    ],
+    "insufficient_evidence": false,
+    "retrieval_trace_id": "retrieval-1"
+  }
+}

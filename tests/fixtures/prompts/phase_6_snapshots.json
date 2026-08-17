@@ -1,0 +1,38 @@
+{
+  "world_builder": {
+    "semantic_version": "1.0.0",
+    "input_contract": "role-input-1",
+    "output_schema_version": "world-seed-1",
+    "template_hash": "7cf96de3ecabd5f931aabf929b676b334bf2adcfd55374eb3a44b184cd6640f5"
+  },
+  "planner": {
+    "semantic_version": "1.0.0",
+    "input_contract": "role-input-1",
+    "output_schema_version": "turn-plan-1",
+    "template_hash": "447376ef3453e6ff2c097257f239254ed4e0f556971f8c4b6ecbb84e5c6855a0"
+  },
+  "simulator": {
+    "semantic_version": "1.0.0",
+    "input_contract": "role-input-1",
+    "output_schema_version": "simulation-result-1",
+    "template_hash": "2e5f72615eb9b41753ee86247001dd12f46407a5b0442496d191b0e9eb187db8"
+  },
+  "context_validator": {
+    "semantic_version": "1.0.0",
+    "input_contract": "role-input-1",
+    "output_schema_version": "consistency-report-1",
+    "template_hash": "249c4bd6796de931bb296bfe501b3b9bb04fa2fab267a5753fb578217d8d778b"
+  },
+  "writer": {
+    "semantic_version": "1.0.0",
+    "input_contract": "role-input-1",
+    "output_schema_version": "narrative-draft-1",
+    "template_hash": "cb6bb6219820a4581b9f08a993d437c31491232f8be87afe97e4ff5bb2101b7e"
+  },
+  "critic": {
+    "semantic_version": "1.0.0",
+    "input_contract": "role-input-1",
+    "output_schema_version": "critique-result-1",
+    "template_hash": "a8c1ad8ed2e51631435a5ccb125137db537e5b9c93e61d5347e6e30399acd2f1"
+  }
+}

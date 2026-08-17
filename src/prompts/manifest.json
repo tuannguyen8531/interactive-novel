@@ -1,0 +1,50 @@
+{
+  "world_builder": {
+    "template": "world_builder.md",
+    "semantic_version": "1.0.0",
+    "input_contract": "role-input-1",
+    "output_schema_version": "world-seed-1",
+    "required_variables": ["input_json"],
+    "changelog": "Initial school-romance world draft contract."
+  },
+  "planner": {
+    "template": "planner.md",
+    "semantic_version": "1.0.0",
+    "input_contract": "role-input-1",
+    "output_schema_version": "turn-plan-1",
+    "required_variables": ["input_json"],
+    "changelog": "Initial turn planning contract."
+  },
+  "simulator": {
+    "template": "simulator.md",
+    "semantic_version": "1.0.0",
+    "input_contract": "role-input-1",
+    "output_schema_version": "simulation-result-1",
+    "required_variables": ["input_json"],
+    "changelog": "Initial typed simulation proposal contract."
+  },
+  "context_validator": {
+    "template": "context_validator.md",
+    "semantic_version": "1.0.0",
+    "input_contract": "role-input-1",
+    "output_schema_version": "consistency-report-1",
+    "required_variables": ["input_json"],
+    "changelog": "Initial evidence-aware consistency contract."
+  },
+  "writer": {
+    "template": "writer.md",
+    "semantic_version": "1.0.0",
+    "input_contract": "role-input-1",
+    "output_schema_version": "narrative-draft-1",
+    "required_variables": ["input_json"],
+    "changelog": "Initial SceneSpec-bounded narrative draft contract."
+  },
+  "critic": {
+    "template": "critic.md",
+    "semantic_version": "1.0.0",
+    "input_contract": "role-input-1",
+    "output_schema_version": "critique-result-1",
+    "required_variables": ["input_json"],
+    "changelog": "Initial bounded writer-critic revision contract."
+  }
+}
