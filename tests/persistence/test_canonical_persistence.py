@@ -26,10 +26,12 @@ from src.application.contracts.persistence import (
     SnapshotRecord,
     utc_now,
 )
+from src.application.contracts.retrieval import RetrievalScope
 from src.application.errors import IdempotencyConflictError, StaleBranchRevisionError
 from src.application.ports.persistence import UowFactory
 from src.application.services.branches import BranchApplicationService
 from src.application.services.canonical_turns import CanonicalTurnApplicationService
+from src.application.services.game_states import GameStateApplicationService
 from src.application.services.playthroughs import PlaythroughApplicationService
 from src.application.services.replay import ReplayApplicationService
 from src.application.services.worlds import WorldApplicationService
@@ -534,8 +536,28 @@ async def test_fork_regenerate_and_visible_history_do_not_mix_branches(database:
         assert {event.event_id for event in root_events} == {"event-root", "event-root-future"}
         assert {event.event_id for event in child_events} == {"event-root", "event-child"}
         assert {event.event_id for event in sibling_events} == {"event-root", "event-sibling"}
+        child_candidates = await uow.retrieval.list_candidates(
+            RetrievalScope(
+                playthrough_id=playthrough_id,
+                branch_id=child.id,
+                branch_ancestry=(root.id, child.id),
+                world_time=100,
+            )
+        )
+        assert {item.source_id for item in child_candidates if item.kind == "event"} == {
+            "event-root",
+            "event-child",
+        }
         assert [item.id for item in await uow.canonical.get_branch_ancestry(child.id)] == [root.id, child.id]
         assert (await uow.canonical.get_branch(root.id)).head_revision == 2  # type: ignore[union-attr]
+
+    child_state = await GameStateApplicationService(uow_factory).load(
+        playthrough_id=playthrough_id,
+        branch_id=child.id,
+    )
+    assert child_state.branch_id == child.id
+    assert child_state.branch_ancestry == (root.id, child.id)
+    assert child_state.world_time == 2
 
 
 async def test_replay_snapshot_fallback_and_derived_failure_leave_canon_intact(database: Database) -> None:

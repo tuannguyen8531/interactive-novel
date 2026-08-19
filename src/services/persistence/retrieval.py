@@ -47,6 +47,7 @@ from .models import (
     ObservationModel,
     RetrievalTraceModel,
 )
+from .visibility import resolve_visible_branch_scope
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -186,8 +187,11 @@ class SqlAlchemyRetrievalRepository(SqlAlchemyEmbeddingStore):
         await self.trace_store.save(trace)
 
     async def list_candidates(self, scope: RetrievalScope) -> tuple[MemoryCandidate, ...]:
-        branch_ids = tuple(scope.allowed_branch_ids)
-        if not branch_ids:
+        visible = await resolve_visible_branch_scope(self._session, scope.branch_id)
+        requested_branch_ids = set(scope.allowed_branch_ids)
+        branch_ids = tuple(branch_id for branch_id in visible.branch_ids if branch_id in requested_branch_ids)
+        turn_ids = visible.turn_ids
+        if not branch_ids or not turn_ids:
             return ()
 
         events = list(
@@ -196,6 +200,7 @@ class SqlAlchemyRetrievalRepository(SqlAlchemyEmbeddingStore):
                     select(EventModel).where(
                         EventModel.playthrough_id == scope.playthrough_id,
                         EventModel.branch_id.in_(branch_ids),
+                        EventModel.turn_id.in_(turn_ids),
                         EventModel.world_time <= scope.world_time,
                     )
                 )
@@ -249,6 +254,7 @@ class SqlAlchemyRetrievalRepository(SqlAlchemyEmbeddingStore):
                     select(KnowledgeClaimModel).where(
                         KnowledgeClaimModel.playthrough_id == scope.playthrough_id,
                         KnowledgeClaimModel.branch_id.in_(branch_ids),
+                        KnowledgeClaimModel.turn_id.in_(turn_ids),
                         KnowledgeClaimModel.valid_time_start <= scope.world_time,
                         (KnowledgeClaimModel.valid_time_end.is_(None) | (KnowledgeClaimModel.valid_time_end >= scope.world_time)),
                     )
@@ -286,6 +292,7 @@ class SqlAlchemyRetrievalRepository(SqlAlchemyEmbeddingStore):
                     select(ObservationModel).where(
                         ObservationModel.playthrough_id == scope.playthrough_id,
                         ObservationModel.branch_id.in_(branch_ids),
+                        ObservationModel.turn_id.in_(turn_ids),
                         ObservationModel.world_time <= scope.world_time,
                     )
                 )
@@ -317,6 +324,7 @@ class SqlAlchemyRetrievalRepository(SqlAlchemyEmbeddingStore):
                     select(BeliefModel).where(
                         BeliefModel.playthrough_id == scope.playthrough_id,
                         BeliefModel.branch_id.in_(branch_ids),
+                        BeliefModel.turn_id.in_(turn_ids),
                         BeliefModel.world_time <= scope.world_time,
                     )
                 )
@@ -348,6 +356,7 @@ class SqlAlchemyRetrievalRepository(SqlAlchemyEmbeddingStore):
                     select(NarrativeThreadModel).where(
                         NarrativeThreadModel.playthrough_id == scope.playthrough_id,
                         NarrativeThreadModel.branch_id.in_(branch_ids),
+                        NarrativeThreadModel.turn_id.in_(turn_ids),
                     )
                 )
             ).all()
@@ -374,6 +383,7 @@ class SqlAlchemyRetrievalRepository(SqlAlchemyEmbeddingStore):
                     select(NarrativeHookModel).where(
                         NarrativeHookModel.playthrough_id == scope.playthrough_id,
                         NarrativeHookModel.branch_id.in_(branch_ids),
+                        NarrativeHookModel.turn_id.in_(turn_ids),
                     )
                 )
             ).all()
@@ -397,6 +407,7 @@ class SqlAlchemyRetrievalRepository(SqlAlchemyEmbeddingStore):
                     select(DerivedArtifactModel).where(
                         DerivedArtifactModel.playthrough_id == scope.playthrough_id,
                         DerivedArtifactModel.branch_id.in_(branch_ids),
+                        DerivedArtifactModel.source_turn_id.in_(turn_ids),
                         DerivedArtifactModel.artifact_type == "episodic_summary",
                         DerivedArtifactModel.status == "fresh",
                     )

@@ -8,12 +8,20 @@ from src.application.contracts.queries import CharacterView, MemoryView, Relatio
 from src.application.errors import ResourceNotFoundError
 from src.application.ports.persistence import UnitOfWork, UowFactory
 
+from .game_states import GameStateApplicationService
+
 
 class CharacterQueryApplicationService:
     """Expose read-only projections without returning persistence models."""
 
-    def __init__(self, uow_factory: UowFactory) -> None:
+    def __init__(
+        self,
+        uow_factory: UowFactory,
+        *,
+        game_states: GameStateApplicationService | None = None,
+    ) -> None:
         self._uow_factory = uow_factory
+        self._game_states = game_states
 
     async def list_characters(
         self,
@@ -89,6 +97,21 @@ class CharacterQueryApplicationService:
         branch_id: str,
         character_id: str | None = None,
     ) -> tuple[RelationshipView, ...]:
+        if self._game_states is not None:
+            state = await self._game_states.load(playthrough_id=playthrough_id, branch_id=branch_id)
+            records = (
+                RelationshipView(
+                    relationship_id=f"relationship:{source_id}:{target_id}",
+                    playthrough_id=playthrough_id,
+                    branch_id=branch_id,
+                    source_id=source_id,
+                    target_id=target_id,
+                    values=dict(vector.values),
+                )
+                for (source_id, target_id), vector in state.relationships.items()
+                if character_id is None or character_id in {source_id, target_id}
+            )
+            return tuple(sorted(records, key=lambda item: (item.source_id, item.target_id)))
         async with self._uow_factory() as uow:
             await self._required_branch(uow, playthrough_id=playthrough_id, branch_id=branch_id)
             return tuple(

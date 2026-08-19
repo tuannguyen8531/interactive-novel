@@ -277,6 +277,11 @@ class ProviderRouter(ProviderGateway):
     def config_snapshot(self) -> dict[str, object]:
         return self.config.snapshot().as_dict()
 
+    async def reconfigure(self, config: ProviderRoutingConfig) -> None:
+        """Atomically replace routing metadata after closing cached adapters."""
+        await self.aclose()
+        self.config = config
+
     async def aclose(self) -> None:
         for provider in self._providers.values():
             await provider.aclose()

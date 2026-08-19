@@ -11,6 +11,7 @@ from src.application.contracts.providers import (
     ProviderCapability,
     ProviderRequest,
     ProviderResponse,
+    ProviderRoutingConfig,
     StreamChunk,
     StructuredResponse,
     StructuredSchema,
@@ -72,6 +73,8 @@ class ProviderGateway(Protocol):
     ) -> EmbeddingResponse: ...
 
     async def check_connectivity(self) -> tuple[ConnectivityResult, ...]: ...
+
+    async def reconfigure(self, config: ProviderRoutingConfig) -> None: ...
 
     def config_snapshot(self) -> dict[str, object]: ...
 

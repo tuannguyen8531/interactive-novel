@@ -2,9 +2,10 @@
 
 from .branches import BranchApplicationService
 from .canonical_turns import CanonicalTurnApplicationService
-from .derived import DerivedArtifactApplicationService, DerivedJobApplicationService
+from .derived import DerivedArtifactApplicationService, DerivedJobApplicationService, DerivedJobWorker
 from .events import InMemoryJobEventBroker
 from .export import PlaythroughExportApplicationService
+from .game_states import GameStateApplicationService
 from .jobs import InMemoryJobStore, UowJobStore
 from .playthroughs import PlaythroughApplicationService
 from .provider_settings import ProviderSettingsApplicationService
@@ -19,6 +20,8 @@ __all__ = [
     "CanonicalTurnApplicationService",
     "DerivedArtifactApplicationService",
     "DerivedJobApplicationService",
+    "DerivedJobWorker",
+    "GameStateApplicationService",
     "CharacterQueryApplicationService",
     "InMemoryJobEventBroker",
     "InMemoryJobStore",

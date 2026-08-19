@@ -13,6 +13,7 @@ from src.application.services.events import InMemoryJobEventBroker
 from src.application.services.jobs import InMemoryJobStore
 from src.application.services.turns import TurnApplicationService
 from src.config import Settings
+from src.domain.state import GameState
 
 
 class FakePlaythroughs:
@@ -62,6 +63,15 @@ class FakeRunner:
         return None
 
 
+class FakeGameStates:
+    async def load(self, *, playthrough_id: str, branch_id: str) -> GameState:
+        return GameState.empty(
+            world_id="world-1",
+            playthrough_id=playthrough_id,
+            branch_id=branch_id,
+        )
+
+
 def _services() -> tuple[SimpleNamespace, TurnApplicationService]:
     playthrough = PlaythroughRecord.new(world_id="world-1")
     branch = BranchRecord.root(playthrough_id=playthrough.id, branch_id="root")
@@ -80,6 +90,7 @@ def _services() -> tuple[SimpleNamespace, TurnApplicationService]:
     return (
         SimpleNamespace(
             playthroughs=FakePlaythroughs(playthrough),
+            game_states=FakeGameStates(),
             turns=turns,
             events=events,
         ),

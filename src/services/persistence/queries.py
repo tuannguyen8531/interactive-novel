@@ -13,12 +13,12 @@ from src.application.contracts.queries import CharacterView, MemoryView, Relatio
 
 from .models import (
     BeliefModel,
-    BranchModel,
     CharacterModel,
     CharacterStateModel,
     ObservationModel,
     RelationshipModel,
 )
+from .visibility import resolve_visible_branch_scope
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -104,13 +104,16 @@ class SqlAlchemyInspectionRepository:
     ) -> list[MemoryView]:
         if limit <= 0:
             raise ValueError("Memory limit must be positive.")
-        branch_ids = await self._branch_ancestry_ids(branch_id)
+        scope = await resolve_visible_branch_scope(self._session, branch_id)
+        if not scope.turn_ids:
+            return []
         observations = list(
             (
                 await self._session.scalars(
                     select(ObservationModel).where(
                         ObservationModel.playthrough_id == playthrough_id,
-                        ObservationModel.branch_id.in_(branch_ids),
+                        ObservationModel.branch_id.in_(scope.branch_ids),
+                        ObservationModel.turn_id.in_(scope.turn_ids),
                         ObservationModel.observer_id == character_id,
                     )
                 )
@@ -121,7 +124,8 @@ class SqlAlchemyInspectionRepository:
                 await self._session.scalars(
                     select(BeliefModel).where(
                         BeliefModel.playthrough_id == playthrough_id,
-                        BeliefModel.branch_id.in_(branch_ids),
+                        BeliefModel.branch_id.in_(scope.branch_ids),
+                        BeliefModel.turn_id.in_(scope.turn_ids),
                         BeliefModel.believer_id == character_id,
                     )
                 )
@@ -177,17 +181,17 @@ class SqlAlchemyInspectionRepository:
         branch_id: str,
         character_id: str | None = None,
     ) -> list[RelationshipView]:
-        branch_ids = await self._branch_ancestry_ids(branch_id)
+        scope = await resolve_visible_branch_scope(self._session, branch_id)
         statement = select(RelationshipModel).where(
             RelationshipModel.playthrough_id == playthrough_id,
-            RelationshipModel.branch_id.in_(branch_ids),
+            RelationshipModel.branch_id.in_(scope.branch_ids),
         )
         if character_id is not None:
             statement = statement.where(
                 or_(RelationshipModel.source_id == character_id, RelationshipModel.target_id == character_id)
             )
         models = list((await self._session.scalars(statement)).all())
-        branch_rank = {value: index for index, value in enumerate(branch_ids)}
+        branch_rank = {value: index for index, value in enumerate(scope.branch_ids)}
         latest: dict[tuple[str, str], RelationshipModel] = {}
         for model in models:
             edge = (model.source_id, model.target_id)
@@ -219,41 +223,28 @@ class SqlAlchemyInspectionRepository:
         ids = tuple(character_ids)
         if not ids or branch_id is None:
             return {}
-        branch_ids = await self._branch_ancestry_ids(branch_id)
+        scope = await resolve_visible_branch_scope(self._session, branch_id)
+        if not scope.turn_ids:
+            return {}
         models = list(
             (
                 await self._session.scalars(
                     select(CharacterStateModel).where(
                         CharacterStateModel.character_id.in_(ids),
                         CharacterStateModel.playthrough_id == playthrough_id,
-                        CharacterStateModel.branch_id.in_(branch_ids),
+                        CharacterStateModel.branch_id.in_(scope.branch_ids),
+                        CharacterStateModel.last_active_turn_id.in_(scope.turn_ids),
                     )
                 )
             ).all()
         )
-        branch_rank = {value: index for index, value in enumerate(branch_ids)}
+        branch_rank = {value: index for index, value in enumerate(scope.branch_ids)}
         latest: dict[str, CharacterStateModel] = {}
         for model in models:
             previous = latest.get(model.character_id)
             if previous is None or branch_rank[model.branch_id] >= branch_rank[previous.branch_id]:
                 latest[model.character_id] = model
         return latest
-
-    async def _branch_ancestry_ids(self, branch_id: str) -> tuple[str, ...]:
-        records: list[str] = []
-        seen: set[str] = set()
-        current_id: str | None = branch_id
-        while current_id is not None:
-            if current_id in seen:
-                raise ValueError(f"Branch ancestry cycle detected at {current_id}.")
-            seen.add(current_id)
-            model = await self._session.scalar(select(BranchModel).where(BranchModel.id == current_id))
-            if model is None:
-                raise ValueError(f"Branch {current_id} does not exist.")
-            records.append(model.id)
-            current_id = model.parent_branch_id
-        records.reverse()
-        return tuple(records)
 
 
 def _numeric_values(values: dict[str, Any]) -> dict[str, float]:

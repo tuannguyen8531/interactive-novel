@@ -16,6 +16,7 @@ class ReplayApplicationService:
         self._engine = engine or DomainEngine()
 
     async def replay_branch(self, *, branch_id: str, initial_state: GameState) -> GameState:
+        target_branch_id = initial_state.branch_id
         async with self._uow_factory() as uow:
             snapshot = await uow.canonical.load_latest_snapshot(branch_id)
             after_revision = 0
@@ -25,7 +26,17 @@ class ReplayApplicationService:
                 after_revision = snapshot.source_revision
             payloads = await uow.canonical.list_approved_patches(branch_id, after_revision=after_revision)
         for _, payload in payloads:
-            state = self._engine.apply(state, patch_from_payload(payload)).after
+            # Bootstrap/import records can be canonical without using the typed
+            # state-patch codec. Their state is supplied by the initial seed.
+            if not isinstance(payload.get("operations"), list) or not payload.get("patch_id"):
+                continue
+            patch = patch_from_payload(payload)
+            # A child history contains immutable patches authored on its
+            # ancestors. Validate each patch against its original branch while
+            # preserving the target branch's full ancestry visibility.
+            state.branch_id = patch.branch_id
+            state = self._engine.apply(state, patch).after
+        state.branch_id = target_branch_id
         return state
 
 

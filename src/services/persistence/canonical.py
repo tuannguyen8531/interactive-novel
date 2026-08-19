@@ -204,6 +204,18 @@ class SqlAlchemyCanonicalRepository:
         statement = statement.order_by(TurnModel.created_at, TurnModel.id)
         return [_turn_record(model) for model in (await self._session.scalars(statement)).all()]
 
+    async def list_visible_turns(self, branch_id: str) -> list[TurnRecord]:
+        _, turn_ids = await self._visible_turn_ids(branch_id)
+        if not turn_ids:
+            return []
+        models = list(
+            (
+                await self._session.scalars(select(TurnModel).where(TurnModel.id.in_(turn_ids), TurnModel.status == "completed"))
+            ).all()
+        )
+        by_id = {model.id: model for model in models}
+        return [_turn_record(by_id[turn_id]) for turn_id in reversed(turn_ids) if turn_id in by_id]
+
     async def get_branch_ancestry(self, branch_id: str) -> list[BranchRecord]:
         records: list[BranchRecord] = []
         seen: set[str] = set()

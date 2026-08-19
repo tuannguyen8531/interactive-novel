@@ -23,6 +23,7 @@ from src.application.contracts.persistence import (
 )
 from src.application.contracts.providers import (
     ConnectivityResult,
+    ExecutionMode,
     LogicalRole,
     ProviderName,
     ProviderRoute,
@@ -46,6 +47,7 @@ from src.application.services.turns import TurnApplicationService
 from src.application.services.world_drafts import WorldDraftApplicationService
 from src.application.services.worlds import WorldApplicationService
 from src.domain.state import GameState
+from src.services.provider_settings import JsonProviderSettingsStore
 
 
 class Store:
@@ -473,13 +475,20 @@ async def test_turn_submit_get_cancel_and_policy_are_idempotent() -> None:
 
 
 class FakeGateway:
+    def __init__(self) -> None:
+        self.config: ProviderRoutingConfig | None = None
+
+    async def reconfigure(self, config: ProviderRoutingConfig) -> None:
+        self.config = config
+
     async def check_connectivity(self) -> tuple[ConnectivityResult, ...]:
         return (ConnectivityResult(provider="ollama", model="test", reachable=True, latency_ms=1.0),)
 
 
 async def test_provider_settings_store_secret_free_snapshot_and_connection_check() -> None:
     store = InMemoryProviderSettingsStore()
-    service = ProviderSettingsApplicationService(store, gateway=cast(ProviderGateway, FakeGateway()))
+    gateway = FakeGateway()
+    service = ProviderSettingsApplicationService(store, gateway=cast(ProviderGateway, gateway))
     config = ProviderRoutingConfig(
         targets={
             "local": ProviderTarget(
@@ -499,7 +508,44 @@ async def test_provider_settings_store_secret_free_snapshot_and_connection_check
     assert snapshot.as_dict()["targets"]["local"]["model"] == "fixture-model"
     assert saved is not None
     assert "do-not-store" not in str(saved)
+    assert gateway.config == config
     assert connectivity[0].reachable is True
+
+
+async def test_provider_settings_survive_restart_and_reconfigure_gateway(tmp_path: Path) -> None:
+    path = tmp_path / "provider-settings.json"
+    config = ProviderRoutingConfig(
+        targets={
+            "fast-local": ProviderTarget(
+                name="fast-local",
+                provider=ProviderName.OLLAMA,
+                model="small-model",
+            )
+        },
+        role_routes={LogicalRole.PLANNER: ProviderRoute("fast-local")},
+        mode=ExecutionMode.FAST,
+    )
+    first_gateway = FakeGateway()
+    await ProviderSettingsApplicationService(
+        JsonProviderSettingsStore(path),
+        gateway=cast(ProviderGateway, first_gateway),
+    ).update_provider_settings(config)
+
+    restarted_gateway = FakeGateway()
+    restored = await ProviderSettingsApplicationService(
+        JsonProviderSettingsStore(path),
+        gateway=cast(ProviderGateway, restarted_gateway),
+    ).initialize(
+        ProviderRoutingConfig(
+            targets={"default": ProviderTarget(name="default", provider=ProviderName.OLLAMA, model="default")},
+            role_routes={LogicalRole.PLANNER: ProviderRoute("default")},
+        )
+    )
+
+    assert restored.mode == ExecutionMode.FAST
+    assert restored.targets["fast-local"]["model"] == "small-model"
+    assert restarted_gateway.config is not None
+    assert restarted_gateway.config.mode == ExecutionMode.FAST
 
 
 async def test_playthrough_export_contains_canonical_records_and_is_json_safe() -> None:

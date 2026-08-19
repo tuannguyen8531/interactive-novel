@@ -15,7 +15,6 @@ from src.api.schemas import TurnSubmitRequest
 from src.api.serialization import public_json
 from src.application.contracts.turns import SubmitTurnCommand
 from src.application.errors import ResourceNotFoundError, ServiceUnavailableError
-from src.domain.state import GameState
 
 router = APIRouter(tags=["turns"])
 _services_dependency = Depends(get_services)
@@ -27,14 +26,11 @@ async def submit_turn(
     services: ApplicationContainer = _services_dependency,
     idempotency_header: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
-    playthrough = await services.playthroughs.get_playthrough(payload.playthrough_id)
     turn_run_id = payload.turn_run_id or str(uuid4())
     idempotency_key = idempotency_header or payload.idempotency_key or turn_run_id
-    game_state = GameState.empty(
-        world_id=playthrough.world_id,
+    game_state = await services.game_states.load(
         playthrough_id=payload.playthrough_id,
         branch_id=payload.branch_id,
-        world_time=playthrough.world_clock_minutes,
     )
     command = SubmitTurnCommand(
         idempotency_key=idempotency_key,

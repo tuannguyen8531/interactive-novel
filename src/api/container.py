@@ -7,14 +7,16 @@ from typing import Any, cast
 
 from src.application.contracts.providers import LogicalRole, ProviderRoute, ProviderRoutingConfig, ProviderTarget
 from src.application.contracts.telemetry import TelemetryConfig
-from src.application.ports.providers import ProviderGateway
+from src.application.ports.providers import ProviderGateway, ProviderPort
 from src.application.services.branches import BranchApplicationService
+from src.application.services.derived import DerivedJobApplicationService, DerivedJobWorker
 from src.application.services.events import InMemoryJobEventBroker
 from src.application.services.export import PlaythroughExportApplicationService
 from src.application.services.feedback import FeedbackApplicationService
+from src.application.services.game_states import GameStateApplicationService
 from src.application.services.jobs import UowJobStore
 from src.application.services.playthroughs import PlaythroughApplicationService
-from src.application.services.provider_settings import InMemoryProviderSettingsStore, ProviderSettingsApplicationService
+from src.application.services.provider_settings import ProviderSettingsApplicationService
 from src.application.services.queries import CharacterQueryApplicationService
 from src.application.services.turns import TurnApplicationService
 from src.application.services.world_drafts import WorldDraftApplicationService
@@ -28,6 +30,7 @@ from src.services.llm.factory import ProviderRouter
 from src.services.persistence.database import Database, create_database
 from src.services.persistence.migrations import upgrade_database
 from src.services.persistence.uow import make_uow_factory
+from src.services.provider_settings import JsonProviderSettingsStore
 from src.services.telemetry import TelemetryRecorder, build_telemetry_recorder
 
 
@@ -46,17 +49,23 @@ class ApplicationContainer:
     playthroughs: PlaythroughApplicationService
     branches: BranchApplicationService
     queries: CharacterQueryApplicationService
+    game_states: GameStateApplicationService
     exports: PlaythroughExportApplicationService
     world_drafts: WorldDraftApplicationService
     provider_settings: ProviderSettingsApplicationService
+    derived_jobs: DerivedJobApplicationService
+    derived_worker: DerivedJobWorker
     telemetry: TelemetryRecorder
     feedback: FeedbackApplicationService
 
     async def start(self) -> None:
         await upgrade_database(self.database.engine)
+        await self.provider_settings.initialize(_default_provider_config())
         await self.turns.start()
+        await self.derived_worker.start()
 
     async def shutdown(self) -> None:
+        await self.derived_worker.stop()
         await self.turns.shutdown()
         await self.runner.aclose()
         await self.database.dispose()
@@ -100,6 +109,13 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         event_broker=events,
         max_concurrency=settings.turn_max_concurrency,
     )
+    game_states = GameStateApplicationService(uow_factory)
+    derived_jobs = DerivedJobApplicationService(
+        uow_factory,
+        embedding_provider=cast(ProviderPort, provider),
+        game_states=game_states,
+    )
+    derived_worker = DerivedJobWorker(derived_jobs)
     return ApplicationContainer(
         settings=settings,
         database=database,
@@ -111,16 +127,19 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         worlds=WorldApplicationService(uow_factory),
         playthroughs=PlaythroughApplicationService(uow_factory),
         branches=BranchApplicationService(uow_factory),
-        queries=CharacterQueryApplicationService(uow_factory),
+        queries=CharacterQueryApplicationService(uow_factory, game_states=game_states),
+        game_states=game_states,
         exports=PlaythroughExportApplicationService(uow_factory),
         world_drafts=WorldDraftApplicationService(
             uow_factory,
             generator=ProviderWorldDraftGenerator(provider),
         ),
         provider_settings=ProviderSettingsApplicationService(
-            InMemoryProviderSettingsStore(),
+            JsonProviderSettingsStore(paths.settings),
             gateway=provider,
         ),
+        derived_jobs=derived_jobs,
+        derived_worker=derived_worker,
         telemetry=telemetry,
         feedback=FeedbackApplicationService(JsonlFeedbackStore(paths.feedback)),
     )

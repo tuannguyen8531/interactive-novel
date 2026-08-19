@@ -5,9 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
-from src.application.contracts.persistence import CanonicalTurnBundle, DerivedJobRecord
+from src.application.contracts.persistence import CanonicalTurnBundle
 from src.application.contracts.providers import CancellationToken, ExecutionMode
 from src.application.contracts.retrieval import RetrievalScope
 from src.application.contracts.turns import TurnRunRequest
@@ -84,9 +83,11 @@ class GraphTurnRunner:
             committer=UowTurnCommitter(self._uow_factory),
             candidate_source=UowCandidateSource(self._uow_factory),
             cancellation=token,
-            execution_mode=self._execution_mode,
+            execution_mode=getattr(getattr(self._provider, "config", None), "mode", self._execution_mode),
             event_sink=self._event_sink,
-            derived_job_handler=self._enqueue_derived_jobs,
+            # Canonical persistence writes derived intents in the same
+            # transaction as the turn; the background worker consumes them.
+            derived_job_handler=None,
             max_repair_attempts=self._max_repair_attempts,
             max_revision_attempts=self._max_revision_attempts,
             max_contract_retries=self._max_contract_retries,
@@ -124,28 +125,6 @@ class GraphTurnRunner:
 
     async def aclose(self) -> None:
         await self._provider.aclose()
-
-    async def _enqueue_derived_jobs(
-        self,
-        intents: tuple[dict[str, Any], ...],
-        bundle: CanonicalTurnBundle,
-    ) -> None:
-        async with self._uow_factory() as uow:
-            for intent in intents:
-                job_type = str(intent["job_type"])
-                await uow.canonical.enqueue_derived_job(
-                    DerivedJobRecord(
-                        id=str(uuid4()),
-                        idempotency_key=f"{bundle.turn_id}:{job_type}",
-                        job_type=job_type,
-                        playthrough_id=bundle.playthrough_id,
-                        branch_id=bundle.branch_id,
-                        source_turn_id=bundle.turn_id,
-                        source_revision=bundle.base_revision + 1,
-                        payload={"source": "turn_commit"},
-                    )
-                )
-            await uow.commit()
 
 
 __all__ = ["GraphTurnRunner", "UowCandidateSource", "UowTurnCommitter"]
