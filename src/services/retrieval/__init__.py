@@ -4,6 +4,7 @@ from .budget import DEFAULT_ROLE_BUDGETS, TokenBudgetAllocator, estimate_tokens
 from .claims import ClaimExtractor
 from .context import ContextAssembler, TargetedConsistencyRetriever
 from .embeddings import InMemoryEmbeddingStore, OllamaEmbeddingIndexer, cosine_similarity
+from .rebuild import EmbeddingRebuildService
 from .scope import HardScopeFilter
 from .scoring import RetrievalScorer
 from .sources import (
@@ -12,6 +13,7 @@ from .sources import (
     event_to_candidate,
     hook_to_candidate,
     observation_to_candidate,
+    summary_to_candidate,
     thread_to_candidate,
 )
 from .tracing import InMemoryRetrievalTraceStore
@@ -22,6 +24,7 @@ __all__ = [
     "ContextAssembler",
     "HardScopeFilter",
     "InMemoryEmbeddingStore",
+    "EmbeddingRebuildService",
     "InMemoryRetrievalTraceStore",
     "OllamaEmbeddingIndexer",
     "RetrievalScorer",
@@ -34,5 +37,6 @@ __all__ = [
     "event_to_candidate",
     "hook_to_candidate",
     "observation_to_candidate",
+    "summary_to_candidate",
     "thread_to_candidate",
 ]

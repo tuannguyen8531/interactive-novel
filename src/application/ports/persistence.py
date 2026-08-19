@@ -19,6 +19,7 @@ from src.application.contracts.persistence import (
 )
 from src.application.contracts.queries import CharacterView, MemoryView, RelationshipView
 
+from .derived import DerivedArtifactRepository
 from .jobs import JobRepository
 from .retrieval import MemoryCandidateSource
 
@@ -152,6 +153,7 @@ class UnitOfWork(Protocol):
     canonical: CanonicalRepository
     inspection: InspectionRepository
     jobs: JobRepository
+    derived: DerivedArtifactRepository
 
     @property
     def retrieval(self) -> MemoryCandidateSource: ...

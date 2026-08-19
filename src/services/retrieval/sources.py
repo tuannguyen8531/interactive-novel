@@ -196,11 +196,42 @@ def hook_to_candidate(record: NarrativeHookRecord) -> MemoryCandidate:
     )
 
 
+def summary_to_candidate(
+    *,
+    source_id: str,
+    playthrough_id: str,
+    branch_id: str,
+    world_time: int,
+    text: str,
+    payload: Mapping[str, Any],
+) -> MemoryCandidate:
+    """Adapt an episodic summary while retaining its canonical source IDs."""
+    data = dict(payload)
+    return MemoryCandidate(
+        source_id=source_id,
+        kind=MemoryKind.SUMMARY,
+        playthrough_id=playthrough_id,
+        branch_id=branch_id,
+        world_time=world_time,
+        text=text,
+        owner_id="public",
+        visibility="public",
+        branch_scope=branch_id,
+        entity_ids=_tuple_strings(data.get("entity_ids")),
+        goal_ids=_tuple_strings(data.get("goal_ids")),
+        thread_ids=_tuple_strings(data.get("thread_ids")),
+        salience=float(data.get("salience", 0.75)),
+        payload=data,
+        provenance={"derived": True, "canonical_source_ids": list(data.get("source_ids", []))},
+    )
+
+
 __all__ = [
     "belief_to_candidate",
     "claim_to_candidate",
     "event_to_candidate",
     "hook_to_candidate",
     "observation_to_candidate",
+    "summary_to_candidate",
     "thread_to_candidate",
 ]

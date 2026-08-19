@@ -31,11 +31,13 @@ from src.services.retrieval.sources import (
     event_to_candidate,
     hook_to_candidate,
     observation_to_candidate,
+    summary_to_candidate,
     thread_to_candidate,
 )
 
 from .models import (
     BeliefModel,
+    DerivedArtifactModel,
     EventModel,
     EventParticipantModel,
     KnowledgeClaimModel,
@@ -388,6 +390,30 @@ class SqlAlchemyRetrievalRepository(SqlAlchemyEmbeddingStore):
                 )
             )
             for hook in hooks
+        )
+        summaries = list(
+            (
+                await self._session.scalars(
+                    select(DerivedArtifactModel).where(
+                        DerivedArtifactModel.playthrough_id == scope.playthrough_id,
+                        DerivedArtifactModel.branch_id.in_(branch_ids),
+                        DerivedArtifactModel.artifact_type == "episodic_summary",
+                        DerivedArtifactModel.status == "fresh",
+                    )
+                )
+            ).all()
+        )
+        candidates.extend(
+            summary_to_candidate(
+                source_id=artifact.id,
+                playthrough_id=artifact.playthrough_id,
+                branch_id=artifact.branch_id,
+                world_time=int(artifact.payload.get("end_world_time", scope.world_time)),
+                text=str(artifact.payload.get("text", "")),
+                payload={**dict(artifact.payload), "source_revision": artifact.source_revision},
+            )
+            for artifact in summaries
+            if str(artifact.payload.get("text", "")).strip()
         )
         return tuple(candidates)
 

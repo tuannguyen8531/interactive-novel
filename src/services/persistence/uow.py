@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.application.ports.derived import DerivedArtifactRepository
 from src.application.ports.jobs import JobRepository
 from src.application.ports.persistence import (
     CanonicalRepository,
@@ -16,6 +17,7 @@ from src.application.ports.persistence import (
 
 from .canonical import SqlAlchemyCanonicalRepository
 from .database import Database
+from .derived import SqlAlchemyDerivedArtifactRepository
 from .jobs import SqlAlchemyJobRepository
 from .queries import SqlAlchemyInspectionRepository
 from .repositories import SqlAlchemyCharacterRepository, SqlAlchemyPlaythroughRepository, SqlAlchemyWorldRepository
@@ -34,6 +36,7 @@ class SqlAlchemyUnitOfWork:
         self.canonical: CanonicalRepository = SqlAlchemyCanonicalRepository(self._session)
         self.inspection: InspectionRepository = SqlAlchemyInspectionRepository(self._session)
         self.jobs: JobRepository = SqlAlchemyJobRepository(self._session)
+        self.derived: DerivedArtifactRepository = SqlAlchemyDerivedArtifactRepository(self._session)
         self._retrieval = SqlAlchemyRetrievalRepository(self._session)
 
     @property

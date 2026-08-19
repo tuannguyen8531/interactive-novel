@@ -527,6 +527,61 @@ class DerivedJobRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class DerivedArtifactRecord:
+    """Discardable, versioned output of a post-commit derived job."""
+
+    id: str
+    artifact_type: str
+    playthrough_id: str
+    branch_id: str
+    source_turn_id: str | None
+    source_revision: int
+    artifact_version: str
+    content_hash: str
+    payload: dict[str, Any] = field(default_factory=dict)
+    status: str = "fresh"
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        artifact_type: str,
+        playthrough_id: str,
+        branch_id: str,
+        source_turn_id: str | None,
+        source_revision: int,
+        artifact_version: str,
+        payload: Mapping[str, Any],
+        artifact_id: str | None = None,
+    ) -> DerivedArtifactRecord:
+        if not artifact_type.strip() or not artifact_version.strip():
+            raise ValueError("Derived artifact type and version are required.")
+        if source_revision < 0:
+            raise ValueError("Derived artifact source revision cannot be negative.")
+        encoded = json.dumps(dict(payload), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        now = utc_now()
+        return cls(
+            id=artifact_id or str(uuid4()),
+            artifact_type=artifact_type,
+            playthrough_id=playthrough_id,
+            branch_id=branch_id,
+            source_turn_id=source_turn_id,
+            source_revision=source_revision,
+            artifact_version=artifact_version,
+            content_hash=hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
+            payload=dict(payload),
+            created_at=now,
+            updated_at=now,
+        )
+
+    def is_fresh_for(self, source_revision: int, *, artifact_version: str | None = None) -> bool:
+        """Only an exact source revision may satisfy a current read."""
+        return self.source_revision == source_revision and (artifact_version is None or self.artifact_version == artifact_version)
+
+
+@dataclass(frozen=True, slots=True)
 class OutboxEventRecord:
     id: str
     idempotency_key: str
@@ -548,6 +603,7 @@ __all__ = [
     "CharacterRecord",
     "CharacterStateRecord",
     "ClaimLinkRecord",
+    "DerivedArtifactRecord",
     "DerivedJobRecord",
     "EmotionalTensionRecord",
     "EventRecord",

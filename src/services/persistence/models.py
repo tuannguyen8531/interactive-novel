@@ -349,6 +349,35 @@ class SnapshotModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class DerivedArtifactModel(Base):
+    """Versioned derived output; never a source of gameplay authority."""
+
+    __tablename__ = "derived_artifacts"
+    __table_args__ = (
+        UniqueConstraint(
+            "playthrough_id",
+            "branch_id",
+            "artifact_type",
+            "source_revision",
+            "artifact_version",
+            name="uq_derived_artifacts_revision",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    artifact_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    playthrough_id: Mapped[str] = mapped_column(String(36), ForeignKey("playthroughs.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(String(36), ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    source_turn_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("turns.id", ondelete="SET NULL"), nullable=True)
+    source_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    artifact_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="fresh")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class MemoryEmbeddingModel(Base):
     """Derived vector plus the metadata needed to invalidate stale values."""
 
@@ -465,6 +494,7 @@ __all__ = [
     "CharacterModel",
     "CharacterStateModel",
     "DerivedJobModel",
+    "DerivedArtifactModel",
     "EmotionalTensionModel",
     "EventModel",
     "EventParticipantModel",

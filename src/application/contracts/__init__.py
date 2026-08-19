@@ -16,6 +16,15 @@ from .ai import (
     TurnPlan,
     WorldSeed,
 )
+from .memory import (
+    BeliefConflict,
+    EmbeddingRebuildReport,
+    EpisodicSummary,
+    HookPriority,
+    RelationshipTrend,
+    RetrievalEvaluationDashboard,
+    ThreadHealth,
+)
 from .persistence import CharacterRecord, PlaythroughRecord, WorldRecord
 from .providers import ProviderRequest, ProviderRoutingConfig, ProviderTarget
 from .retrieval import (
@@ -42,6 +51,7 @@ from .retrieval import (
 __all__ = [
     "AIOutput",
     "AIPromptRole",
+    "BeliefConflict",
     "ConsistencyReport",
     "ClaimExtractionResult",
     "CharacterRecord",
@@ -49,8 +59,11 @@ __all__ = [
     "CritiqueResult",
     "EmbeddingMetadata",
     "EmbeddingRecord",
+    "EmbeddingRebuildReport",
+    "EpisodicSummary",
     "InitialContextManifest",
     "InitialContextRequest",
+    "HookPriority",
     "KnowledgeClaimProposal",
     "KnowledgeRequirement",
     "LLMRunTrace",
@@ -69,11 +82,14 @@ __all__ = [
     "RetrievalScope",
     "RetrievalTrace",
     "RetrievalTraceHit",
+    "RetrievalEvaluationDashboard",
     "ScoreBreakdown",
     "SceneSpec",
     "SimulationResult",
     "StatePatchProposal",
     "TurnPlan",
+    "RelationshipTrend",
+    "ThreadHealth",
     "WorldRecord",
     "WorldSeed",
     "canonical_value",

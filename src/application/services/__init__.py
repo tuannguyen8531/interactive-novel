@@ -2,6 +2,7 @@
 
 from .branches import BranchApplicationService
 from .canonical_turns import CanonicalTurnApplicationService
+from .derived import DerivedArtifactApplicationService, DerivedJobApplicationService
 from .events import InMemoryJobEventBroker
 from .export import PlaythroughExportApplicationService
 from .jobs import InMemoryJobStore, UowJobStore
@@ -16,6 +17,8 @@ from .worlds import WorldApplicationService
 __all__ = [
     "BranchApplicationService",
     "CanonicalTurnApplicationService",
+    "DerivedArtifactApplicationService",
+    "DerivedJobApplicationService",
     "CharacterQueryApplicationService",
     "InMemoryJobEventBroker",
     "InMemoryJobStore",

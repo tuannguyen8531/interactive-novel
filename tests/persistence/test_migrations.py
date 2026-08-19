@@ -26,6 +26,7 @@ async def test_empty_database_migrates_idempotently_and_has_expected_schema(empt
         "characters",
         "claim_links",
         "derived_jobs",
+        "derived_artifacts",
         "emotional_tensions",
         "event_participants",
         "events",

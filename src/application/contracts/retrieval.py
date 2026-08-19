@@ -31,6 +31,7 @@ class MemoryKind(StrEnum):
     THREAD = "thread"
     HOOK = "hook"
     STATE = "state"
+    SUMMARY = "summary"
 
 
 class RetrievalPhase(StrEnum):
