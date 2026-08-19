@@ -180,7 +180,7 @@ export const api = {
   updateProviderSettings: (payload: Record<string, unknown>): Promise<ProviderSettings> =>
     request<ProviderSettings>('/api/providers/settings', jsonPut(payload)),
   testProviderConnection: (): Promise<ConnectivityResult[]> =>
-    request<ConnectivityResult[]>('/api/providers/test')
+    request<ConnectivityResult[]>('/api/providers/test', { method: 'POST' })
 }
 
 export type { JobEvent }

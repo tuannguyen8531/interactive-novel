@@ -4,7 +4,7 @@ from sqlalchemy import inspect, text
 
 from src.paths import RuntimePaths
 from src.services.persistence.database import Database
-from src.services.persistence.migrations import upgrade_database
+from src.services.persistence.migrations import alembic_config, upgrade_database
 
 
 async def _table_names(database: Database) -> set[str]:
@@ -50,6 +50,10 @@ async def test_empty_database_migrates_idempotently_and_has_expected_schema(empt
         assert (await connection.scalar(text("PRAGMA foreign_keys"))) == 1
         assert (await connection.scalar(text("PRAGMA journal_mode"))).lower() == "wal"
         assert (await connection.scalar(text("PRAGMA busy_timeout"))) == 5_000
+
+
+def test_programmatic_migrations_preserve_host_process_logging() -> None:
+    assert alembic_config().attributes["configure_logger"] is False
 
 
 def test_runtime_paths_are_project_anchored_and_test_overridable(tmp_path) -> None:

@@ -12,10 +12,17 @@ from alembic import context
 from src.services.persistence.models import Base
 
 config = context.config
-if config.config_file_name is not None:
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+
+
+def _database_url() -> str:
+    url = config.get_main_option("sqlalchemy.url")
+    if url is None or not url.strip():
+        raise RuntimeError("Alembic requires a non-empty sqlalchemy.url setting.")
+    return url
 
 
 def _configure_connection(connection: Connection) -> None:
@@ -39,7 +46,7 @@ def do_run_migrations(connection: Connection) -> None:
 
 def run_migrations_offline() -> None:
     context.configure(
-        url=config.get_main_option("sqlalchemy.url"),
+        url=_database_url(),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -49,7 +56,7 @@ def run_migrations_offline() -> None:
 
 
 async def run_async_migrations() -> None:
-    connectable = create_async_engine(config.get_main_option("sqlalchemy.url"), poolclass=pool.NullPool)
+    connectable = create_async_engine(_database_url(), poolclass=pool.NullPool)
     try:
         async with connectable.connect() as connection:
             await connection.run_sync(do_run_migrations)

@@ -13,8 +13,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def alembic_config() -> Config:
-    """Load the repository Alembic configuration."""
-    return Config(str(PROJECT_ROOT / "alembic.ini"))
+    """Load Alembic without replacing logging owned by the host process."""
+    config = Config(str(PROJECT_ROOT / "alembic.ini"))
+    config.attributes["configure_logger"] = False
+    return config
 
 
 def _upgrade_with_connection(connection: object) -> None:
