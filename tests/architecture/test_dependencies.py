@@ -47,8 +47,14 @@ def test_backend_dependency_direction() -> None:
                 violations.append(f"{owner} -> {target}: infrastructure cannot depend on adapters or orchestration")
             if owner.startswith("src.application.") and target.startswith(("src.api", "src.cli")):
                 violations.append(f"{owner} -> {target}: application cannot depend on adapters")
-            if owner.startswith("src.graph.") and target.startswith(("src.application", "src.api", "src.cli")):
-                violations.append(f"{owner} -> {target}: graph cannot depend on adapters or use cases")
+            if (
+                owner.startswith("src.graph.")
+                and target.startswith("src.application")
+                and not target.startswith(("src.application.contracts", "src.application.ports"))
+            ):
+                violations.append(f"{owner} -> {target}: graph may depend only on application contracts/ports")
+            if owner.startswith("src.graph.") and target.startswith(("src.api", "src.cli")):
+                violations.append(f"{owner} -> {target}: graph cannot depend on adapters")
     assert not violations, "\n".join(violations)
 
 

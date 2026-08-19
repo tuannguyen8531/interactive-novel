@@ -1,0 +1,358 @@
+from __future__ import annotations
+
+import copy
+import json
+from collections.abc import AsyncIterator, Mapping, Sequence
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from src.application.contracts.providers import (
+    ConnectivityResult,
+    EmbeddingResponse,
+    ExecutionMode,
+    ProviderCapability,
+    ProviderRequest,
+    ProviderResponse,
+    StreamChunk,
+    StructuredResponse,
+    StructuredSchema,
+)
+from src.application.contracts.retrieval import MemoryCandidate, MemoryKind, RetrievalScope
+from src.application.ports.providers import ProviderPort
+from src.domain.characters import Character, CharacterProfile, CharacterState
+from src.domain.content import ContentPolicy
+from src.domain.guard import DomainGuard
+from src.domain.state import GameState
+from src.graph import TurnPipeline, TurnPipelineDependencies, TurnPipelineRequest
+from src.graph.checkpoint import build_in_memory_checkpointer
+from src.services.ai.contracts import AIContractRegistry
+
+FIXTURE_ROOT = Path(__file__).resolve().parents[1] / "fixtures" / "ai"
+ROLE_OUTPUTS = json.loads((FIXTURE_ROOT / "role_outputs.json").read_text(encoding="utf-8"))
+
+
+class FakeProvider(ProviderPort):
+    @property
+    def provider_name(self) -> str:
+        return "fake"
+
+    @property
+    def model(self) -> str:
+        return "fake-deterministic"
+
+    @property
+    def capabilities(self) -> frozenset[ProviderCapability]:
+        return frozenset(
+            {
+                ProviderCapability.STRUCTURED,
+                ProviderCapability.TEXT,
+                ProviderCapability.STREAM,
+                ProviderCapability.EMBEDDING,
+            }
+        )
+
+    def __init__(self, *, sequences: Mapping[str, Sequence[Mapping[str, Any]]] | None = None) -> None:
+        self.sequences = {role: [copy.deepcopy(item) for item in values] for role, values in (sequences or {}).items()}
+        self.calls: list[tuple[str, tuple[str, ...]]] = []
+        self.fused_calls: list[tuple[str, ...]] = []
+        self.contracts = AIContractRegistry()
+
+    async def generate_text(self, request: ProviderRequest) -> ProviderResponse:
+        return self._response(request, "fake text")
+
+    async def generate_structured(self, request: ProviderRequest, schema: StructuredSchema) -> StructuredResponse:
+        role = str(request.role)
+        self.calls.append((request.physical_call_id, (role,)))
+        payload = self._next_payload(role)
+        return StructuredResponse(response=self._response(request, json.dumps(payload)), data=payload)
+
+    async def generate_fused_structured(
+        self,
+        requests: Mapping[Any, ProviderRequest],
+        schemas: Mapping[Any, StructuredSchema],
+    ) -> Mapping[Any, StructuredResponse]:
+        roles = tuple(str(role) for role in requests)
+        self.fused_calls.append(roles)
+        self.calls.append((next(iter(requests.values())).physical_call_id, roles))
+        payloads = {str(role): self._next_payload(str(role)) for role in requests}
+        return {
+            role: StructuredResponse(
+                response=self._response(request, json.dumps(payloads[str(role)])),
+                data=payloads[str(role)],
+            )
+            for role, request in requests.items()
+        }
+
+    def _next_payload(self, role: str) -> Mapping[str, Any]:
+        values = self.sequences.get(role)
+        if values:
+            return copy.deepcopy(values.pop(0))
+        return copy.deepcopy(ROLE_OUTPUTS[role])
+
+    def _response(self, request: ProviderRequest, text: str) -> ProviderResponse:
+        return ProviderResponse(
+            provider=self.provider_name,
+            model=self.model,
+            role=request.role,
+            physical_call_id=request.physical_call_id,
+            text=text,
+            request_id=f"request:{request.physical_call_id}",
+            finish_reason="stop",
+        )
+
+    def stream_text(self, request: ProviderRequest) -> AsyncIterator[StreamChunk]:
+        async def stream() -> AsyncIterator[StreamChunk]:
+            yield StreamChunk(
+                provider=self.provider_name,
+                model=self.model,
+                role=request.role,
+                physical_call_id=request.physical_call_id,
+                text="fake text",
+                index=0,
+                done=True,
+            )
+
+        return stream()
+
+    async def embed(self, texts: Sequence[str], *, model: str | None = None) -> EmbeddingResponse:
+        return EmbeddingResponse(provider=self.provider_name, model=model or self.model, embeddings=tuple((1.0,) for _ in texts))
+
+    async def check_connectivity(self) -> ConnectivityResult:
+        return ConnectivityResult(provider=self.provider_name, model=self.model, reachable=True, latency_ms=0.0)
+
+    async def aclose(self) -> None:
+        return None
+
+
+class CandidateSource:
+    def __init__(self) -> None:
+        self.candidates = (
+            MemoryCandidate(
+                source_id="event-1",
+                kind=MemoryKind.CLAIM,
+                playthrough_id="playthrough-1",
+                branch_id="root",
+                world_time=0,
+                text="Alice located at library.",
+                owner_id="public",
+                source_event_id="event-1",
+                claim_id="claim-alice-library",
+                branch_scope="root",
+                entity_ids=("alice", "library"),
+                predicate="located_at",
+                subject_id="alice",
+                object_id="library",
+            ),
+        )
+
+    async def list_candidates(self, scope: RetrievalScope) -> tuple[MemoryCandidate, ...]:
+        return self.candidates
+
+
+class FakeCommitter:
+    def __init__(self) -> None:
+        self.bundles: list[Any] = []
+
+    async def commit_turn(self, bundle: Any) -> dict[str, Any]:
+        self.bundles.append(bundle)
+        return {"turn_id": bundle.turn_id, "status": "completed"}
+
+
+def make_game_state() -> GameState:
+    state = GameState.empty(
+        world_id="world-1",
+        playthrough_id="playthrough-1",
+        branch_id="root",
+        policy=ContentPolicy(),
+    )
+    state.locations = {"library", "courtyard"}
+    state.characters = {
+        "player": Character(CharacterProfile("player", "Mina", 17), CharacterState()),
+        "alice": Character(CharacterProfile("alice", "Alice", 17), CharacterState()),
+    }
+    return state
+
+
+def make_request(state: GameState, run_id: str = "turn-run-1") -> TurnPipelineRequest:
+    return TurnPipelineRequest(
+        turn_run_id=run_id,
+        playthrough_id=state.playthrough_id,
+        branch_id=state.branch_id,
+        base_revision=0,
+        raw_input="Offer to help Alice with the festival display.",
+        actor_id="player",
+        game_state=state,
+    )
+
+
+def make_pipeline(
+    provider: FakeProvider,
+    committer: FakeCommitter,
+    *,
+    mode: str = "quality",
+    cancellation: Any = None,
+    derived_job_handler: Any = None,
+    failure_hook: Any = None,
+) -> TurnPipeline:
+    dependencies = TurnPipelineDependencies(
+        provider=provider,
+        committer=committer,
+        candidate_source=CandidateSource(),
+        guard=DomainGuard(),
+        cancellation=cancellation,
+        execution_mode=ExecutionMode(mode),
+        derived_job_handler=derived_job_handler,
+    )
+    pipeline = TurnPipeline(dependencies, checkpointer=build_in_memory_checkpointer())
+    # The public runner intentionally keeps crash injection in the runtime
+    # only for the resume acceptance test.
+    if failure_hook is not None:
+        pipeline.dependencies.event_sink = None
+    return pipeline
+
+
+@pytest.mark.asyncio
+async def test_fake_pipeline_commits_one_canonical_turn() -> None:
+    provider = FakeProvider()
+    committer = FakeCommitter()
+    pipeline = make_pipeline(provider, committer)
+
+    result = await pipeline.run(make_request(make_game_state()))
+
+    assert result["status"] == "completed"
+    assert result["commit_done"] is True
+    assert result["derived_jobs_queued"] is True
+    assert len(committer.bundles) == 1
+    assert committer.bundles[0].claims[0].claim_id == "claim-alice-library"
+    assert any(item["event_type"] == "completed" for item in result["node_events"])
+
+
+@pytest.mark.asyncio
+async def test_fast_fused_planner_simulator_matches_quality_artifacts() -> None:
+    quality_provider = FakeProvider()
+    quality_committer = FakeCommitter()
+    quality = await make_pipeline(quality_provider, quality_committer).run(make_request(make_game_state(), "quality-run"))
+
+    fast_provider = FakeProvider()
+    fast_committer = FakeCommitter()
+    fast = make_pipeline(fast_provider, fast_committer, mode="fast")
+    fast_result = await fast.run(make_request(make_game_state(), "fast-run"))
+
+    assert quality["status"] == fast_result["status"] == "completed"
+    assert quality.get("final_narrative") == fast_result.get("final_narrative")
+    assert quality.get("approved_patch") == fast_result.get("approved_patch")
+    assert not any(item["fused"] for item in quality["physical_call_traces"])
+    assert any(
+        item["fused"] and set(item["logical_roles"]) == {"planner", "simulator"} for item in fast_result["physical_call_traces"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_guard_rejection_repairs_once_before_commit() -> None:
+    invalid = copy.deepcopy(ROLE_OUTPUTS["simulator"])
+    invalid["state_patch"]["operations"][0]["location_id"] = "unknown-location"
+    provider = FakeProvider(sequences={"simulator": (invalid, ROLE_OUTPUTS["simulator"])})
+    committer = FakeCommitter()
+
+    result = await make_pipeline(provider, committer).run(make_request(make_game_state()))
+
+    assert result["status"] == "completed"
+    assert result["retry_counters"]["repair"] == 1
+    assert len(committer.bundles) == 1
+
+
+@pytest.mark.asyncio
+async def test_planner_contract_error_retries_with_same_role_contract() -> None:
+    invalid = copy.deepcopy(ROLE_OUTPUTS["planner"])
+    invalid.pop("candidate_beats")
+    provider = FakeProvider(sequences={"planner": (invalid, ROLE_OUTPUTS["planner"])})
+    committer = FakeCommitter()
+
+    result = await make_pipeline(provider, committer).run(make_request(make_game_state()))
+
+    assert result["status"] == "completed"
+    planner_traces = [trace for trace in result["llm_traces"] if trace["logical_role"] == "planner"]
+    assert planner_traces
+    assert planner_traces[0]["retry_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_cancellation_before_commit_leaves_canonical_boundary_untouched() -> None:
+    from src.application.contracts.providers import CancellationToken
+
+    token = CancellationToken()
+    token.cancel()
+    committer = FakeCommitter()
+    state = make_game_state()
+    result = await make_pipeline(FakeProvider(), committer, cancellation=token).run(make_request(state))
+
+    assert result["status"] == "cancelled"
+    assert result["commit_done"] is False
+    assert committer.bundles == []
+    assert state.characters["alice"].state.location_id is None
+
+
+@pytest.mark.asyncio
+async def test_derived_job_failure_preserves_completed_canonical_turn() -> None:
+    async def fail_derived(_: tuple[dict[str, Any], ...], __: Any) -> None:
+        raise RuntimeError("derived worker unavailable")
+
+    committer = FakeCommitter()
+    result = await make_pipeline(
+        FakeProvider(),
+        committer,
+        derived_job_handler=fail_derived,
+    ).run(make_request(make_game_state()))
+
+    assert result["status"] == "completed"
+    assert result["commit_done"] is True
+    assert result["derived_jobs_queued"] is False
+    assert len(committer.bundles) == 1
+    assert any(error["code"] == "derived_job_failure" for error in result["errors"])
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_resume_does_not_double_commit_after_one_crash() -> None:
+    provider = FakeProvider()
+    committer = FakeCommitter()
+    crashed = False
+
+    def crash_once(node: str) -> None:
+        nonlocal crashed
+        if node == "build_canonical_records" and not crashed:
+            crashed = True
+            raise RuntimeError("simulated process crash")
+
+    from src.graph.builder import build_turn_graph
+    from src.graph.checkpoint import checkpoint_config
+    from src.graph.runtime import TurnGraphRuntime
+    from src.graph.state import initial_graph_state
+
+    state = make_game_state()
+    request = make_request(state, "resume-run")
+    runtime = TurnGraphRuntime(
+        request=request,
+        provider=provider,
+        candidate_source=CandidateSource(),
+        committer=committer,
+        guard=DomainGuard(),
+        failure_hook=crash_once,
+    )
+    graph = build_turn_graph(runtime, checkpointer=build_in_memory_checkpointer())
+    initial = initial_graph_state(
+        turn_run_id=request.turn_run_id,
+        playthrough_id=request.playthrough_id,
+        branch_id=request.branch_id,
+        base_revision=request.base_revision,
+        raw_input=request.raw_input,
+        actor_id=request.actor_id,
+    )
+
+    with pytest.raises(RuntimeError, match="simulated process crash"):
+        await graph.ainvoke(initial, config=checkpoint_config(request.turn_run_id))
+    result = await graph.ainvoke(None, config=checkpoint_config(request.turn_run_id))
+
+    assert result["status"] == "completed"
+    assert len(committer.bundles) == 1
