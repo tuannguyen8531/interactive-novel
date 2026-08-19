@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/client'
-import type { ConnectivityResult, ProviderSettings, ProviderTarget } from '@/api/types'
+import type { ConnectivityResult, OllamaAccount, ProviderSettings, ProviderTarget } from '@/api/types'
 
 export const PROVIDER_ROLES = [
   'planner',
@@ -24,6 +24,8 @@ export const useProviderStore = defineStore('provider', () => {
   const connectivity = ref<ConnectivityResult[]>([])
   const loading = ref(false)
   const testing = ref(false)
+  const ollamaAccount = ref<OllamaAccount | null>(null)
+  const ollamaAccountLoading = ref(false)
   const error = ref<string | null>(null)
 
   async function load(): Promise<void> {
@@ -87,6 +89,21 @@ export const useProviderStore = defineStore('provider', () => {
     }
   }
 
+  async function loadOllamaAccount(baseUrl: string | null): Promise<void> {
+    ollamaAccountLoading.value = true
+    try {
+      ollamaAccount.value = await api.getOllamaAccount(baseUrl)
+    } catch (cause) {
+      ollamaAccount.value = {
+        signed_in: false,
+        username: null,
+        detail: errorText(cause)
+      }
+    } finally {
+      ollamaAccountLoading.value = false
+    }
+  }
+
   function ensureRoutes(): void {
     if (!settings.value) return
     const firstTarget = Object.keys(settings.value.targets)[0]
@@ -130,6 +147,27 @@ export const useProviderStore = defineStore('provider', () => {
     normalizeRoutes()
   }
 
+  function renameTarget(currentName: string, requestedName: string): string | null {
+    if (!settings.value?.targets[currentName]) return 'Target no longer exists.'
+    const nextName = requestedName.trim()
+    if (!nextName) return 'Target name cannot be empty.'
+    if (nextName.length > 160) return 'Target name must be 160 characters or fewer.'
+    if (nextName === currentName) return null
+    if (settings.value.targets[nextName]) return `Target "${nextName}" already exists.`
+
+    settings.value.targets = Object.fromEntries(
+      Object.entries(settings.value.targets).map(([name, target]) =>
+        name === currentName ? [nextName, { ...target, name: nextName }] : [name, target]
+      )
+    )
+    for (const route of Object.values(settings.value.role_routes)) {
+      if (route.primary_target === currentName) route.primary_target = nextName
+      route.fallback_targets = route.fallback_targets.map((name) => (name === currentName ? nextName : name))
+    }
+    normalizeRoutes()
+    return null
+  }
+
   function changeProvider(name: string, provider: ProviderName): void {
     const target = settings.value?.targets[name]
     if (!target) return
@@ -163,12 +201,16 @@ export const useProviderStore = defineStore('provider', () => {
     connectivity,
     loading,
     testing,
+    ollamaAccount,
+    ollamaAccountLoading,
     error,
     load,
     save,
     test,
+    loadOllamaAccount,
     addTarget,
     removeTarget,
+    renameTarget,
     changeProvider,
     setPrimaryTarget,
     toggleFallback

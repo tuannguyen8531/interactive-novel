@@ -109,6 +109,48 @@ def test_structured_schema_returns_typed_model() -> None:
     assert result.role == AIPromptRole.PLANNER
 
 
+def test_world_seed_schema_normalizes_one_provider_envelope_with_authoritative_trace_metadata() -> None:
+    payload = copy.deepcopy(_fixtures()["world_builder"])
+    world_seed = {
+        key: value
+        for key, value in payload.items()
+        if key not in {"schema_version", "role", "run_id", "prompt_version", "physical_call_id"}
+    }
+    wrapped = {
+        "schema_version": "world-seed-1",
+        "role": "world_builder",
+        "run_id": "provider-invented-run",
+        "metadata": {"prompt": "not contract metadata"},
+        "world_seed": world_seed,
+    }
+    schema = AIContractRegistry().structured_schema(
+        AIPromptRole.WORLD_BUILDER,
+        authoritative_metadata={
+            "schema_version": "world-seed-1",
+            "role": "world_builder",
+            "run_id": "authoritative-run",
+            "prompt_version": "1.0.1",
+            "physical_call_id": "authoritative-call",
+        },
+    )
+
+    result = schema.validate(wrapped, provider="fixture")
+
+    assert result.__class__.__name__ == "WorldSeed"
+    assert result.title == payload["title"]
+    assert result.run_id == "authoritative-run"
+    assert result.prompt_version == "1.0.1"
+    assert result.physical_call_id == "authoritative-call"
+
+
+def test_role_envelope_with_unknown_outer_fields_remains_invalid() -> None:
+    payload = copy.deepcopy(_fixtures()["world_builder"])
+    wrapped = {"world_seed": payload, "unexpected_authority": True}
+
+    with pytest.raises(AIContractValidationError):
+        AIContractRegistry().parse(AIPromptRole.WORLD_BUILDER, wrapped)
+
+
 def test_supporting_validation_and_evidence_contracts_parse() -> None:
     fixtures = _supporting_fixtures()
     query = ValidationQuery.model_validate(fixtures["validation_query"])

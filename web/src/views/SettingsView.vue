@@ -19,9 +19,19 @@ const roles = [
 ]
 
 const targetNames = computed(() => Object.keys(settings.providerSettings?.targets ?? {}))
+const ollamaTarget = computed(() =>
+  Object.values(settings.providerSettings?.targets ?? {}).find((target) => target.provider === 'ollama')
+)
+const ollamaAccountText = computed(() => {
+  if (settings.ollamaAccountLoading) return 'Checking…'
+  if (settings.ollamaAccount?.username) return settings.ollamaAccount.username
+  if (settings.ollamaAccount?.detail === 'Not signed in') return 'Not signed in to Ollama Cloud.'
+  return 'Unavailable'
+})
 
-onMounted(() => {
-  void settings.load()
+onMounted(async () => {
+  await settings.load()
+  await refreshOllamaAccount()
 })
 
 async function save(): Promise<void> {
@@ -47,6 +57,7 @@ async function testConnection(): Promise<void> {
 function addTarget(): void {
   settings.addTarget(newProvider.value)
   saved.value = false
+  if (newProvider.value === 'ollama') void refreshOllamaAccount()
 }
 
 function removeTarget(targetName: string): void {
@@ -54,9 +65,32 @@ function removeTarget(targetName: string): void {
   saved.value = false
 }
 
+function renameTarget(targetName: string, event: Event): void {
+  const input = event.target as HTMLInputElement
+  const error = settings.renameTarget(targetName, input.value)
+  input.setCustomValidity(error ?? '')
+  if (error) {
+    input.reportValidity()
+    input.value = targetName
+    return
+  }
+  saved.value = false
+}
+
+function clearTargetNameError(event: Event): void {
+  const input = event.target as HTMLInputElement
+  input.setCustomValidity('')
+}
+
 function changeProvider(targetName: string, provider: ProviderTarget['provider']): void {
   settings.changeProvider(targetName, provider)
   saved.value = false
+  if (provider === 'ollama') void refreshOllamaAccount()
+}
+
+async function refreshOllamaAccount(): Promise<void> {
+  if (!ollamaTarget.value) return
+  await settings.loadOllamaAccount(ollamaTarget.value.base_url)
 }
 
 function changePrimary(role: string, targetName: string): void {
@@ -73,6 +107,13 @@ function availableFallbacks(role: string): string[] {
   const primary = settings.providerSettings?.role_routes[role]?.primary_target
   return targetNames.value.filter((name) => name !== primary)
 }
+
+function fallbackSummary(role: string): string {
+  const selected = settings.providerSettings?.role_routes[role]?.fallback_targets ?? []
+  if (!selected.length) return 'No fallback'
+  if (selected.length <= 2) return selected.join(', ')
+  return `${selected.length} targets selected`
+}
 </script>
 
 <template>
@@ -86,37 +127,71 @@ function availableFallbacks(role: string): string[] {
 
   <section v-if="settings.loading && !settings.providerSettings" class="empty-state">Loading provider settings…</section>
   <section v-else class="settings-grid">
-    <form class="card settings-card" @submit.prevent="save">
+    <form class="card settings-card full-row" @submit.prevent="save">
       <p class="eyebrow">Execution</p>
       <h2>Runtime policy</h2>
-      <label>
-        Mode
-        <select v-model="settings.mode">
-          <option value="quality">Quality</option>
-          <option value="fast">Fast</option>
-        </select>
-      </label>
-      <label class="checkbox-row">
-        <input v-model="settings.allowCloud" type="checkbox" />
-        <span>Allow cloud provider routing</span>
-      </label>
-      <p class="muted small-copy">Cloud targets remain disabled until this option is explicitly enabled.</p>
-      <button type="submit" :disabled="settings.loading || !settings.providerSettings">Save all settings</button>
-      <span v-if="saved" class="saved-label">Saved</span>
+      <div class="execution-layout">
+        <label>
+          Mode
+          <select v-model="settings.mode">
+            <option value="quality">Quality</option>
+            <option value="fast">Fast</option>
+          </select>
+        </label>
+        <div>
+          <label class="checkbox-row">
+            <input v-model="settings.allowCloud" type="checkbox" />
+            <span>Allow cloud provider routing</span>
+          </label>
+          <p class="muted small-copy">Cloud targets remain disabled until this option is explicitly enabled.</p>
+        </div>
+        <div class="save-row">
+          <button type="submit" :disabled="settings.loading || !settings.providerSettings">Save all settings</button>
+          <span v-if="saved" class="saved-label">Saved</span>
+        </div>
+      </div>
     </form>
 
-    <section class="card settings-card">
+    <section class="card settings-card full-row">
       <p class="eyebrow">Targets</p>
       <h2>Provider models</h2>
       <div v-if="!settings.providerSettings" class="notice-box">No provider settings have been stored yet.</div>
-      <div v-else class="target-list">
-        <div v-for="(target, targetName) in settings.providerSettings.targets" :key="targetName" class="target-editor">
+      <template v-else>
+        <div class="add-target-panel">
+          <div>
+            <strong>Add a provider target</strong>
+            <p class="muted small-copy">Choose a provider, then assign the new target to roles below.</p>
+          </div>
+          <div class="add-target-controls">
+            <label>
+              Provider
+              <select v-model="newProvider" aria-label="Provider for new target">
+                <option value="ollama">Ollama</option>
+                <option value="gemini">Gemini</option>
+                <option value="openrouter">OpenRouter</option>
+              </select>
+            </label>
+            <button type="button" @click="addTarget">+ Add target</button>
+          </div>
+        </div>
+        <div class="target-list">
+          <div v-for="(target, targetName) in settings.providerSettings.targets" :key="targetName" class="target-editor">
           <div class="target-heading">
-            <strong>{{ targetName }}</strong>
+            <label class="target-name-label">
+              Target name
+              <input
+                :value="targetName"
+                maxlength="160"
+                autocomplete="off"
+                @input="clearTargetNameError"
+                @change="renameTarget(targetName, $event)"
+              />
+            </label>
             <button
-              class="text-button danger"
+              class="remove-target-button"
               type="button"
               :disabled="targetNames.length <= 1"
+              :aria-label="`Remove target ${targetName}`"
               @click="removeTarget(targetName)"
             >
               Remove
@@ -134,16 +209,25 @@ function availableFallbacks(role: string): string[] {
             Model
             <ProviderModelField v-model="target.model" :target="target" @update:model-value="saved = false" />
           </label>
-          <label>
-            Base URL
-            <input
-              v-model="target.base_url"
-              autocomplete="url"
-              :placeholder="target.provider === 'ollama' ? 'http://localhost:11434/api' : 'Provider default'"
-              @input="saved = false"
-            />
-          </label>
-          <div class="field-grid">
+          <div v-if="target.provider === 'ollama'" class="field-grid">
+            <div class="field-block">
+              <span class="field-label">Cloud account</span>
+              <div class="account-control">
+                <input :value="ollamaAccountText" disabled aria-label="Ollama Cloud account" />
+                <button class="secondary" type="button" :disabled="settings.ollamaAccountLoading" @click="refreshOllamaAccount">
+                  {{ settings.ollamaAccountLoading ? 'Checking…' : 'Refresh' }}
+                </button>
+              </div>
+              <p v-if="settings.ollamaAccount?.detail && settings.ollamaAccount.detail !== 'Not signed in'" class="muted account-detail">
+                {{ settings.ollamaAccount.detail }}
+              </p>
+            </div>
+            <label>
+              Timeout (seconds)
+              <input v-model.number="target.timeout_seconds" type="number" min="1" max="600" @input="saved = false" />
+            </label>
+          </div>
+          <div v-else class="field-grid">
             <label>
               API key environment variable
               <input
@@ -159,18 +243,12 @@ function availableFallbacks(role: string): string[] {
             </label>
           </div>
           <p class="muted secret-note">
-            Secret values belong in <code>.env</code>; only the variable name is saved here.
+            <template v-if="target.provider === 'ollama'">Ollama Cloud sign-in is managed by the local Ollama application.</template>
+            <template v-else>Secret values belong in <code>.env</code>; only the variable name is saved here.</template>
           </p>
+          </div>
         </div>
-        <div class="add-target-row">
-          <select v-model="newProvider" aria-label="Provider for new target">
-            <option value="ollama">Ollama</option>
-            <option value="gemini">Gemini</option>
-            <option value="openrouter">OpenRouter</option>
-          </select>
-          <button class="secondary" type="button" @click="addTarget">Add target</button>
-        </div>
-      </div>
+      </template>
       <button class="secondary" type="button" :disabled="settings.testing || settings.loading" @click="testConnection">
         {{ settings.testing ? 'Testing…' : 'Save & test connections' }}
       </button>
@@ -200,25 +278,27 @@ function availableFallbacks(role: string): string[] {
               <option v-for="targetName in targetNames" :key="targetName" :value="targetName">{{ targetName }}</option>
             </select>
           </label>
-          <fieldset>
-            <legend>Fallbacks</legend>
-            <label
-              v-for="targetName in availableFallbacks(role.id)"
-              :key="targetName"
-              class="fallback-option"
-            >
-              <input
-                type="checkbox"
-                :checked="settings.providerSettings.role_routes[role.id].fallback_targets.includes(targetName)"
-                @change="changeFallback(role.id, targetName, $event)"
-              />
-              {{ targetName }}
-            </label>
-            <span
-              v-if="targetNames.length <= 1"
-              class="muted"
-            >None available</span>
-          </fieldset>
+          <div class="fallback-field">
+            <span class="field-label">Fallbacks</span>
+            <details class="fallback-dropdown">
+              <summary>{{ fallbackSummary(role.id) }}</summary>
+              <div class="fallback-menu">
+                <label
+                  v-for="targetName in availableFallbacks(role.id)"
+                  :key="targetName"
+                  class="fallback-option"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="settings.providerSettings.role_routes[role.id].fallback_targets.includes(targetName)"
+                    @change="changeFallback(role.id, targetName, $event)"
+                  />
+                  {{ targetName }}
+                </label>
+                <span v-if="targetNames.length <= 1" class="muted fallback-empty">No fallback target available</span>
+              </div>
+            </details>
+          </div>
         </div>
       </div>
     </section>
@@ -236,8 +316,12 @@ function availableFallbacks(role: string): string[] {
 
 .settings-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 1rem;
+}
+
+.full-row {
+  grid-column: 1 / -1;
 }
 
 .settings-card {
@@ -291,13 +375,50 @@ input {
 }
 
 .saved-label {
-  margin-left: 0.75rem;
   color: var(--green);
   font-size: 0.85rem;
 }
 
+.execution-layout {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.7fr) minmax(18rem, 1.3fr) auto;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.save-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  align-self: center;
+}
+
+.add-target-panel {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--line);
+  border-radius: 0.7rem;
+  background: #fffdf8;
+}
+
+.add-target-panel p,
+.add-target-controls label {
+  margin-bottom: 0;
+}
+
+.add-target-controls {
+  display: flex;
+  gap: 0.65rem;
+  align-items: end;
+}
+
 .target-list {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(30rem, 100%), 1fr));
   gap: 0.65rem;
   margin-bottom: 1.2rem;
 }
@@ -309,16 +430,18 @@ input {
   background: #f4efe6;
 }
 
-.target-heading,
-.add-target-row {
+.target-heading {
   display: flex;
   gap: 0.75rem;
-  align-items: center;
+  align-items: end;
   justify-content: space-between;
+  margin-bottom: 0.75rem;
 }
 
-.target-heading {
-  margin-bottom: 0.75rem;
+.target-name-label {
+  min-width: 0;
+  flex: 1;
+  margin-bottom: 0;
 }
 
 .field-grid {
@@ -327,20 +450,58 @@ input {
   gap: 0.75rem;
 }
 
+.field-block {
+  min-width: 0;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.account-control {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.account-control input:disabled {
+  background: #eee9df;
+  color: var(--ink);
+  opacity: 1;
+}
+
+.account-detail {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
 .secret-note {
   margin: -0.25rem 0 0;
   font-size: 0.75rem;
 }
 
-.text-button {
-  padding: 0;
-  border: 0;
+.remove-target-button {
+  min-height: 2.65rem;
+  flex: 0 0 auto;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #d8a8ad;
   background: transparent;
-  color: var(--accent);
+  color: #a33f48;
 }
 
-.text-button.danger {
+.remove-target-button:hover:not(:disabled) {
+  border-color: #a33f48;
+  background: #f8e8e9;
   color: #a33f48;
+}
+
+.remove-target-button:disabled {
+  border-color: var(--line);
+  background: transparent;
 }
 
 .routing-card {
@@ -372,22 +533,58 @@ input {
   color: var(--muted);
 }
 
-fieldset {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
+.fallback-field {
   min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
 }
 
-legend {
-  width: 100%;
-  margin-bottom: 0.4rem;
+.fallback-dropdown {
+  position: relative;
+}
+
+.fallback-dropdown summary {
+  overflow: hidden;
+  padding: 0.7rem 2.1rem 0.7rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  list-style: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fallback-dropdown summary::-webkit-details-marker {
+  display: none;
+}
+
+.fallback-dropdown summary::after {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  content: '▾';
   color: var(--muted);
-  font-size: 0.85rem;
-  font-weight: 700;
+}
+
+.fallback-dropdown[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.fallback-menu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  left: 0;
+  display: grid;
+  gap: 0.2rem;
+  max-height: 14rem;
+  overflow-y: auto;
+  padding: 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: #fff;
+  box-shadow: var(--shadow);
 }
 
 .fallback-option {
@@ -395,11 +592,23 @@ legend {
   gap: 0.35rem;
   align-items: center;
   margin: 0;
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.35rem;
   font-weight: 500;
+  cursor: pointer;
+}
+
+.fallback-option:hover {
+  background: #f1ece2;
 }
 
 .fallback-option input {
   width: auto;
+}
+
+.fallback-empty {
+  padding: 0.45rem 0.5rem;
+  font-size: 0.8rem;
 }
 
 .connectivity-list {
@@ -428,9 +637,16 @@ legend {
     margin-top: 1rem;
   }
 
+  .execution-layout,
   .field-grid,
   .route-row {
     grid-template-columns: 1fr;
+  }
+
+  .add-target-panel,
+  .add-target-controls {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 </style>

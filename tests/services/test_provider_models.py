@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from src.application.contracts.providers import ProviderTarget
-from src.services.llm.models import list_provider_models
+from src.services.llm.models import get_ollama_account, list_provider_models
 
 
 @pytest.mark.parametrize(
@@ -52,3 +52,30 @@ async def test_list_provider_models_is_best_effort() -> None:
         models = await list_provider_models(target, client=client)
 
     assert models == ()
+
+
+@pytest.mark.parametrize(
+    ("status_code", "payload", "signed_in", "username", "detail"),
+    [
+        (200, {"name": "reader@example.com"}, True, "reader@example.com", None),
+        (401, {}, False, None, "Not signed in"),
+    ],
+)
+async def test_get_ollama_account_reports_daemon_session(
+    status_code: int,
+    payload: dict[str, object],
+    signed_in: bool,
+    username: str | None,
+    detail: str | None,
+) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert str(request.url) == "http://provider.test/api/me"
+        return httpx.Response(status_code, json=payload)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        account = await get_ollama_account(base_url="http://provider.test/api", client=client)
+
+    assert account.signed_in is signed_in
+    assert account.username == username
+    assert account.detail == detail

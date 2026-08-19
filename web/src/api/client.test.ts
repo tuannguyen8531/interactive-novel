@@ -62,4 +62,25 @@ describe('API client', () => {
       timeout_seconds: 60
     })
   })
+
+  it('requests the Ollama Cloud account through the local daemon', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ signed_in: true, username: 'fixture-user', detail: null }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const account = await api.getOllamaAccount('http://localhost:11434/api', 8)
+
+    expect(account.username).toBe('fixture-user')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/providers/ollama/account')
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(String(init.body))).toEqual({
+      base_url: 'http://localhost:11434/api',
+      timeout_seconds: 8
+    })
+  })
 })

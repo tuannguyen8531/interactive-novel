@@ -43,3 +43,5 @@ async def test_provider_world_builder_renders_versioned_school_romance_prompt() 
     assert provider.request.role == AIPromptRole.WORLD_BUILDER
     assert '"template": "school_romance"' in provider.request.user_prompt
     assert provider.request.metadata["output_schema_version"] == "world-seed-1"
+    assert result.prompt_version == "1.0.1"
+    assert result.run_id != payload["run_id"]

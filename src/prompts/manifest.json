@@ -1,11 +1,11 @@
 {
   "world_builder": {
     "template": "world_builder.md",
-    "semantic_version": "1.0.0",
+    "semantic_version": "1.0.1",
     "input_contract": "role-input-1",
     "output_schema_version": "world-seed-1",
     "required_variables": ["input_json"],
-    "changelog": "Initial school-romance world draft contract."
+    "changelog": "Require a flat WorldSeed object and reject provider-added envelopes beyond one normalized wrapper."
   },
   "planner": {
     "template": "planner.md",

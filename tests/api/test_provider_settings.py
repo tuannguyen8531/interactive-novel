@@ -10,6 +10,7 @@ import src.api.routes.providers as provider_routes
 from src.api.factory import create_app
 from src.application.contracts.providers import ConnectivityResult, ProviderRoutingConfig
 from src.config import Settings
+from src.services.llm.models import OllamaAccountStatus
 
 
 class FakeProviderSettings:
@@ -119,3 +120,26 @@ async def test_provider_models_endpoint_returns_discovered_models(monkeypatch) -
 
     assert response.status_code == 200
     assert response.json() == {"provider": "ollama", "models": ["alpha:3b", "embedding:latest"]}
+
+
+@pytest.mark.asyncio
+async def test_ollama_account_endpoint_returns_safe_status(monkeypatch) -> None:
+    async def fake_get_ollama_account(*, base_url, timeout_seconds):
+        assert base_url == "http://ollama.test/api"
+        assert timeout_seconds == 5
+        return OllamaAccountStatus(signed_in=True, username="fixture-user")
+
+    monkeypatch.setattr(provider_routes, "get_ollama_account", fake_get_ollama_account)
+    app = create_app(
+        Settings(app_name="provider-api-test"),
+        services=SimpleNamespace(provider_settings=FakeProviderSettings()),  # type: ignore[arg-type]
+    )
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/providers/ollama/account",
+            json={"base_url": "http://ollama.test/api", "timeout_seconds": 5},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"signed_in": True, "username": "fixture-user", "detail": None}

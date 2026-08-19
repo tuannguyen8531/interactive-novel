@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from typing import Any, cast
 
@@ -60,6 +61,15 @@ ROLE_MODELS: Mapping[AIPromptRole, type[VersionedOutput]] = {
     AIPromptRole.CRITIC: CritiqueResult,
 }
 
+_TRACE_FIELDS = (
+    "schema_version",
+    "role",
+    "run_id",
+    "prompt_version",
+    "physical_call_id",
+    "config_snapshot_id",
+)
+
 
 class AIContractRegistry:
     """Registry connecting logical roles to strict Pydantic output models."""
@@ -76,6 +86,7 @@ class AIContractRegistry:
 
         normalized = AIPromptRole(role)
         model = self.model_for(normalized)
+        payload = _normalize_role_payload(normalized, model, payload)
         try:
             result = model.model_validate(payload)
         except ValidationError as error:
@@ -112,13 +123,28 @@ class AIContractRegistry:
             raise AIContractValidationError(normalized, (diagnostic,)) from error
         return self.parse(role, payload)
 
-    def structured_schema(self, role: AIPromptRole | str) -> StructuredSchema:
+    def structured_schema(
+        self,
+        role: AIPromptRole | str,
+        *,
+        authoritative_metadata: Mapping[str, Any] | None = None,
+    ) -> StructuredSchema:
         normalized = AIPromptRole(role)
         model = self.model_for(normalized)
 
         def validate(payload: Any) -> VersionedOutput:
             try:
-                return self.parse(normalized, payload)
+                normalized_payload = _normalize_role_payload(normalized, model, payload)
+                if isinstance(normalized_payload, Mapping) and authoritative_metadata:
+                    normalized_payload = {
+                        **normalized_payload,
+                        **{
+                            key: value
+                            for key, value in authoritative_metadata.items()
+                            if key in _TRACE_FIELDS and value is not None
+                        },
+                    }
+                return self.parse(normalized, normalized_payload)
             except AIContractValidationError as error:
                 raise StructuredOutputError(
                     f"{normalized.value} output failed its typed contract.",
@@ -131,6 +157,36 @@ class AIContractRegistry:
             json_schema=model.model_json_schema(),
             validator=validate,
         )
+
+
+def _normalize_role_payload(
+    role: AIPromptRole,
+    model: type[VersionedOutput],
+    payload: Any,
+) -> Any:
+    """Unwrap a single, explicit role envelope emitted by some providers."""
+
+    if not isinstance(payload, Mapping):
+        return payload
+    model_key = re.sub(r"(?<!^)(?=[A-Z])", "_", model.__name__).lower()
+    allowed_envelope_keys = {*_TRACE_FIELDS, "metadata", role.value, model_key}
+    if not set(payload).issubset(allowed_envelope_keys):
+        return payload
+    for wrapper_key in (model_key, role.value):
+        nested = payload.get(wrapper_key)
+        if not isinstance(nested, Mapping):
+            continue
+        result = dict(nested)
+        metadata = payload.get("metadata")
+        for key in _TRACE_FIELDS:
+            value = payload.get(key)
+            if value is None and isinstance(metadata, Mapping):
+                value = metadata.get(key)
+            if value is not None:
+                result.setdefault(key, value)
+        result.setdefault("role", role.value)
+        return result
+    return payload
 
 
 def _diagnostics(error: ValidationError) -> tuple[ContractDiagnostic, ...]:

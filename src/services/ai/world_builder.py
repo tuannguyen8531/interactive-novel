@@ -62,7 +62,16 @@ class ProviderWorldDraftGenerator:
         )
         response = await self._provider.generate_structured(
             request,
-            self._contracts.structured_schema(AIPromptRole.WORLD_BUILDER),
+            self._contracts.structured_schema(
+                AIPromptRole.WORLD_BUILDER,
+                authoritative_metadata={
+                    "schema_version": definition.output_schema_version,
+                    "role": AIPromptRole.WORLD_BUILDER.value,
+                    "run_id": run_id,
+                    "prompt_version": definition.semantic_version,
+                    "physical_call_id": physical_call_id,
+                },
+            ),
         )
         if isinstance(response.data, WorldSeed):
             return response.data

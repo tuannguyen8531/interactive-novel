@@ -11,6 +11,7 @@ import pytest
 from src.api.factory import create_app
 from src.application.contracts.ai import WorldSeed
 from src.application.contracts.persistence import BranchRecord, PlaythroughRecord, TurnRecord, WorldRecord, utc_now
+from src.application.contracts.providers import StructuredOutputError
 from src.application.services.world_drafts import WorldConfirmation
 from src.config import Settings
 
@@ -65,6 +66,15 @@ class _WorldDraftService:
         )
 
 
+class _FailingWorldDraftService:
+    async def generate_world_draft(self, prompt: str) -> WorldSeed:
+        raise StructuredOutputError(
+            "world_builder output failed its typed contract.",
+            provider="fixture",
+            fallback_eligible=True,
+        )
+
+
 @pytest.mark.asyncio
 async def test_world_builder_endpoints_generate_review_and_confirm_without_raw_db_access() -> None:
     payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]
@@ -90,3 +100,28 @@ async def test_world_builder_endpoints_generate_review_and_confirm_without_raw_d
     assert confirmed.json()["world"]["id"] == "world-api"
     assert confirmed.json()["opening_scene"]["scene_id"] == "opening-scene"
     assert world_drafts.confirmations == 1
+
+
+@pytest.mark.asyncio
+async def test_world_builder_provider_contract_failure_returns_safe_gateway_error() -> None:
+    app = create_app(
+        Settings(app_name="world-builder-api-test"),
+        services=SimpleNamespace(world_drafts=_FailingWorldDraftService()),  # type: ignore[arg-type]
+    )
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/api/world-drafts", json={"prompt": "A gentle school romance."})
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "error": {
+            "code": "structured_output_error",
+            "message": "world_builder output failed its typed contract.",
+            "details": {
+                "provider": "fixture",
+                "status_code": None,
+                "request_id": None,
+                "attempts": 0,
+            },
+        }
+    }

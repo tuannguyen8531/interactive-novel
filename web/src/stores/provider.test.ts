@@ -8,7 +8,8 @@ vi.mock('@/api/client', () => ({
   api: {
     getProviderSettings: vi.fn(),
     updateProviderSettings: vi.fn(),
-    testProviderConnection: vi.fn()
+    testProviderConnection: vi.fn(),
+    getOllamaAccount: vi.fn()
   }
 }))
 
@@ -84,5 +85,56 @@ describe('provider store', () => {
     store.removeTarget('secondary')
 
     expect(store.settings?.role_routes.writer).toEqual({ primary_target: 'local', fallback_targets: [] })
+  })
+
+  it('loads the Ollama Cloud account without exposing credentials', async () => {
+    vi.mocked(api.getOllamaAccount).mockResolvedValue({
+      signed_in: true,
+      username: 'fixture-user',
+      detail: null
+    })
+    const store = useProviderStore()
+
+    await store.loadOllamaAccount('http://localhost:11434/api')
+
+    expect(store.ollamaAccount?.username).toBe('fixture-user')
+    expect(api.getOllamaAccount).toHaveBeenCalledWith('http://localhost:11434/api')
+  })
+
+  it('keeps multiple fallback targets in selection order', async () => {
+    const value = fixture()
+    value.targets.secondary = { ...value.targets.local, name: 'secondary', model: 'secondary-model' }
+    value.targets.third = { ...value.targets.local, name: 'third', model: 'third-model' }
+    vi.mocked(api.getProviderSettings).mockResolvedValue(value)
+    const store = useProviderStore()
+    await store.load()
+
+    store.toggleFallback('writer', 'secondary', true)
+    store.toggleFallback('writer', 'third', true)
+
+    expect(store.settings?.role_routes.writer.fallback_targets).toEqual(['secondary', 'third'])
+    store.setPrimaryTarget('writer', 'secondary')
+    expect(store.settings?.role_routes.writer).toEqual({
+      primary_target: 'secondary',
+      fallback_targets: ['third']
+    })
+  })
+
+  it('renames a target and updates every route reference atomically', async () => {
+    const value = fixture()
+    value.targets.secondary = { ...value.targets.local, name: 'secondary', model: 'secondary-model' }
+    value.role_routes.writer = { primary_target: 'secondary', fallback_targets: ['local'] }
+    value.role_routes.critic = { primary_target: 'local', fallback_targets: ['secondary'] }
+    vi.mocked(api.getProviderSettings).mockResolvedValue(value)
+    const store = useProviderStore()
+    await store.load()
+
+    expect(store.renameTarget('secondary', 'creative')).toBeNull()
+
+    expect(store.settings?.targets.secondary).toBeUndefined()
+    expect(store.settings?.targets.creative.name).toBe('creative')
+    expect(store.settings?.role_routes.writer.primary_target).toBe('creative')
+    expect(store.settings?.role_routes.critic.fallback_targets).toEqual(['creative'])
+    expect(store.renameTarget('creative', 'local')).toBe('Target "local" already exists.')
   })
 })

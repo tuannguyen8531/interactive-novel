@@ -6,10 +6,16 @@ from fastapi import APIRouter, Depends
 
 from src.api.container import ApplicationContainer
 from src.api.dependencies import get_services
-from src.api.schemas import ProviderModelsRequest, ProviderModelsResponse, ProviderSettingsRequest
+from src.api.schemas import (
+    OllamaAccountRequest,
+    OllamaAccountResponse,
+    ProviderModelsRequest,
+    ProviderModelsResponse,
+    ProviderSettingsRequest,
+)
 from src.api.serialization import public_json
 from src.application.contracts.providers import ExecutionMode, ProviderRoute, ProviderRoutingConfig, ProviderTarget
-from src.services.llm.models import list_provider_models
+from src.services.llm.models import get_ollama_account, list_provider_models
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 _services_dependency = Depends(get_services)
@@ -58,6 +64,19 @@ async def get_provider_models(payload: ProviderModelsRequest) -> ProviderModelsR
     )
     models = await list_provider_models(target)
     return ProviderModelsResponse(provider=payload.provider, models=list(models))
+
+
+@router.post("/ollama/account", response_model=OllamaAccountResponse)
+async def get_ollama_cloud_account(payload: OllamaAccountRequest) -> OllamaAccountResponse:
+    account = await get_ollama_account(
+        base_url=payload.base_url,
+        timeout_seconds=payload.timeout_seconds,
+    )
+    return OllamaAccountResponse(
+        signed_in=account.signed_in,
+        username=account.username,
+        detail=account.detail,
+    )
 
 
 __all__ = ["router"]

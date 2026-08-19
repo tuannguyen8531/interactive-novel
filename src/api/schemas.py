@@ -165,6 +165,19 @@ class ProviderModelsResponse(BaseModel):
     models: list[str]
 
 
+class OllamaAccountRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_url: str | None = Field(default=None, max_length=2_000)
+    timeout_seconds: float = Field(default=10.0, gt=0, le=600)
+
+
+class OllamaAccountResponse(BaseModel):
+    signed_in: bool
+    username: str | None = None
+    detail: str | None = None
+
+
 class FeedbackRequest(BaseModel):
     """Explicit alpha feedback; it never carries prompts or provider output."""
 

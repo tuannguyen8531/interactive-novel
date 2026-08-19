@@ -5,6 +5,7 @@ import type {
   ConnectivityResult,
   JobEvent,
   MemoryView,
+  OllamaAccount,
   PlaythroughExport,
   PlaythroughRecord,
   ProviderSettings,
@@ -187,6 +188,11 @@ export const api = {
       base_url: target.base_url,
       api_key_env: target.api_key_env,
       timeout_seconds: target.timeout_seconds
+    })),
+  getOllamaAccount: (baseUrl: string | null, timeoutSeconds = 10): Promise<OllamaAccount> =>
+    request<OllamaAccount>('/api/providers/ollama/account', jsonBody({
+      base_url: baseUrl,
+      timeout_seconds: timeoutSeconds
     })),
   testProviderConnection: (): Promise<ConnectivityResult[]> =>
     request<ConnectivityResult[]>('/api/providers/test', { method: 'POST' })

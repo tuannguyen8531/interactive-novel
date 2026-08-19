@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -13,6 +14,13 @@ from src.application.contracts.providers import ProviderTarget
 from .gemini import GeminiProvider
 from .ollama import OllamaProvider
 from .openrouter import OpenRouterProvider
+
+
+@dataclass(frozen=True, slots=True)
+class OllamaAccountStatus:
+    signed_in: bool
+    username: str | None = None
+    detail: str | None = None
 
 
 async def list_provider_models(
@@ -56,6 +64,37 @@ async def list_provider_models(
             await http.aclose()
 
 
+async def get_ollama_account(
+    *,
+    base_url: str | None = None,
+    timeout_seconds: float = 10.0,
+    client: httpx.AsyncClient | None = None,
+) -> OllamaAccountStatus:
+    """Return the Ollama Cloud account attached to the local daemon."""
+
+    owned_client = client is None
+    http = client or httpx.AsyncClient(timeout=min(timeout_seconds, 10.0))
+    url = f"{(base_url or OllamaProvider.default_base_url).rstrip('/')}/me"
+    try:
+        response = await http.post(url)
+        if response.status_code == 401:
+            return OllamaAccountStatus(signed_in=False, detail="Not signed in")
+        response.raise_for_status()
+        payload = response.json()
+        username = str(payload.get("name", "")).strip() if isinstance(payload, Mapping) else ""
+        if not username:
+            return OllamaAccountStatus(
+                signed_in=False,
+                detail="Ollama did not return an account name",
+            )
+        return OllamaAccountStatus(signed_in=True, username=username)
+    except (httpx.HTTPError, OSError, TypeError, ValueError) as error:
+        return OllamaAccountStatus(signed_in=False, detail=f"Account unavailable: {error}")
+    finally:
+        if owned_client:
+            await http.aclose()
+
+
 def _base_url(target: ProviderTarget, provider: str) -> str:
     defaults = {
         "ollama": OllamaProvider.default_base_url,
@@ -82,4 +121,4 @@ def _model_ids(provider: str, payload: Any) -> set[str]:
     return {value for value in values if value}
 
 
-__all__ = ["list_provider_models"]
+__all__ = ["OllamaAccountStatus", "get_ollama_account", "list_provider_models"]

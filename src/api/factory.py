@@ -17,6 +17,7 @@ from starlette.exceptions import HTTPException
 from src.api.container import ApplicationContainer, build_application_container
 from src.api.errors import application_error_response, error_response, http_exception_response
 from src.api.routes import register_routes
+from src.application.contracts.providers import ProviderError
 from src.application.errors import ApplicationError
 from src.config import Settings, get_settings
 from src.paths import PROJECT_ROOT
@@ -78,6 +79,20 @@ def create_app(
             code="validation_error",
             message="Request validation failed.",
             details={"errors": error.errors()},
+        )
+
+    @app.exception_handler(ProviderError)
+    async def _provider_error(_: Request, error: ProviderError) -> JSONResponse:
+        return error_response(
+            status_code=502,
+            code=error.code,
+            message=str(error),
+            details={
+                "provider": error.provider,
+                "status_code": error.status_code,
+                "request_id": error.request_id,
+                "attempts": error.attempts,
+            },
         )
 
     @app.exception_handler(Exception)

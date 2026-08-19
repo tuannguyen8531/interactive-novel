@@ -314,6 +314,12 @@ export interface ProviderModelsResponse {
   models: string[]
 }
 
+export interface OllamaAccount {
+  signed_in: boolean
+  username: string | null
+  detail: string | null
+}
+
 export interface ConnectivityResult {
   provider: string
   model: string
