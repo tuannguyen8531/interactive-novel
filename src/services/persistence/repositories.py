@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.application.contracts.persistence import PlaythroughRecord, WorldRecord
+from src.application.contracts.persistence import CharacterRecord, PlaythroughRecord, WorldRecord
 
-from .models import PlaythroughModel, WorldModel
+from .models import CharacterModel, PlaythroughModel, WorldModel
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -41,6 +41,7 @@ def _playthrough_record(model: PlaythroughModel) -> PlaythroughRecord:
         world_clock_minutes=model.world_clock_minutes,
         rng_seed=model.rng_seed,
         rng_state=dict(model.rng_state),
+        active_branch_id=model.active_branch_id,
         lifecycle=model.lifecycle,
         schema_version=model.schema_version,
         created_at=_as_utc(model.created_at),
@@ -76,6 +77,10 @@ class SqlAlchemyWorldRepository:
         model = result.scalar_one_or_none()
         return None if model is None else _world_record(model)
 
+    async def list(self) -> list[WorldRecord]:
+        result = await self._session.scalars(select(WorldModel).order_by(WorldModel.created_at, WorldModel.id))
+        return [_world_record(model) for model in result.all()]
+
 
 class SqlAlchemyPlaythroughRepository:
     """Playthrough repository backed by the current Unit of Work session."""
@@ -94,6 +99,7 @@ class SqlAlchemyPlaythroughRepository:
                 world_clock_minutes=playthrough.world_clock_minutes,
                 rng_seed=playthrough.rng_seed,
                 rng_state=dict(playthrough.rng_state),
+                active_branch_id=playthrough.active_branch_id,
                 lifecycle=playthrough.lifecycle,
                 schema_version=playthrough.schema_version,
                 created_at=playthrough.created_at,
@@ -107,15 +113,92 @@ class SqlAlchemyPlaythroughRepository:
         model = result.scalar_one_or_none()
         return None if model is None else _playthrough_record(model)
 
+    async def list(self, *, world_id: str | None = None) -> list[PlaythroughRecord]:
+        statement = select(PlaythroughModel).order_by(PlaythroughModel.created_at, PlaythroughModel.id)
+        if world_id is not None:
+            statement = statement.where(PlaythroughModel.world_id == world_id)
+        result = await self._session.scalars(statement)
+        return [_playthrough_record(model) for model in result.all()]
+
     async def set_root_branch(self, playthrough_id: str, branch_id: str) -> None:
         result = await self._session.execute(
             update(PlaythroughModel)
             .where(PlaythroughModel.id == playthrough_id)
-            .values(root_branch_id=branch_id, updated_at=datetime.now(UTC))
+            .values(root_branch_id=branch_id, active_branch_id=branch_id, updated_at=datetime.now(UTC))
+        )
+        if getattr(result, "rowcount", None) != 1:
+            raise ValueError(f"Playthrough {playthrough_id} does not exist.")
+        await self._session.flush()
+
+    async def set_active_branch(self, playthrough_id: str, branch_id: str) -> None:
+        result = await self._session.execute(
+            update(PlaythroughModel)
+            .where(PlaythroughModel.id == playthrough_id)
+            .values(active_branch_id=branch_id, updated_at=datetime.now(UTC))
+        )
+        if getattr(result, "rowcount", None) != 1:
+            raise ValueError(f"Playthrough {playthrough_id} does not exist.")
+        await self._session.flush()
+
+    async def update_provider_config_snapshot(self, playthrough_id: str, snapshot: dict[str, object]) -> None:
+        result = await self._session.execute(
+            update(PlaythroughModel)
+            .where(PlaythroughModel.id == playthrough_id)
+            .values(provider_config_snapshot=dict(snapshot), updated_at=datetime.now(UTC))
         )
         if getattr(result, "rowcount", None) != 1:
             raise ValueError(f"Playthrough {playthrough_id} does not exist.")
         await self._session.flush()
 
 
-__all__ = ["SqlAlchemyPlaythroughRepository", "SqlAlchemyWorldRepository"]
+class SqlAlchemyCharacterRepository:
+    """World/profile repository for confirmed world-builder characters."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, character: CharacterRecord) -> None:
+        self._session.add(
+            CharacterModel(
+                id=character.id,
+                world_id=character.world_id,
+                playthrough_id=character.playthrough_id,
+                display_name=character.display_name,
+                aliases=list(character.aliases),
+                profile=dict(character.profile),
+                schema_version=character.schema_version,
+                created_at=character.created_at,
+                updated_at=character.updated_at,
+            )
+        )
+        await self._session.flush()
+
+    async def get(self, character_id: str) -> CharacterRecord | None:
+        model = await self._session.scalar(select(CharacterModel).where(CharacterModel.id == character_id))
+        return None if model is None else _character_record(model)
+
+    async def list(self, *, world_id: str, playthrough_id: str | None = None) -> list[CharacterRecord]:
+        statement = select(CharacterModel).where(CharacterModel.world_id == world_id)
+        if playthrough_id is not None:
+            statement = statement.where(
+                or_(CharacterModel.playthrough_id == playthrough_id, CharacterModel.playthrough_id.is_(None))
+            )
+        statement = statement.order_by(CharacterModel.created_at, CharacterModel.id)
+        return [_character_record(model) for model in (await self._session.scalars(statement)).all()]
+
+
+def _character_record(model: CharacterModel) -> CharacterRecord:
+    return CharacterRecord(
+        id=model.id,
+        world_id=model.world_id,
+        playthrough_id=model.playthrough_id,
+        display_name=model.display_name,
+        aliases=tuple(model.aliases),
+        profile=dict(model.profile),
+        schema_version=model.schema_version,
+        created_at=_as_utc(model.created_at),
+        updated_at=_as_utc(model.updated_at),
+    )
+
+
+__all__ = ["SqlAlchemyCharacterRepository", "SqlAlchemyPlaythroughRepository", "SqlAlchemyWorldRepository"]

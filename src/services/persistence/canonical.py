@@ -181,6 +181,29 @@ class SqlAlchemyCanonicalRepository:
         model = await self._session.scalar(select(TurnModel).where(TurnModel.id == turn_id))
         return None if model is None else _turn_record(model)
 
+    async def get_turn_by_run_id(self, turn_run_id: str) -> TurnRecord | None:
+        model = await self._session.scalar(select(TurnModel).where(TurnModel.turn_run_id == turn_run_id))
+        return None if model is None else _turn_record(model)
+
+    async def list_branches(self, playthrough_id: str) -> list[BranchRecord]:
+        models = list(
+            (
+                await self._session.scalars(
+                    select(BranchModel)
+                    .where(BranchModel.playthrough_id == playthrough_id)
+                    .order_by(BranchModel.depth, BranchModel.created_at, BranchModel.id)
+                )
+            ).all()
+        )
+        return [_branch_record(model) for model in models]
+
+    async def list_turns(self, playthrough_id: str, *, branch_id: str | None = None) -> list[TurnRecord]:
+        statement = select(TurnModel).where(TurnModel.playthrough_id == playthrough_id)
+        if branch_id is not None:
+            statement = statement.where(TurnModel.branch_id == branch_id)
+        statement = statement.order_by(TurnModel.created_at, TurnModel.id)
+        return [_turn_record(model) for model in (await self._session.scalars(statement)).all()]
+
     async def get_branch_ancestry(self, branch_id: str) -> list[BranchRecord]:
         records: list[BranchRecord] = []
         seen: set[str] = set()

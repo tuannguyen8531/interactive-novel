@@ -78,4 +78,12 @@ class ProviderGateway(Protocol):
     async def aclose(self) -> None: ...
 
 
-__all__ = ["ProviderGateway", "ProviderPort"]
+class ProviderSettingsStore(Protocol):
+    """Secret-free storage for the active provider routing snapshot."""
+
+    async def get(self) -> dict[str, object] | None: ...
+
+    async def put(self, snapshot: dict[str, object]) -> None: ...
+
+
+__all__ = ["ProviderGateway", "ProviderPort", "ProviderSettingsStore"]

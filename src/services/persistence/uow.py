@@ -4,11 +4,19 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.application.ports.persistence import CanonicalRepository, PlaythroughRepository, UowFactory, WorldRepository
+from src.application.ports.persistence import (
+    CanonicalRepository,
+    CharacterRepository,
+    InspectionRepository,
+    PlaythroughRepository,
+    UowFactory,
+    WorldRepository,
+)
 
 from .canonical import SqlAlchemyCanonicalRepository
 from .database import Database
-from .repositories import SqlAlchemyPlaythroughRepository, SqlAlchemyWorldRepository
+from .queries import SqlAlchemyInspectionRepository
+from .repositories import SqlAlchemyCharacterRepository, SqlAlchemyPlaythroughRepository, SqlAlchemyWorldRepository
 from .retrieval import SqlAlchemyRetrievalRepository
 
 
@@ -19,8 +27,10 @@ class SqlAlchemyUnitOfWork:
         self._session = session_factory()
         self._completed = False
         self.worlds: WorldRepository = SqlAlchemyWorldRepository(self._session)
+        self.characters: CharacterRepository = SqlAlchemyCharacterRepository(self._session)
         self.playthroughs: PlaythroughRepository = SqlAlchemyPlaythroughRepository(self._session)
         self.canonical: CanonicalRepository = SqlAlchemyCanonicalRepository(self._session)
+        self.inspection: InspectionRepository = SqlAlchemyInspectionRepository(self._session)
         self._retrieval = SqlAlchemyRetrievalRepository(self._session)
 
     @property

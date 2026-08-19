@@ -86,6 +86,46 @@ class WorldRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class CharacterRecord:
+    """Persistence-neutral character seed/profile owned by a world."""
+
+    id: str
+    world_id: str
+    playthrough_id: str | None
+    display_name: str
+    aliases: tuple[str, ...]
+    profile: dict[str, Any]
+    schema_version: int = 1
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        world_id: str,
+        display_name: str,
+        aliases: tuple[str, ...] = (),
+        profile: dict[str, Any] | None = None,
+        playthrough_id: str | None = None,
+        character_id: str | None = None,
+    ) -> CharacterRecord:
+        if not world_id.strip() or not display_name.strip():
+            raise ValueError("Character world and display name must not be empty.")
+        now = utc_now()
+        return cls(
+            id=character_id or str(uuid4()),
+            world_id=world_id,
+            playthrough_id=playthrough_id,
+            display_name=display_name,
+            aliases=tuple(aliases),
+            profile=dict(profile or {}),
+            created_at=now,
+            updated_at=now,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class PlaythroughRecord:
     """Persistence-neutral representation of a single playthrough."""
 
@@ -97,6 +137,7 @@ class PlaythroughRecord:
     world_clock_minutes: int
     rng_seed: str
     rng_state: dict[str, Any]
+    active_branch_id: str | None = None
     lifecycle: str = "active"
     schema_version: int = 1
     created_at: datetime = field(default_factory=utc_now)
@@ -113,6 +154,7 @@ class PlaythroughRecord:
         world_clock_minutes: int = 0,
         rng_seed: str | None = None,
         rng_state: dict[str, Any] | None = None,
+        active_branch_id: str | None = None,
         playthrough_id: str | None = None,
     ) -> PlaythroughRecord:
         if world_clock_minutes < 0:
@@ -127,6 +169,7 @@ class PlaythroughRecord:
             world_clock_minutes=world_clock_minutes,
             rng_seed=rng_seed or str(uuid4()),
             rng_state=dict(rng_state or {}),
+            active_branch_id=active_branch_id,
             created_at=now,
             updated_at=now,
         )
@@ -502,6 +545,7 @@ __all__ = [
     "BranchRecord",
     "CanonFactRecord",
     "CanonicalTurnBundle",
+    "CharacterRecord",
     "CharacterStateRecord",
     "ClaimLinkRecord",
     "DerivedJobRecord",

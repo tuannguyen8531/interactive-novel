@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.application.contracts.persistence import WorldRecord
+from src.application.errors import ResourceNotFoundError
 from src.application.ports.persistence import UowFactory
 
 
@@ -40,6 +41,18 @@ class WorldApplicationService:
     async def load_world(self, world_id: str) -> WorldRecord | None:
         async with self._uow_factory() as uow:
             return await uow.worlds.get(world_id)
+
+    async def get_world(self, world_id: str) -> WorldRecord:
+        """Load one world as a required resource for command use cases."""
+        world = await self.load_world(world_id)
+        if world is None:
+            raise ResourceNotFoundError(f"World {world_id} does not exist.")
+        return world
+
+    async def list_worlds(self) -> tuple[WorldRecord, ...]:
+        """List reusable worlds in stable creation order."""
+        async with self._uow_factory() as uow:
+            return tuple(await uow.worlds.list())
 
 
 __all__ = ["WorldApplicationService"]

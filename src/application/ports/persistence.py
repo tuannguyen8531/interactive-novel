@@ -8,6 +8,7 @@ from typing import Protocol
 from src.application.contracts.persistence import (
     BranchRecord,
     CanonicalTurnBundle,
+    CharacterRecord,
     DerivedJobRecord,
     EventRecord,
     InvariantReport,
@@ -16,6 +17,7 @@ from src.application.contracts.persistence import (
     TurnRecord,
     WorldRecord,
 )
+from src.application.contracts.queries import CharacterView, MemoryView, RelationshipView
 
 from .retrieval import MemoryCandidateSource
 
@@ -25,13 +27,29 @@ class WorldRepository(Protocol):
 
     async def get(self, world_id: str) -> WorldRecord | None: ...
 
+    async def list(self) -> list[WorldRecord]: ...
+
+
+class CharacterRepository(Protocol):
+    async def add(self, character: CharacterRecord) -> None: ...
+
+    async def get(self, character_id: str) -> CharacterRecord | None: ...
+
+    async def list(self, *, world_id: str, playthrough_id: str | None = None) -> list[CharacterRecord]: ...
+
 
 class PlaythroughRepository(Protocol):
     async def add(self, playthrough: PlaythroughRecord) -> None: ...
 
     async def get(self, playthrough_id: str) -> PlaythroughRecord | None: ...
 
+    async def list(self, *, world_id: str | None = None) -> list[PlaythroughRecord]: ...
+
     async def set_root_branch(self, playthrough_id: str, branch_id: str) -> None: ...
+
+    async def set_active_branch(self, playthrough_id: str, branch_id: str) -> None: ...
+
+    async def update_provider_config_snapshot(self, playthrough_id: str, snapshot: dict[str, object]) -> None: ...
 
 
 class CanonicalRepository(Protocol):
@@ -42,6 +60,12 @@ class CanonicalRepository(Protocol):
     async def get_branch(self, branch_id: str) -> BranchRecord | None: ...
 
     async def get_turn(self, turn_id: str) -> TurnRecord | None: ...
+
+    async def get_turn_by_run_id(self, turn_run_id: str) -> TurnRecord | None: ...
+
+    async def list_branches(self, playthrough_id: str) -> list[BranchRecord]: ...
+
+    async def list_turns(self, playthrough_id: str, *, branch_id: str | None = None) -> list[TurnRecord]: ...
 
     async def get_branch_ancestry(self, branch_id: str) -> list[BranchRecord]: ...
 
@@ -82,10 +106,50 @@ class CanonicalRepository(Protocol):
     async def reconcile_derived_jobs(self) -> int: ...
 
 
+class InspectionRepository(Protocol):
+    """Read-only projections used by character, memory and relationship queries."""
+
+    async def list_characters(
+        self,
+        *,
+        playthrough_id: str,
+        world_id: str,
+        branch_id: str | None = None,
+    ) -> list[CharacterView]: ...
+
+    async def get_character_public_profile(
+        self,
+        *,
+        playthrough_id: str,
+        world_id: str,
+        character_id: str,
+        branch_id: str | None = None,
+    ) -> CharacterView | None: ...
+
+    async def inspect_character_memory(
+        self,
+        *,
+        playthrough_id: str,
+        branch_id: str,
+        character_id: str,
+        limit: int = 100,
+    ) -> list[MemoryView]: ...
+
+    async def inspect_relationships(
+        self,
+        *,
+        playthrough_id: str,
+        branch_id: str,
+        character_id: str | None = None,
+    ) -> list[RelationshipView]: ...
+
+
 class UnitOfWork(Protocol):
     worlds: WorldRepository
+    characters: CharacterRepository
     playthroughs: PlaythroughRepository
     canonical: CanonicalRepository
+    inspection: InspectionRepository
 
     @property
     def retrieval(self) -> MemoryCandidateSource: ...
@@ -101,4 +165,12 @@ class UnitOfWork(Protocol):
 
 UowFactory = Callable[[], UnitOfWork]
 
-__all__ = ["CanonicalRepository", "PlaythroughRepository", "UnitOfWork", "UowFactory", "WorldRepository"]
+__all__ = [
+    "CanonicalRepository",
+    "CharacterRepository",
+    "InspectionRepository",
+    "PlaythroughRepository",
+    "UnitOfWork",
+    "UowFactory",
+    "WorldRepository",
+]

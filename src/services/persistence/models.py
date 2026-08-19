@@ -42,6 +42,7 @@ class PlaythroughModel(Base):
     world_clock_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     rng_seed: Mapped[str] = mapped_column(String(160), nullable=False)
     rng_state: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    active_branch_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     lifecycle: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
     schema_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

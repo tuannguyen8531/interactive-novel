@@ -16,7 +16,7 @@ from .ai import (
     TurnPlan,
     WorldSeed,
 )
-from .persistence import PlaythroughRecord, WorldRecord
+from .persistence import CharacterRecord, PlaythroughRecord, WorldRecord
 from .providers import ProviderRequest, ProviderRoutingConfig, ProviderTarget
 from .retrieval import (
     PUBLIC_OWNER,
@@ -44,6 +44,7 @@ __all__ = [
     "AIPromptRole",
     "ConsistencyReport",
     "ClaimExtractionResult",
+    "CharacterRecord",
     "ContextEntry",
     "CritiqueResult",
     "EmbeddingMetadata",

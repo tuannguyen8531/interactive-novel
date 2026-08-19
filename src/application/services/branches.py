@@ -66,6 +66,21 @@ class BranchApplicationService:
             branch_id=branch_id,
         )
 
+    async def switch_branch(self, *, playthrough_id: str, branch_id: str) -> BranchRecord:
+        """Make an existing active branch the playthrough's selected branch."""
+        async with self._uow_factory() as uow:
+            playthrough = await uow.playthroughs.get(playthrough_id)
+            if playthrough is None:
+                raise ResourceNotFoundError(f"Playthrough {playthrough_id} does not exist.")
+            branch = await uow.canonical.get_branch(branch_id)
+            if branch is None or branch.playthrough_id != playthrough_id:
+                raise ResourceNotFoundError(f"Branch {branch_id} does not belong to playthrough {playthrough_id}.")
+            if branch.lifecycle != "active":
+                raise ResourceConflictError("Cannot switch to an abandoned branch.")
+            await uow.playthroughs.set_active_branch(playthrough_id, branch_id)
+            await uow.commit()
+            return branch
+
     async def list_ancestry(self, branch_id: str) -> list[BranchRecord]:
         async with self._uow_factory() as uow:
             try:
