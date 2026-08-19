@@ -17,6 +17,30 @@ After `uv run build`, `uv run serve` serves the built Vue SPA and backend from
 `http://127.0.0.1:8000`. The health endpoint is
 `http://127.0.0.1:8000/api/health`.
 
+## Provider configuration
+
+Create the local environment file once:
+
+```bash
+cp .env.example .env
+```
+
+The Settings / Providers screen edits provider targets, model IDs, base URLs,
+per-role routing and fallbacks. These non-secret values are persisted in
+`runtime/settings.json` and applied to the running provider router when saved.
+The model field discovers available IDs from the selected provider, while still
+allowing a custom model ID when the catalog is unavailable or incomplete.
+
+Keep `GEMINI_API_KEY`, `OPENROUTER_API_KEY` and other credentials in `.env`.
+The UI stores only an environment-variable name such as `GEMINI_API_KEY`; API
+responses and `runtime/settings.json` never contain the secret value. Shell
+environment variables take precedence over `.env`.
+
+Ollama uses separate defaults for generation and embeddings. Ensure the model
+IDs selected in the UI exist locally (for example `llama3.2:3b` and
+`nomic-embed-text:latest`). The default Ollama base URL includes its REST prefix:
+`http://localhost:11434/api`.
+
 For frontend development:
 
 ```bash

@@ -286,7 +286,7 @@ export interface JobEvent {
 
 export interface ProviderTarget {
   name: string
-  provider: string
+  provider: 'ollama' | 'gemini' | 'openrouter'
   model: string
   base_url: string | null
   api_key_env: string | null
@@ -307,6 +307,11 @@ export interface ProviderSettings {
   allow_cloud: boolean
   targets: Record<string, ProviderTarget>
   role_routes: Record<string, ProviderRoute>
+}
+
+export interface ProviderModelsResponse {
+  provider: ProviderTarget['provider']
+  models: string[]
 }
 
 export interface ConnectivityResult {

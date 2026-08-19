@@ -8,6 +8,8 @@ import type {
   PlaythroughExport,
   PlaythroughRecord,
   ProviderSettings,
+  ProviderModelsResponse,
+  ProviderTarget,
   RelationshipView,
   TimelineEvent,
   TurnJobView,
@@ -179,6 +181,13 @@ export const api = {
   getProviderSettings: (): Promise<ProviderSettings | null> => request<ProviderSettings | null>('/api/providers/settings'),
   updateProviderSettings: (payload: Record<string, unknown>): Promise<ProviderSettings> =>
     request<ProviderSettings>('/api/providers/settings', jsonPut(payload)),
+  listProviderModels: (target: ProviderTarget): Promise<ProviderModelsResponse> =>
+    request<ProviderModelsResponse>('/api/providers/models', jsonBody({
+      provider: target.provider,
+      base_url: target.base_url,
+      api_key_env: target.api_key_env,
+      timeout_seconds: target.timeout_seconds
+    })),
   testProviderConnection: (): Promise<ConnectivityResult[]> =>
     request<ConnectivityResult[]>('/api/providers/test', { method: 'POST' })
 }

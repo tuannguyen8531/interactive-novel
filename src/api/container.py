@@ -60,7 +60,7 @@ class ApplicationContainer:
 
     async def start(self) -> None:
         await upgrade_database(self.database.engine)
-        await self.provider_settings.initialize(_default_provider_config())
+        await self.provider_settings.initialize(_default_provider_config(self.settings))
         await self.turns.start()
         await self.derived_worker.start()
 
@@ -91,7 +91,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     )
     uow_factory = make_uow_factory(database)
     events = InMemoryJobEventBroker(history_size=settings.sse_history_size)
-    provider = ProviderRouter(_default_provider_config())
+    provider = ProviderRouter(_default_provider_config(settings))
     runner = GraphTurnRunner(
         uow_factory=uow_factory,
         provider=cast(Any, provider),
@@ -145,8 +145,19 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
     )
 
 
-def _default_provider_config() -> ProviderRoutingConfig:
-    target = ProviderTarget(name="local", provider="ollama", model="llama3.2")
+def _default_provider_config(settings: Settings) -> ProviderRoutingConfig:
+    completion = ProviderTarget(
+        name="local",
+        provider="ollama",
+        model=settings.ollama_model,
+        base_url=settings.ollama_base_url,
+    )
+    embedding = ProviderTarget(
+        name="local-embedding",
+        provider="ollama",
+        model=settings.ollama_embedding_model,
+        base_url=settings.ollama_base_url,
+    )
     roles: dict[str, ProviderRoute] = {
         role.value: ProviderRoute("local")
         for role in (
@@ -158,8 +169,11 @@ def _default_provider_config() -> ProviderRoutingConfig:
         )
     }
     roles["world_builder"] = ProviderRoute("local")
-    roles["embedding"] = ProviderRoute("local")
-    return ProviderRoutingConfig(targets={target.name: target}, role_routes=roles)
+    roles["embedding"] = ProviderRoute("local-embedding")
+    return ProviderRoutingConfig(
+        targets={completion.name: completion, embedding.name: embedding},
+        role_routes=roles,
+    )
 
 
 __all__ = ["ApplicationContainer", "build_application_container"]

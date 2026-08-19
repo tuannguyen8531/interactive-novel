@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends
 
 from src.api.container import ApplicationContainer
 from src.api.dependencies import get_services
-from src.api.schemas import ProviderSettingsRequest
+from src.api.schemas import ProviderModelsRequest, ProviderModelsResponse, ProviderSettingsRequest
 from src.api.serialization import public_json
 from src.application.contracts.providers import ExecutionMode, ProviderRoute, ProviderRoutingConfig, ProviderTarget
+from src.services.llm.models import list_provider_models
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 _services_dependency = Depends(get_services)
@@ -43,6 +44,20 @@ async def update_provider_settings(
 @router.post("/test")
 async def test_provider_connection(services: ApplicationContainer = _services_dependency):
     return public_json(await services.provider_settings.test_provider_connection())
+
+
+@router.post("/models", response_model=ProviderModelsResponse)
+async def get_provider_models(payload: ProviderModelsRequest) -> ProviderModelsResponse:
+    target = ProviderTarget(
+        name="model-catalog",
+        provider=payload.provider,
+        model="model-catalog",
+        base_url=payload.base_url,
+        api_key_env=payload.api_key_env,
+        timeout_seconds=payload.timeout_seconds,
+    )
+    models = await list_provider_models(target)
+    return ProviderModelsResponse(provider=payload.provider, models=list(models))
 
 
 __all__ = ["router"]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.application.contracts.ai import WorldSeed
 
@@ -97,12 +97,13 @@ class TurnSubmitRequest(BaseModel):
 
 
 class ProviderTargetRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(min_length=1, max_length=160)
-    provider: str = Field(min_length=1, max_length=40)
+    provider: Literal["ollama", "gemini", "openrouter"]
     model: str = Field(min_length=1, max_length=160)
     base_url: str | None = Field(default=None, max_length=2_000)
-    api_key_env: str | None = Field(default=None, max_length=160)
-    api_key: str | None = Field(default=None, max_length=10_000)
+    api_key_env: str | None = Field(default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$", max_length=160)
     timeout_seconds: float = Field(default=60.0, gt=0, le=600)
     max_retries: int = Field(default=2, ge=0, le=10)
     backoff_base_seconds: float = Field(default=0.25, ge=0, le=60)
@@ -118,6 +119,50 @@ class ProviderSettingsRequest(BaseModel):
     role_routes: dict[str, ProviderRouteRequest]
     mode: Literal["quality", "fast"] = "quality"
     allow_cloud: bool = False
+
+    @model_validator(mode="after")
+    def validate_routing(self) -> ProviderSettingsRequest:
+        if not self.targets:
+            raise ValueError("At least one provider target is required.")
+        for name, target in self.targets.items():
+            if name != target.name:
+                raise ValueError(f"Provider target key {name} must match its name.")
+        required_roles = {
+            "planner",
+            "simulator",
+            "context_validator",
+            "writer",
+            "critic",
+            "world_builder",
+            "embedding",
+        }
+        missing_roles = sorted(required_roles - self.role_routes.keys())
+        if missing_roles:
+            raise ValueError(f"Missing provider routes: {', '.join(missing_roles)}.")
+        for role, route in self.role_routes.items():
+            referenced = (route.primary_target, *route.fallback_targets)
+            unknown = [name for name in referenced if name not in self.targets]
+            if unknown:
+                raise ValueError(f"Provider route {role} references unknown target {unknown[0]}.")
+            if route.primary_target in route.fallback_targets:
+                raise ValueError(f"Provider route {role} repeats its primary target as fallback.")
+            if len(set(route.fallback_targets)) != len(route.fallback_targets):
+                raise ValueError(f"Provider route {role} contains duplicate fallbacks.")
+        return self
+
+
+class ProviderModelsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: Literal["ollama", "gemini", "openrouter"]
+    base_url: str | None = Field(default=None, max_length=2_000)
+    api_key_env: str | None = Field(default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$", max_length=160)
+    timeout_seconds: float = Field(default=10.0, gt=0, le=600)
+
+
+class ProviderModelsResponse(BaseModel):
+    provider: Literal["ollama", "gemini", "openrouter"]
+    models: list[str]
 
 
 class FeedbackRequest(BaseModel):

@@ -47,8 +47,10 @@ function openFixture(): void {
       <p v-if="library.loading" class="muted">Loading the library…</p>
       <p v-else-if="library.error" class="muted">{{ library.error }}</p>
       <p v-else class="muted">Server data remains the source of truth when the API is available.</p>
-      <button type="button" @click="router.push({ name: 'world-builder' })">Create a world</button>
-      <button class="secondary" type="button" :disabled="library.loading" @click="library.load()">Refresh library</button>
+      <div class="backend-actions">
+        <button type="button" @click="router.push({ name: 'world-builder' })">Create a world</button>
+        <button class="secondary" type="button" :disabled="library.loading" @click="library.load()">Refresh library</button>
+      </div>
     </article>
   </section>
 
@@ -137,6 +139,11 @@ function openFixture(): void {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.backend-actions {
+  display: grid;
+  gap: 0.65rem;
 }
 
 .section-heading {

@@ -35,6 +35,11 @@ export const useSettingsStore = defineStore('settings', () => {
     error,
     load,
     save,
-    testProvider
+    testProvider,
+    addTarget: provider.addTarget,
+    removeTarget: provider.removeTarget,
+    changeProvider: provider.changeProvider,
+    setPrimaryTarget: provider.setPrimaryTarget,
+    toggleFallback: provider.toggleFallback
   }
 })

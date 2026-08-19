@@ -121,7 +121,11 @@ async def test_all_adapters_parse_and_repair_structured_output(provider: str) ->
 async def test_all_adapters_embed_and_check_connectivity(provider: str) -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "GET":
-            return httpx.Response(200, json={"models": []}, headers={"x-request-id": "health-1"})
+            return httpx.Response(
+                200,
+                json={"models": [{"name": "fixture-model:latest"}]},
+                headers={"x-request-id": "health-1"},
+            )
         if provider == "ollama":
             payload = {"model": "fixture-model", "embeddings": [[0.1, 0.2]]}
         elif provider == "gemini":
@@ -139,6 +143,18 @@ async def test_all_adapters_embed_and_check_connectivity(provider: str) -> None:
     assert embeddings.request_id == "embed-1"
     assert connectivity.reachable is True
     assert connectivity.request_id == "health-1"
+
+
+async def test_ollama_connectivity_reports_a_missing_configured_model() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"models": [{"name": "different-model:latest"}]})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        connectivity = await _provider("ollama", client).check_connectivity()
+
+    assert connectivity.reachable is False
+    assert connectivity.status_code == 404
+    assert connectivity.message == "Ollama model 'fixture-model:latest' is not installed."
 
 
 @pytest.mark.parametrize("provider", [name for name, _ in PROVIDERS])

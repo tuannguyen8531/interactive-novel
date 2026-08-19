@@ -5,15 +5,30 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from src.paths import PROJECT_ROOT
+
+ENV_FILE = PROJECT_ROOT / ".env"
+# Pydantic reads declared application fields from .env. Provider adapters use
+# os.getenv(api_key_env), so load the same file into the process environment
+# without overriding variables explicitly supplied by the shell.
+
+
+def load_environment(path: Path = ENV_FILE) -> None:
+    load_dotenv(path, override=False)
+
+
+load_environment()
 
 
 class Settings(BaseSettings):
     """Environment-backed settings with safe local-first defaults."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=ENV_FILE,
         env_prefix="",
         extra="ignore",
         case_sensitive=False,
@@ -38,6 +53,9 @@ class Settings(BaseSettings):
     telemetry_completion_cost_per_1k_tokens: float = Field(default=0.0, ge=0.0)
     telemetry_max_samples: int = Field(default=10_000, ge=1, le=1_000_000)
     input_max_chars: int = Field(default=20_000, ge=256, le=100_000)
+    ollama_base_url: str = "http://localhost:11434/api"
+    ollama_model: str = "llama3.2:3b"
+    ollama_embedding_model: str = "nomic-embed-text:latest"
 
     def cors_origin_list(self) -> list[str]:
         """Return configured exact CORS origins in stable order."""
@@ -50,4 +68,4 @@ def get_settings() -> Settings:
     return Settings()
 
 
-__all__ = ["Settings", "get_settings"]
+__all__ = ["ENV_FILE", "Settings", "get_settings", "load_environment"]

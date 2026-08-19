@@ -29,4 +29,37 @@ describe('API client', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/api/providers/test')
     expect((fetchMock.mock.calls[0][1] as RequestInit).method).toBe('POST')
   })
+
+  it('requests models using secret-safe target metadata', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ provider: 'ollama', models: ['llama3.2:3b'] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await api.listProviderModels({
+      name: 'local',
+      provider: 'ollama',
+      model: 'llama3.2:3b',
+      base_url: 'http://localhost:11434/api',
+      api_key_env: null,
+      timeout_seconds: 60,
+      max_retries: 2,
+      backoff_base_seconds: 0.25,
+      header_names: []
+    })
+
+    expect(result.models).toEqual(['llama3.2:3b'])
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/providers/models')
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(String(init.body))).toEqual({
+      provider: 'ollama',
+      base_url: 'http://localhost:11434/api',
+      api_key_env: null,
+      timeout_seconds: 60
+    })
+  })
 })

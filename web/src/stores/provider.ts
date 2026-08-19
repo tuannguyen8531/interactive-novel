@@ -1,7 +1,19 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/client'
-import type { ConnectivityResult, ProviderSettings } from '@/api/types'
+import type { ConnectivityResult, ProviderSettings, ProviderTarget } from '@/api/types'
+
+export const PROVIDER_ROLES = [
+  'planner',
+  'simulator',
+  'context_validator',
+  'writer',
+  'critic',
+  'world_builder',
+  'embedding'
+] as const
+
+type ProviderName = ProviderTarget['provider']
 
 function errorText(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
@@ -19,6 +31,7 @@ export const useProviderStore = defineStore('provider', () => {
     error.value = null
     try {
       settings.value = await api.getProviderSettings()
+      ensureRoutes()
     } catch (cause) {
       error.value = errorText(cause)
     } finally {
@@ -28,11 +41,27 @@ export const useProviderStore = defineStore('provider', () => {
 
   async function save(mode: 'quality' | 'fast', allowCloud: boolean): Promise<void> {
     if (!settings.value) return
+    ensureRoutes()
+    normalizeRoutes()
     loading.value = true
     error.value = null
     try {
       settings.value = await api.updateProviderSettings({
-        targets: settings.value.targets,
+        targets: Object.fromEntries(
+          Object.entries(settings.value.targets).map(([name, target]) => [
+            name,
+            {
+              name: target.name,
+              provider: target.provider,
+              model: target.model.trim(),
+              base_url: target.base_url?.trim() || null,
+              api_key_env: target.api_key_env?.trim() || null,
+              timeout_seconds: target.timeout_seconds,
+              max_retries: target.max_retries,
+              backoff_base_seconds: target.backoff_base_seconds
+            }
+          ])
+        ),
         role_routes: settings.value.role_routes,
         mode,
         allow_cloud: allowCloud
@@ -58,5 +87,119 @@ export const useProviderStore = defineStore('provider', () => {
     }
   }
 
-  return { settings, connectivity, loading, testing, error, load, save, test }
+  function ensureRoutes(): void {
+    if (!settings.value) return
+    const firstTarget = Object.keys(settings.value.targets)[0]
+    if (!firstTarget) return
+    for (const role of PROVIDER_ROLES) {
+      settings.value.role_routes[role] ??= { primary_target: firstTarget, fallback_targets: [] }
+    }
+  }
+
+  function normalizeRoutes(): void {
+    if (!settings.value) return
+    const targetNames = new Set(Object.keys(settings.value.targets))
+    for (const route of Object.values(settings.value.role_routes)) {
+      route.fallback_targets = [...new Set(route.fallback_targets)].filter(
+        (name) => name !== route.primary_target && targetNames.has(name)
+      )
+    }
+  }
+
+  function addTarget(provider: ProviderName = 'ollama'): string | null {
+    if (!settings.value) return null
+    let index = Object.keys(settings.value.targets).length + 1
+    let name = `target-${index}`
+    while (settings.value.targets[name]) {
+      index += 1
+      name = `target-${index}`
+    }
+    settings.value.targets[name] = targetDefaults(name, provider)
+    ensureRoutes()
+    return name
+  }
+
+  function removeTarget(name: string): void {
+    if (!settings.value || Object.keys(settings.value.targets).length <= 1) return
+    delete settings.value.targets[name]
+    const replacement = Object.keys(settings.value.targets)[0]
+    for (const route of Object.values(settings.value.role_routes)) {
+      if (route.primary_target === name) route.primary_target = replacement
+      route.fallback_targets = route.fallback_targets.filter((targetName) => targetName !== name)
+    }
+    normalizeRoutes()
+  }
+
+  function changeProvider(name: string, provider: ProviderName): void {
+    const target = settings.value?.targets[name]
+    if (!target) return
+    const defaults = targetDefaults(name, provider)
+    Object.assign(target, {
+      provider,
+      model: defaults.model,
+      base_url: defaults.base_url,
+      api_key_env: defaults.api_key_env
+    })
+  }
+
+  function setPrimaryTarget(role: string, targetName: string): void {
+    const route = settings.value?.role_routes[role]
+    if (!route || !settings.value?.targets[targetName]) return
+    route.primary_target = targetName
+    route.fallback_targets = route.fallback_targets.filter((name) => name !== targetName)
+  }
+
+  function toggleFallback(role: string, targetName: string, enabled: boolean): void {
+    const route = settings.value?.role_routes[role]
+    if (!route || route.primary_target === targetName) return
+    const values = new Set(route.fallback_targets)
+    if (enabled) values.add(targetName)
+    else values.delete(targetName)
+    route.fallback_targets = [...values]
+  }
+
+  return {
+    settings,
+    connectivity,
+    loading,
+    testing,
+    error,
+    load,
+    save,
+    test,
+    addTarget,
+    removeTarget,
+    changeProvider,
+    setPrimaryTarget,
+    toggleFallback
+  }
 })
+
+function targetDefaults(name: string, provider: ProviderName): ProviderTarget {
+  const defaults: Record<ProviderName, Pick<ProviderTarget, 'model' | 'base_url' | 'api_key_env'>> = {
+    ollama: {
+      model: 'llama3.2:3b',
+      base_url: 'http://localhost:11434/api',
+      api_key_env: null
+    },
+    gemini: {
+      model: 'gemini-2.5-flash',
+      base_url: null,
+      api_key_env: 'GEMINI_API_KEY'
+    },
+    openrouter: {
+      model: 'qwen/qwen3-8b',
+      base_url: null,
+      api_key_env: 'OPENROUTER_API_KEY'
+    }
+  }
+  return {
+    name,
+    provider,
+    ...defaults[provider],
+    timeout_seconds: 60,
+    max_retries: 2,
+    backoff_base_seconds: 0.25,
+    header_names: []
+  }
+}

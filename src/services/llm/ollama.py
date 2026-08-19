@@ -10,6 +10,7 @@ from typing import Any
 from src.application.contracts.providers import (
     EmbeddingResponse,
     ProviderCapability,
+    ProviderConfigurationError,
     ProviderProtocolError,
     ProviderRequest,
     ProviderResponse,
@@ -183,7 +184,22 @@ class OllamaProvider(BaseProvider):
         )
 
     async def _check_connectivity_once(self) -> tuple[int, str | None]:
-        response, _ = await self._request_json("GET", f"{self.base_url}/tags")
+        response, payload = await self._request_json("GET", f"{self.base_url}/tags")
+        models = payload.get("models") if isinstance(payload, Mapping) else None
+        available = {
+            str(value)
+            for item in models or ()
+            if isinstance(item, Mapping)
+            for value in (item.get("model"), item.get("name"))
+            if isinstance(value, str)
+        }
+        requested = self.model if ":" in self.model else f"{self.model}:latest"
+        if requested not in available:
+            raise ProviderConfigurationError(
+                f"Ollama model '{requested}' is not installed.",
+                provider=self.provider_name,
+                status_code=404,
+            )
         return response.status_code, self._request_id(response)
 
 
