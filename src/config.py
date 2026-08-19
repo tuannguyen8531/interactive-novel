@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     runtime_dir: Path = Path("runtime")
     database_busy_timeout_ms: int = Field(default=5_000, ge=0)
     database_echo: bool = False
+    turn_max_concurrency: int = Field(default=2, ge=1, le=32)
+    sse_history_size: int = Field(default=256, ge=1, le=10_000)
 
     def cors_origin_list(self) -> list[str]:
         """Return configured exact CORS origins in stable order."""

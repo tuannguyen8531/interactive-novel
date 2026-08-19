@@ -56,11 +56,20 @@ class IdempotencyConflictError(ResourceConflictError):
     public_message = "The idempotency key is already associated with another turn."
 
 
+class ServiceUnavailableError(ApplicationError):
+    """The API lifecycle has not initialized its application container."""
+
+    code = "service_unavailable"
+    public_message = "The application runtime is not ready."
+    status_code = 503
+
+
 __all__ = [
     "ApplicationError",
     "ApplicationValidationError",
     "IdempotencyConflictError",
     "ResourceConflictError",
     "ResourceNotFoundError",
+    "ServiceUnavailableError",
     "StaleBranchRevisionError",
 ]

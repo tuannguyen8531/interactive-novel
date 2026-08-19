@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
+from src.api.container import ApplicationContainer, build_application_container
 from src.api.errors import application_error_response, error_response, http_exception_response
 from src.api.routes import register_routes
 from src.application.errors import ApplicationError
@@ -21,12 +22,24 @@ _logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Keep lifecycle explicit while Phase 1 has no external resources."""
-    yield
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Own database migration, job recovery and graceful runner shutdown."""
+    container: ApplicationContainer | None = getattr(app.state, "services", None)
+    if container is None:
+        container = build_application_container(app.state.settings)
+        app.state.services = container
+    try:
+        await container.start()
+        yield
+    finally:
+        await container.shutdown()
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    services: ApplicationContainer | None = None,
+) -> FastAPI:
     """Construct an isolated FastAPI application for runtime and tests."""
     app_settings = settings or get_settings()
     app = FastAPI(
@@ -35,6 +48,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=_lifespan,
     )
     app.state.settings = app_settings
+    app.state.services = services
     app.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.cors_origin_list(),

@@ -2,7 +2,9 @@
 
 from .branches import BranchApplicationService
 from .canonical_turns import CanonicalTurnApplicationService
+from .events import InMemoryJobEventBroker
 from .export import PlaythroughExportApplicationService
+from .jobs import InMemoryJobStore, UowJobStore
 from .playthroughs import PlaythroughApplicationService
 from .provider_settings import ProviderSettingsApplicationService
 from .queries import CharacterQueryApplicationService
@@ -15,11 +17,14 @@ __all__ = [
     "BranchApplicationService",
     "CanonicalTurnApplicationService",
     "CharacterQueryApplicationService",
+    "InMemoryJobEventBroker",
+    "InMemoryJobStore",
     "PlaythroughExportApplicationService",
     "PlaythroughApplicationService",
     "ProviderSettingsApplicationService",
     "ReplayApplicationService",
     "TurnApplicationService",
+    "UowJobStore",
     "WorldApplicationService",
     "WorldDraftApplicationService",
 ]

@@ -100,6 +100,7 @@ class TurnJobView:
     result: Any = None
     error: dict[str, Any] | None = None
     cancellation_requested: bool = False
+    job_id: str | None = None
     created_at: datetime = field(default_factory=_utc_now)
     updated_at: datetime = field(default_factory=_utc_now)
 
@@ -114,6 +115,7 @@ class TurnJobView:
             "result": self.result,
             "error": self.error,
             "cancellation_requested": self.cancellation_requested,
+            "job_id": self.job_id,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }

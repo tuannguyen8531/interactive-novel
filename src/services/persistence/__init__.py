@@ -2,6 +2,7 @@
 
 from .canonical import InjectedCommitFailure, SqlAlchemyCanonicalRepository
 from .database import Database, create_database
+from .jobs import SqlAlchemyJobRepository
 from .migrations import upgrade_database
 from .retrieval import SqlAlchemyEmbeddingStore, SqlAlchemyRetrievalRepository, SqlAlchemyRetrievalTraceStore
 from .uow import SqlAlchemyUnitOfWork, make_uow_factory
@@ -11,6 +12,7 @@ __all__ = [
     "InjectedCommitFailure",
     "SqlAlchemyCanonicalRepository",
     "SqlAlchemyEmbeddingStore",
+    "SqlAlchemyJobRepository",
     "SqlAlchemyRetrievalRepository",
     "SqlAlchemyRetrievalTraceStore",
     "SqlAlchemyUnitOfWork",

@@ -143,6 +143,13 @@ class TurnGraphNodes:
             self._check_cancelled()
             update = await body(cast(TurnGraphState, working))
             merged = {**working, **update}
+            if node == "write" and merged.get("final_narrative"):
+                merged["node_events"] = await self._event(
+                    merged,
+                    node,
+                    "writer_token",
+                    {"text": str(merged["final_narrative"]), "index": 0, "done": False},
+                )
             merged["node_events"] = await self._event(merged, node, f"{event_prefix}_completed")
             return merged
         except ProviderCancelledError:

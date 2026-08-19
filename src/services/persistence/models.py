@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -426,6 +426,35 @@ class OutboxEventModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class JobModel(Base):
+    """Durable state for an application-level background job."""
+
+    __tablename__ = "jobs"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_jobs_idempotency"),
+        UniqueConstraint("turn_run_id", name="uq_jobs_turn_run_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(40), nullable=False, default="turn")
+    idempotency_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    turn_run_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    playthrough_id: Mapped[str] = mapped_column(String(36), ForeignKey("playthroughs.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(String(36), ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    base_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    raw_input: Mapped[str] = mapped_column(Text, nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    parent_turn_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    config_snapshot_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    command_fingerprint: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="queued")
+    cancellation_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 __all__ = [
     "Base",
     "BeliefEvidenceModel",
@@ -440,6 +469,7 @@ __all__ = [
     "EventModel",
     "EventParticipantModel",
     "KnowledgeClaimModel",
+    "JobModel",
     "MemoryEmbeddingModel",
     "NarrativeHookModel",
     "NarrativeThreadModel",

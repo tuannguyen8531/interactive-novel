@@ -19,6 +19,7 @@ from src.application.contracts.persistence import (
 )
 from src.application.contracts.queries import CharacterView, MemoryView, RelationshipView
 
+from .jobs import JobRepository
 from .retrieval import MemoryCandidateSource
 
 
@@ -150,6 +151,7 @@ class UnitOfWork(Protocol):
     playthroughs: PlaythroughRepository
     canonical: CanonicalRepository
     inspection: InspectionRepository
+    jobs: JobRepository
 
     @property
     def retrieval(self) -> MemoryCandidateSource: ...
@@ -169,6 +171,7 @@ __all__ = [
     "CanonicalRepository",
     "CharacterRepository",
     "InspectionRepository",
+    "JobRepository",
     "PlaythroughRepository",
     "UnitOfWork",
     "UowFactory",
