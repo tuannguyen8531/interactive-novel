@@ -17,6 +17,8 @@ from src.application.contracts.persistence import (
     WorldRecord,
 )
 
+from .retrieval import MemoryCandidateSource
+
 
 class WorldRepository(Protocol):
     async def add(self, world: WorldRecord) -> None: ...
@@ -84,6 +86,9 @@ class UnitOfWork(Protocol):
     worlds: WorldRepository
     playthroughs: PlaythroughRepository
     canonical: CanonicalRepository
+
+    @property
+    def retrieval(self) -> MemoryCandidateSource: ...
 
     async def __aenter__(self) -> UnitOfWork: ...
 

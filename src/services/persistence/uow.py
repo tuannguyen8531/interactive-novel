@@ -9,6 +9,7 @@ from src.application.ports.persistence import CanonicalRepository, PlaythroughRe
 from .canonical import SqlAlchemyCanonicalRepository
 from .database import Database
 from .repositories import SqlAlchemyPlaythroughRepository, SqlAlchemyWorldRepository
+from .retrieval import SqlAlchemyRetrievalRepository
 
 
 class SqlAlchemyUnitOfWork:
@@ -20,6 +21,11 @@ class SqlAlchemyUnitOfWork:
         self.worlds: WorldRepository = SqlAlchemyWorldRepository(self._session)
         self.playthroughs: PlaythroughRepository = SqlAlchemyPlaythroughRepository(self._session)
         self.canonical: CanonicalRepository = SqlAlchemyCanonicalRepository(self._session)
+        self._retrieval = SqlAlchemyRetrievalRepository(self._session)
+
+    @property
+    def retrieval(self) -> SqlAlchemyRetrievalRepository:
+        return self._retrieval
 
     async def __aenter__(self) -> SqlAlchemyUnitOfWork:
         await self._session.begin()

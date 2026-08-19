@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -348,6 +348,49 @@ class SnapshotModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class MemoryEmbeddingModel(Base):
+    """Derived vector plus the metadata needed to invalidate stale values."""
+
+    __tablename__ = "memory_embeddings"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_id",
+            "model",
+            "embedding_version",
+            "content_hash",
+            name="uq_memory_embeddings_source_version",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    source_id: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    source_kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    playthrough_id: Mapped[str] = mapped_column(String(36), ForeignKey("playthroughs.id", ondelete="CASCADE"), index=True)
+    branch_id: Mapped[str] = mapped_column(String(36), ForeignKey("branches.id", ondelete="CASCADE"), index=True)
+    model: Mapped[str] = mapped_column(String(160), nullable=False)
+    dimensions: Mapped[int] = mapped_column(Integer, nullable=False)
+    embedding_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    vector: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class RetrievalTraceModel(Base):
+    """Safe retrieval audit metadata; raw prompts and model outputs are absent."""
+
+    __tablename__ = "retrieval_traces"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    query_id: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    phase: Mapped[str] = mapped_column(String(24), nullable=False)
+    playthrough_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    branch_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    owner_id: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
+    world_time: Mapped[int] = mapped_column(Integer, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class DerivedJobModel(Base):
     __tablename__ = "derived_jobs"
     __table_args__ = (UniqueConstraint("idempotency_key", name="uq_derived_jobs_idempotency"),)
@@ -396,6 +439,7 @@ __all__ = [
     "EventModel",
     "EventParticipantModel",
     "KnowledgeClaimModel",
+    "MemoryEmbeddingModel",
     "NarrativeHookModel",
     "NarrativeThreadModel",
     "ObservationModel",
@@ -403,6 +447,7 @@ __all__ = [
     "PlaythroughModel",
     "RelationshipChangeModel",
     "RelationshipModel",
+    "RetrievalTraceModel",
     "SnapshotModel",
     "TurnModel",
     "WorldModel",
