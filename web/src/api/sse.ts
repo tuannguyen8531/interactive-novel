@@ -43,6 +43,12 @@ export function openSse(url: string, handlers: SseHandlers, options: SseOptions 
   if (options.lastEventId) headers.set('Last-Event-ID', options.lastEventId)
 
   let closed = false
+  let closeNotified = false
+  const notifyClose = () => {
+    if (closeNotified) return
+    closeNotified = true
+    handlers.onClose?.()
+  }
   const run = async (): Promise<void> => {
     try {
       const response = await fetch(url, { headers, signal: controller.signal })
@@ -67,7 +73,7 @@ export function openSse(url: string, handlers: SseHandlers, options: SseOptions 
           separatorIndex = buffer.search(/\r\n\r\n|\n\n|\r\r/)
         }
       }
-      if (!closed) handlers.onClose?.()
+      if (!closed) notifyClose()
     } catch (error) {
       if (!closed && !(error instanceof DOMException && error.name === 'AbortError')) {
         handlers.onError?.(error instanceof Error ? error : new Error(String(error)))
@@ -83,7 +89,7 @@ export function openSse(url: string, handlers: SseHandlers, options: SseOptions 
       if (closed) return
       closed = true
       controller.abort()
-      handlers.onClose?.()
+      notifyClose()
     }
   }
 }

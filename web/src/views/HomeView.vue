@@ -1,89 +1,177 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { useLibraryStore } from '@/stores/library'
+import { FIXTURE_PLAYTHROUGH_ID } from '@/fixtures/fixture'
 
+const router = useRouter()
 const appStore = useAppStore()
+const library = useLibraryStore()
 
 onMounted(() => {
-  void appStore.checkHealth()
+  void Promise.all([appStore.checkHealth(), library.load()])
 })
+
+function openFixture(): void {
+  void router.push({ name: 'play', params: { playthroughId: FIXTURE_PLAYTHROUGH_ID } })
+}
 </script>
 
 <template>
-  <section class="card">
-    <p class="eyebrow">Phase 1 · Project skeleton</p>
-    <h2>Interactive Novel</h2>
-    <p>Backend, frontend shell and transport contracts are ready for the next phase.</p>
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Library</p>
+      <h1>Stories with a living memory</h1>
+      <p class="lede">Choose a playthrough, or step into the deterministic fixture to explore the full turn loop.</p>
+    </div>
+    <div class="health-pill" aria-live="polite">
+      <span class="health-dot" :class="{ connected: appStore.health }" />
+      {{ appStore.health ? 'Backend connected' : appStore.loading ? 'Checking backend…' : 'Fixture available offline' }}
+    </div>
+  </section>
 
-    <div class="health" aria-live="polite">
-      <span class="health-label">Backend health</span>
-      <span v-if="appStore.loading">Checking…</span>
-      <span v-else-if="appStore.health" class="ok">Connected · {{ appStore.health.version }}</span>
-      <span v-else class="error">{{ appStore.error ?? 'Unavailable' }}</span>
+  <section class="hero-grid">
+    <article class="card fixture-card">
+      <div>
+        <p class="eyebrow">Playable fixture</p>
+        <h2>Moonlight Academy</h2>
+        <p>A small school-romance world with three characters, branchable history and ten calm turns to play.</p>
+      </div>
+      <button type="button" @click="openFixture">Open fixture</button>
+    </article>
+
+    <article class="card backend-card">
+      <p class="eyebrow">Local runtime</p>
+      <h2>{{ library.worlds.length }} worlds · {{ library.playthroughs.length }} playthroughs</h2>
+      <p v-if="library.loading" class="muted">Loading the library…</p>
+      <p v-else-if="library.error" class="muted">{{ library.error }}</p>
+      <p v-else class="muted">Server data remains the source of truth when the API is available.</p>
+      <button class="secondary" type="button" :disabled="library.loading" @click="library.load()">Refresh library</button>
+    </article>
+  </section>
+
+  <section class="library-section">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Saved worlds</p>
+        <h2>Continue a story</h2>
+      </div>
     </div>
 
-    <button type="button" :disabled="appStore.loading" @click="appStore.checkHealth()">
-      Check again
-    </button>
+    <div v-if="library.loading" class="empty-state">Loading saved worlds…</div>
+    <div v-else-if="library.error" class="error-box" role="alert">{{ library.error }}</div>
+    <div v-else-if="library.playthroughs.length === 0" class="empty-state">
+      No server playthroughs yet. The fixture above is ready for a browser test.
+    </div>
+    <div v-else class="library-grid">
+      <article v-for="playthrough in library.playthroughs" :key="playthrough.id" class="card story-card">
+        <p class="eyebrow">Playthrough</p>
+        <h3>{{ library.worlds.find((world) => world.id === playthrough.world_id)?.name ?? playthrough.world_id }}</h3>
+        <p class="muted">Clock {{ playthrough.world_clock_minutes }} minutes · {{ playthrough.lifecycle }}</p>
+        <button type="button" @click="router.push({ name: 'play', params: { playthroughId: playthrough.id } })">
+          Continue
+        </button>
+      </article>
+    </div>
   </section>
 </template>
 
 <style scoped>
-.card {
+.lede {
   max-width: 42rem;
-  padding: 2rem;
-  border: 1px solid #d9e1ec;
-  border-radius: 1rem;
-  background: #fff;
-  box-shadow: 0 1rem 3rem rgb(26 42 68 / 8%);
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.65;
 }
 
-.eyebrow {
-  margin: 0 0 0.5rem;
-  color: #4f6b8a;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-h2 {
-  margin: 0 0 0.75rem;
-}
-
-.health {
+.health-pill {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
   align-items: center;
-  margin: 1.5rem 0;
-  padding: 0.8rem 1rem;
-  border-radius: 0.6rem;
-  background: #f4f7fb;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
-.health-label {
-  font-weight: 700;
+.health-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: #b58a47;
 }
 
-.ok {
-  color: #176b45;
+.health-dot.connected {
+  background: var(--green);
 }
 
-.error {
-  color: #a42d3f;
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(16rem, 0.65fr);
+  gap: 1rem;
+  margin-bottom: 3rem;
 }
 
-button {
-  padding: 0.6rem 1rem;
-  border: 0;
-  border-radius: 0.5rem;
-  background: #245ea8;
-  color: #fff;
-  cursor: pointer;
+.fixture-card {
+  display: flex;
+  min-height: 12rem;
+  flex-direction: column;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #fffdf8, #f6e5d8);
 }
 
-button:disabled {
-  cursor: wait;
-  opacity: 0.65;
+.fixture-card h2,
+.backend-card h2 {
+  margin-bottom: 0.5rem;
+}
+
+.fixture-card p:not(.eyebrow),
+.backend-card p:not(.eyebrow) {
+  max-width: 42rem;
+  line-height: 1.55;
+}
+
+.backend-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.section-heading {
+  margin-bottom: 1rem;
+}
+
+.section-heading h2 {
+  margin-bottom: 0;
+}
+
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.story-card h3 {
+  margin-bottom: 0.45rem;
+}
+
+.story-card p {
+  min-height: 2.5rem;
+}
+
+@media (max-width: 700px) {
+  .page-heading,
+  .hero-grid {
+    display: block;
+  }
+
+  .health-pill {
+    margin-top: 1rem;
+  }
+
+  .backend-card {
+    margin-top: 1rem;
+  }
 }
 </style>
