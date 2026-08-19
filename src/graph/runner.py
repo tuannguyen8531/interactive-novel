@@ -13,6 +13,7 @@ from src.application.contracts.retrieval import RetrievalScope
 from src.application.contracts.turns import TurnRunRequest
 from src.application.ports.persistence import UowFactory
 from src.application.ports.providers import ProviderPort
+from src.application.ports.telemetry import TelemetryRecorderPort
 
 from .checkpoint import build_in_memory_checkpointer, sqlite_checkpointer
 from .pipeline import TurnPipeline, TurnPipelineDependencies, TurnPipelineRequest
@@ -56,6 +57,8 @@ class GraphTurnRunner:
         max_repair_attempts: int = 1,
         max_revision_attempts: int = 1,
         max_contract_retries: int = 1,
+        telemetry: TelemetryRecorderPort | None = None,
+        input_max_chars: int = 20_000,
     ) -> None:
         self._uow_factory = uow_factory
         self._provider = provider
@@ -65,6 +68,8 @@ class GraphTurnRunner:
         self._max_repair_attempts = max_repair_attempts
         self._max_revision_attempts = max_revision_attempts
         self._max_contract_retries = max_contract_retries
+        self._telemetry = telemetry
+        self._input_max_chars = input_max_chars
         self._tokens: dict[str, CancellationToken] = {}
         self._cancel_before_start: set[str] = set()
 
@@ -85,6 +90,8 @@ class GraphTurnRunner:
             max_repair_attempts=self._max_repair_attempts,
             max_revision_attempts=self._max_revision_attempts,
             max_contract_retries=self._max_contract_retries,
+            telemetry=self._telemetry,
+            input_max_chars=self._input_max_chars,
         )
         graph_request = TurnPipelineRequest(
             turn_run_id=request.turn_run_id,

@@ -10,6 +10,7 @@ from src.application.contracts.persistence import CanonicalTurnBundle
 from src.application.contracts.providers import CancellationToken, ExecutionMode
 from src.application.ports.providers import ProviderPort
 from src.application.ports.retrieval import MemoryCandidateSource
+from src.application.ports.telemetry import TelemetryRecorderPort
 from src.domain.guard import DomainGuard
 from src.domain.state import GameState
 
@@ -66,6 +67,8 @@ class TurnGraphRuntime:
     max_revision_attempts: int = 1
     max_contract_retries: int = 1
     failure_hook: Callable[[str], None] | None = None
+    telemetry: TelemetryRecorderPort | None = None
+    input_max_chars: int = 20_000
 
 
 __all__ = [

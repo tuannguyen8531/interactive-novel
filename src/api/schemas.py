@@ -120,8 +120,18 @@ class ProviderSettingsRequest(BaseModel):
     allow_cloud: bool = False
 
 
+class FeedbackRequest(BaseModel):
+    """Explicit alpha feedback; it never carries prompts or provider output."""
+
+    rating: int = Field(ge=1, le=5)
+    comment: str = Field(default="", max_length=4_000)
+    category: str = Field(default="general", min_length=1, max_length=80)
+    turn_run_id: str | None = Field(default=None, max_length=160)
+
+
 __all__ = [
     "ErrorEnvelope",
+    "FeedbackRequest",
     "ErrorPayload",
     "ForkBranchRequest",
     "HealthResponse",

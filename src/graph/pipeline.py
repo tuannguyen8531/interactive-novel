@@ -11,6 +11,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from src.application.contracts.providers import CancellationToken, ExecutionMode
 from src.application.ports.providers import ProviderPort
 from src.application.ports.retrieval import MemoryCandidateSource
+from src.application.ports.telemetry import TelemetryRecorderPort
 from src.domain.guard import DomainGuard
 
 from .builder import build_turn_graph
@@ -36,6 +37,8 @@ class TurnPipelineDependencies:
     max_revision_attempts: int = 1
     max_contract_retries: int = 1
     failure_hook: Callable[[str], None] | None = None
+    telemetry: TelemetryRecorderPort | None = None
+    input_max_chars: int = 20_000
 
 
 class TurnPipeline:
@@ -94,6 +97,8 @@ class TurnPipeline:
             max_revision_attempts=self.dependencies.max_revision_attempts,
             max_contract_retries=self.dependencies.max_contract_retries,
             failure_hook=self.dependencies.failure_hook,
+            telemetry=self.dependencies.telemetry,
+            input_max_chars=self.dependencies.input_max_chars,
         )
 
 

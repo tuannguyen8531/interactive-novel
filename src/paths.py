@@ -45,6 +45,14 @@ class RuntimePaths:
     def settings(self) -> Path:
         return self.root / "settings.json"
 
+    @property
+    def telemetry(self) -> Path:
+        return self.logs / "telemetry.jsonl"
+
+    @property
+    def feedback(self) -> Path:
+        return self.logs / "feedback.jsonl"
+
     def ensure_directories(self) -> RuntimePaths:
         """Create only the runtime directories owned by this application."""
         for directory in (self.root, self.logs, self.exports):

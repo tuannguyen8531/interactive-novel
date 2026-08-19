@@ -36,3 +36,6 @@ cd web && npm run test:unit
 `uv run migrate --database /path/to/game.db` for a test or alternate runtime.
 The separate `runtime/checkpoints.db` path is reserved for LangGraph execution
 state and is not a save-game database.
+
+Alpha operations, backup/restore, integrity checks and opt-in telemetry are
+documented in [docs/operations.md](docs/operations.md).

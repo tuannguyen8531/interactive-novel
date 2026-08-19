@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     database_echo: bool = False
     turn_max_concurrency: int = Field(default=2, ge=1, le=32)
     sse_history_size: int = Field(default=256, ge=1, le=10_000)
+    telemetry_enabled: bool = False
+    telemetry_prompt_cost_per_1k_tokens: float = Field(default=0.0, ge=0.0)
+    telemetry_completion_cost_per_1k_tokens: float = Field(default=0.0, ge=0.0)
+    telemetry_max_samples: int = Field(default=10_000, ge=1, le=1_000_000)
+    input_max_chars: int = Field(default=20_000, ge=256, le=100_000)
 
     def cors_origin_list(self) -> list[str]:
         """Return configured exact CORS origins in stable order."""

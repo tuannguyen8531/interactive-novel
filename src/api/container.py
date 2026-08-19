@@ -6,10 +6,12 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from src.application.contracts.providers import LogicalRole, ProviderRoute, ProviderRoutingConfig, ProviderTarget
+from src.application.contracts.telemetry import TelemetryConfig
 from src.application.ports.providers import ProviderGateway
 from src.application.services.branches import BranchApplicationService
 from src.application.services.events import InMemoryJobEventBroker
 from src.application.services.export import PlaythroughExportApplicationService
+from src.application.services.feedback import FeedbackApplicationService
 from src.application.services.jobs import UowJobStore
 from src.application.services.playthroughs import PlaythroughApplicationService
 from src.application.services.provider_settings import InMemoryProviderSettingsStore, ProviderSettingsApplicationService
@@ -21,10 +23,12 @@ from src.config import Settings
 from src.graph.runner import GraphTurnRunner
 from src.paths import get_runtime_paths
 from src.services.ai.world_builder import ProviderWorldDraftGenerator
+from src.services.feedback import JsonlFeedbackStore
 from src.services.llm.factory import ProviderRouter
 from src.services.persistence.database import Database, create_database
 from src.services.persistence.migrations import upgrade_database
 from src.services.persistence.uow import make_uow_factory
+from src.services.telemetry import TelemetryRecorder, build_telemetry_recorder
 
 
 @dataclass(slots=True)
@@ -45,6 +49,8 @@ class ApplicationContainer:
     exports: PlaythroughExportApplicationService
     world_drafts: WorldDraftApplicationService
     provider_settings: ProviderSettingsApplicationService
+    telemetry: TelemetryRecorder
+    feedback: FeedbackApplicationService
 
     async def start(self) -> None:
         await upgrade_database(self.database.engine)
@@ -59,6 +65,16 @@ class ApplicationContainer:
 def build_application_container(settings: Settings) -> ApplicationContainer:
     """Build the default local-first runtime without making provider calls."""
     paths = get_runtime_paths(settings.runtime_dir).ensure_directories()
+    telemetry = build_telemetry_recorder(
+        TelemetryConfig(
+            enabled=settings.telemetry_enabled,
+            output_path=str(paths.telemetry) if settings.telemetry_enabled else None,
+            prompt_cost_per_1k_tokens=settings.telemetry_prompt_cost_per_1k_tokens,
+            completion_cost_per_1k_tokens=settings.telemetry_completion_cost_per_1k_tokens,
+            max_samples=settings.telemetry_max_samples,
+        ),
+        output_path=paths.telemetry,
+    )
     database = create_database(
         runtime=paths,
         busy_timeout_ms=settings.database_busy_timeout_ms,
@@ -73,6 +89,8 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         event_sink=events,
         execution_mode=provider.config.mode,
         checkpoint_path=paths.checkpoints_db,
+        telemetry=telemetry,
+        input_max_chars=settings.input_max_chars,
     )
     job_store = UowJobStore(uow_factory)
     turns = TurnApplicationService(
@@ -103,6 +121,8 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
             InMemoryProviderSettingsStore(),
             gateway=provider,
         ),
+        telemetry=telemetry,
+        feedback=FeedbackApplicationService(JsonlFeedbackStore(paths.feedback)),
     )
 
 
@@ -119,6 +139,7 @@ def _default_provider_config() -> ProviderRoutingConfig:
         )
     }
     roles["world_builder"] = ProviderRoute("local")
+    roles["embedding"] = ProviderRoute("local")
     return ProviderRoutingConfig(targets={target.name: target}, role_routes=roles)
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, Response, status
 
 from src.api.container import ApplicationContainer
 from src.api.dependencies import get_services
@@ -135,6 +135,23 @@ async def branch_ancestry(branch_id: str, services: ApplicationContainer = _serv
 async def export_playthrough(playthrough_id: str, services: ApplicationContainer = _services_dependency):
     exported = await services.exports.export_playthrough(playthrough_id)
     return exported.as_dict()
+
+
+@router.get("/playthroughs/{playthrough_id}/export/bundle")
+async def export_playthrough_bundle(playthrough_id: str, services: ApplicationContainer = _services_dependency):
+    bundle = await services.exports.export_bundle(playthrough_id)
+    return Response(content=bundle.as_bytes(), media_type="application/json")
+
+
+@router.post("/exports/validate")
+async def validate_export_bundle(request: Request, services: ApplicationContainer = _services_dependency):
+    bundle = services.exports.validate_import(await request.body())
+    return {
+        "format_version": bundle.format_version,
+        "exported_at": bundle.exported_at,
+        "sha256": bundle.sha256,
+        "playthrough_id": bundle.payload.get("playthrough", {}).get("id"),
+    }
 
 
 __all__ = ["router"]

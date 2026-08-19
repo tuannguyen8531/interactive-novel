@@ -61,6 +61,7 @@ from src.domain.patch import (
     UpdatePsychology,
 )
 from src.domain.values import Provenance, TimeRange
+from src.services.llm.safety import normalize_player_input, untrusted_player_context
 from src.services.retrieval.claims import ClaimExtractor
 from src.services.retrieval.context import ContextAssembler
 
@@ -162,10 +163,10 @@ class TurnGraphNodes:
             return merged
 
     async def _normalize_input(self, state: TurnGraphState) -> dict[str, Any]:
-        normalized = " ".join(state["raw_input"].split())
-        if not normalized:
+        decision = normalize_player_input(state["raw_input"], max_chars=self.runtime.input_max_chars)
+        if not decision.accepted:
             return _failure(state, "invalid_input", "Turn input cannot be blank.")
-        return {"normalized_input": normalized}
+        return {"normalized_input": decision.normalized, "input_safety": decision.as_dict()}
 
     async def _build_initial_context(self, state: TurnGraphState) -> dict[str, Any]:
         if state.get("context_manifest") is not None:
@@ -542,6 +543,7 @@ class TurnGraphNodes:
             execution_mode=self.runtime.execution_mode,
             config_snapshot_id=config_id,
             max_contract_retries=self.runtime.max_contract_retries,
+            telemetry=self.runtime.telemetry,
         )
 
     async def _event(
@@ -576,7 +578,11 @@ class TurnGraphNodes:
 
 def _role_context(state: TurnGraphState, **extra: Any) -> dict[str, Any]:
     context = dict(state.get("context_manifest", {}))
-    context["normalized_input"] = state.get("normalized_input", state["raw_input"])
+    normalized_input = str(state.get("normalized_input", state["raw_input"]))
+    safety = state.get("input_safety", {})
+    context["normalized_input"] = normalized_input
+    context["player_input"] = untrusted_player_context(normalize_player_input(normalized_input))
+    context["input_safety"] = dict(safety)
     context["targeted_evidence"] = list(state.get("targeted_evidence", ()))
     context.update(extra)
     return context

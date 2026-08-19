@@ -26,6 +26,8 @@ serve = "src.cli.serve:main"
 test = "src.cli.test:main"
 build = "src.cli.build:main"
 migrate = "src.cli.migrate:main"
+backup = "src.cli.backup:main"
+doctor = "src.cli.doctor:main"
 
 [build-system]
 requires = ["hatchling>=1.27,<2.0"]

@@ -16,6 +16,9 @@ from .ai import (
     TurnPlan,
     WorldSeed,
 )
+from .backups import DatabaseBackupReport, IntegrityReport
+from .exports import ExportBundle, PlaythroughExport
+from .feedback import FeedbackRecord
 from .memory import (
     BeliefConflict,
     EmbeddingRebuildReport,
@@ -47,11 +50,13 @@ from .retrieval import (
     canonical_value,
     content_hash,
 )
+from .telemetry import TelemetryConfig, TelemetryEvent, TelemetrySummary
 
 __all__ = [
     "AIOutput",
     "AIPromptRole",
     "BeliefConflict",
+    "DatabaseBackupReport",
     "ConsistencyReport",
     "ClaimExtractionResult",
     "CharacterRecord",
@@ -60,10 +65,13 @@ __all__ = [
     "EmbeddingMetadata",
     "EmbeddingRecord",
     "EmbeddingRebuildReport",
+    "ExportBundle",
     "EpisodicSummary",
+    "FeedbackRecord",
     "InitialContextManifest",
     "InitialContextRequest",
     "HookPriority",
+    "IntegrityReport",
     "KnowledgeClaimProposal",
     "KnowledgeRequirement",
     "LLMRunTrace",
@@ -72,6 +80,7 @@ __all__ = [
     "NarrativeDraft",
     "ParseStatus",
     "PlaythroughRecord",
+    "PlaythroughExport",
     "ProviderRequest",
     "ProviderRoutingConfig",
     "ProviderTarget",
@@ -90,6 +99,9 @@ __all__ = [
     "TurnPlan",
     "RelationshipTrend",
     "ThreadHealth",
+    "TelemetryConfig",
+    "TelemetryEvent",
+    "TelemetrySummary",
     "WorldRecord",
     "WorldSeed",
     "canonical_value",

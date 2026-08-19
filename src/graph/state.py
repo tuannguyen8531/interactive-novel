@@ -41,6 +41,7 @@ class TurnGraphState(TypedDict):
     derived_jobs_queued: bool
     cancellation_requested: bool
     normalized_input: NotRequired[str]
+    input_safety: NotRequired[dict[str, Any]]
     context_manifest: NotRequired[dict[str, Any]]
     plan: NotRequired[Any]
     simulation: NotRequired[Any]

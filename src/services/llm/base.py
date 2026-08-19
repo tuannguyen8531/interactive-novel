@@ -41,12 +41,17 @@ from src.application.contracts.providers import (
 from .structured import parse_structured_text
 
 T = TypeVar("T")
-_SECRET_PATTERN = re.compile(r"(?i)(bearer\s+|api[_-]?key[=:]\s*)([^\s,;]+)")
+_SECRET_PATTERN = re.compile(
+    r"(?ix)"
+    r"(bearer\s+|api[_-]?key[=:]\s*)([^\s,;]+)"
+    r"|(\b(?:sk-[A-Za-z0-9_-]{12,}|AIza[0-9A-Za-z_-]{20,}|gh[pousr]_[A-Za-z0-9_]{12,}|xox[baprs]-[A-Za-z0-9-]{12,})\b)"
+)
 
 
-def redact_secret(value: str) -> str:
+def redact_secret(value: str, *, max_length: int | None = 500) -> str:
     """Remove common bearer/API-key forms before an error reaches logs."""
-    return _SECRET_PATTERN.sub(r"\1[REDACTED]", value)[:500]
+    redacted = _SECRET_PATTERN.sub(lambda match: f"{match.group(1) or ''}[REDACTED]", value)
+    return redacted if max_length is None else redacted[:max_length]
 
 
 class BaseProvider(ABC):

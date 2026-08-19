@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from src.application.contracts.exports import PlaythroughExport
-from src.application.errors import ResourceNotFoundError
+from src.application.contracts.exports import ExportBundle, PlaythroughExport
+from src.application.errors import ApplicationValidationError, ResourceNotFoundError
 from src.application.ports.persistence import UowFactory
 
 
@@ -60,6 +60,18 @@ class PlaythroughExportApplicationService:
             ),
             derived_jobs=jobs,
         )
+
+    async def export_bundle(self, playthrough_id: str) -> ExportBundle:
+        """Return a checksummed portable envelope for export/import workflows."""
+        return ExportBundle.from_export(await self.export_playthrough(playthrough_id))
+
+    @staticmethod
+    def validate_import(raw: bytes) -> ExportBundle:
+        """Validate a bundle before a future canonical import use case consumes it."""
+        try:
+            return ExportBundle.from_bytes(raw)
+        except ValueError as error:
+            raise ApplicationValidationError("Export bundle validation failed.") from error
 
 
 __all__ = ["PlaythroughExportApplicationService"]
