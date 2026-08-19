@@ -27,11 +27,11 @@ class _WorldDraftService:
         return self.seed
 
     def validate_world_draft(self, seed: WorldSeed) -> WorldSeed:
-        assert seed.title == self.seed.title
+        assert seed.role == self.seed.role
         return seed
 
     async def confirm_world_bundle(self, seed: WorldSeed, *, world_id: str | None = None) -> WorldConfirmation:
-        assert seed.title == self.seed.title
+        assert seed.role == self.seed.role
         self.confirmations += 1
         world = WorldRecord.new(world_id=world_id or "world-confirmed", name=seed.title)
         playthrough = PlaythroughRecord.new(world_id=world.id, player_character_id=seed.player_character.character_id)
@@ -65,7 +65,6 @@ class _WorldDraftService:
         )
 
 
-@pytest.mark.skip(reason="API integration exceeds the 30-second sandbox limit; run manually outside the sandbox.")
 @pytest.mark.asyncio
 async def test_world_builder_endpoints_generate_review_and_confirm_without_raw_db_access() -> None:
     payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]

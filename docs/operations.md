@@ -8,12 +8,37 @@ Từ thư mục dự án:
 uv sync
 uv run doctor
 uv run migrate
+uv run build
 uv run serve
 ```
 
 `doctor` chỉ tạo các thư mục runtime và kiểm tra readiness; nó không gọi
 provider. Dữ liệu canonical nằm ở `runtime/game.db`, còn checkpoint LangGraph
-nằm riêng ở `runtime/checkpoints.db`.
+nằm riêng ở `runtime/checkpoints.db`. Sau `uv run build`, backend phục vụ SPA
+đã build tại `http://127.0.0.1:8000`; `/api`, `/docs` và `/openapi.json` vẫn là
+các route backend riêng.
+
+Khi phát triển giao diện với hot reload, dùng hai terminal:
+
+```bash
+# terminal 1
+uv run serve
+
+# terminal 2
+cd web && npm run dev
+```
+
+Kiểm tra dự án theo cùng quy ước với `novel-ai-trans`:
+
+```bash
+uv run test
+uv run test --frontend
+```
+
+Lệnh đầu chạy Ruff, Pyright và Pytest; cờ `--frontend` thêm Vue unit tests.
+Nếu chạy trong sandbox và một API test không trả kết quả sau 30 giây, hãy dừng
+lệnh từ môi trường chạy; đây không phải giới hạn của `uv run test` khi chạy
+bên ngoài sandbox.
 
 ## Integrity và backup
 

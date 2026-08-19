@@ -87,7 +87,6 @@ def _services() -> tuple[SimpleNamespace, TurnApplicationService]:
     )
 
 
-@pytest.mark.skip(reason="ASGI SSE streaming exceeds the 30-second sandbox limit; run this API check manually.")
 @pytest.mark.asyncio
 async def test_submit_is_idempotent_and_sse_reconnect_replays_final_event() -> None:
     services, turns = _services()

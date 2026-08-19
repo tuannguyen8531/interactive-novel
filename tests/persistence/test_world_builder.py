@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 from sqlalchemy import func, select
 
 from src.application.contracts.ai import WorldSeed
@@ -14,7 +13,6 @@ from src.services.persistence.uow import make_uow_factory
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "ai" / "role_outputs.json"
 
 
-@pytest.mark.skip(reason="SQLite integration exceeds the 30-second sandbox limit; run manually outside the sandbox.")
 async def test_confirmed_world_builder_seed_round_trips_all_opening_artifacts(database) -> None:
     payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]
     payload["initial_beliefs"] = [
