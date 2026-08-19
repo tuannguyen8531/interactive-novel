@@ -10,7 +10,7 @@ from .provider_settings import ProviderSettingsApplicationService
 from .queries import CharacterQueryApplicationService
 from .replay import ReplayApplicationService
 from .turns import TurnApplicationService
-from .world_drafts import WorldDraftApplicationService
+from .world_drafts import WorldConfirmation, WorldDraftApplicationService
 from .worlds import WorldApplicationService
 
 __all__ = [
@@ -26,5 +26,6 @@ __all__ = [
     "TurnApplicationService",
     "UowJobStore",
     "WorldApplicationService",
+    "WorldConfirmation",
     "WorldDraftApplicationService",
 ]

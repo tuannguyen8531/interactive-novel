@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from src.application.contracts.ai import WorldSeed
+
 
 class HealthResponse(BaseModel):
     """Public liveness response."""
@@ -38,6 +40,19 @@ class WorldCreateRequest(BaseModel):
     tone: str = Field(default="", max_length=80)
     canon_rules: dict[str, Any] = Field(default_factory=dict)
     content_policy: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorldDraftGenerateRequest(BaseModel):
+    """Natural-language request for a transient school-romance WorldSeed."""
+
+    prompt: str = Field(min_length=1, max_length=20_000)
+
+
+class WorldDraftRequest(BaseModel):
+    """Edited WorldSeed sent back for deterministic validation or confirmation."""
+
+    draft: WorldSeed
+    world_id: str | None = Field(default=None, min_length=1, max_length=160)
 
 
 class PlaythroughCreateRequest(BaseModel):
@@ -118,4 +133,6 @@ __all__ = [
     "SwitchBranchRequest",
     "TurnSubmitRequest",
     "WorldCreateRequest",
+    "WorldDraftGenerateRequest",
+    "WorldDraftRequest",
 ]

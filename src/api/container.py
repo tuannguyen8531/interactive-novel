@@ -15,10 +15,12 @@ from src.application.services.playthroughs import PlaythroughApplicationService
 from src.application.services.provider_settings import InMemoryProviderSettingsStore, ProviderSettingsApplicationService
 from src.application.services.queries import CharacterQueryApplicationService
 from src.application.services.turns import TurnApplicationService
+from src.application.services.world_drafts import WorldDraftApplicationService
 from src.application.services.worlds import WorldApplicationService
 from src.config import Settings
 from src.graph.runner import GraphTurnRunner
 from src.paths import get_runtime_paths
+from src.services.ai.world_builder import ProviderWorldDraftGenerator
 from src.services.llm.factory import ProviderRouter
 from src.services.persistence.database import Database, create_database
 from src.services.persistence.migrations import upgrade_database
@@ -41,6 +43,7 @@ class ApplicationContainer:
     branches: BranchApplicationService
     queries: CharacterQueryApplicationService
     exports: PlaythroughExportApplicationService
+    world_drafts: WorldDraftApplicationService
     provider_settings: ProviderSettingsApplicationService
 
     async def start(self) -> None:
@@ -92,6 +95,10 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         branches=BranchApplicationService(uow_factory),
         queries=CharacterQueryApplicationService(uow_factory),
         exports=PlaythroughExportApplicationService(uow_factory),
+        world_drafts=WorldDraftApplicationService(
+            uow_factory,
+            generator=ProviderWorldDraftGenerator(provider),
+        ),
         provider_settings=ProviderSettingsApplicationService(
             InMemoryProviderSettingsStore(),
             gateway=provider,
@@ -111,6 +118,7 @@ def _default_provider_config() -> ProviderRoutingConfig:
             LogicalRole.CRITIC,
         )
     }
+    roles["world_builder"] = ProviderRoute("local")
     return ProviderRoutingConfig(targets={target.name: target}, role_routes=roles)
 
 

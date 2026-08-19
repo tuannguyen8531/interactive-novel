@@ -17,6 +17,110 @@ export interface WorldRecord {
   updated_at: string
 }
 
+export interface WorldContentBoundaries {
+  rating: 'teen_14_plus' | 'mature_16_plus' | 'adult_18_plus' | string
+  topic_boundaries: Record<string, 'allow' | 'opt_in' | 'excluded' | string>
+  violence_ceiling: 'none' | 'non_graphic' | 'graphic' | string
+  adult_explicit_opt_in: boolean
+}
+
+export interface WorldCharacterSeed {
+  character_id: string
+  name: string
+  aliases: string[]
+  age: number
+  role: string
+  background: string
+  voice: string
+  traits: string[]
+  values: string[]
+  goal_ids: string[]
+  private_claim_ids: string[]
+}
+
+export interface WorldClaimProposal {
+  proposal_id: string
+  subject_id: string
+  predicate: string
+  object_id: string | null
+  typed_value: unknown
+  polarity: string
+  qualifiers: Record<string, unknown>
+  valid_time: { start: number; end: number | null }
+  branch_scope: string
+}
+
+export interface WorldBeliefProposal {
+  belief_id: string
+  believer_id: string
+  claim_id: string
+  stance: 'supports' | 'rejects' | 'uncertain' | string
+  confidence: number
+  evidence_ids: string[]
+  counter_evidence_ids: string[]
+  branch_scope: string
+  world_time: number
+  source_reliability: number
+}
+
+export interface WorldSceneSpec {
+  scene_id: string
+  source_role: string
+  source_run_id: string
+  guard_approved: boolean
+  world_time: number
+  tags: string[]
+  participants: Record<string, number>
+  consent: Record<string, string>
+  approved_beats: string[]
+  visible_actions: string[]
+  allowed_dialogue_intents: string[]
+  pov: string
+  tone: string
+  continuity_details: string[]
+  allowed_claims: Array<{ claim_id?: string; fingerprint?: string }>
+  forbidden_claims: Array<{ claim_id?: string; fingerprint?: string }>
+  length_target: number
+}
+
+export interface WorldSeed {
+  schema_version: 'world-seed-1' | string
+  role: 'world_builder' | string
+  run_id: string
+  prompt_version: string
+  physical_call_id: string | null
+  config_snapshot_id?: string | null
+  title: string
+  premise: string
+  genre: string
+  tone: string
+  content_boundaries: WorldContentBoundaries
+  locations: Array<{ location_id: string; name: string; description: string }>
+  player_character: WorldCharacterSeed
+  npc_profiles: WorldCharacterSeed[]
+  initial_claims: WorldClaimProposal[]
+  initial_relationships: Array<{ source_id: string; target_id: string; values: Record<string, number> }>
+  initial_beliefs: WorldBeliefProposal[]
+  goals: Array<{ goal_id: string; owner_id: string; description: string; priority: number }>
+  tensions: Array<{
+    tension_id: string
+    observer_id: string
+    rival_id: string
+    focus_id: string
+    appraisal: string
+  }>
+  threads: Array<{ thread_id: string; premise: string; participant_ids: string[]; stakes: string }>
+  opening_scene: WorldSceneSpec
+}
+
+export interface WorldConfirmation {
+  world: WorldRecord
+  playthrough: PlaythroughRecord
+  branch: BranchRecord
+  opening_scene: WorldSceneSpec
+  opening_turn: TurnRecord
+}
+
 export interface PlaythroughRecord {
   id: string
   world_id: string

@@ -11,7 +11,9 @@ import type {
   RelationshipView,
   TimelineEvent,
   TurnJobView,
-  WorldRecord
+  WorldConfirmation,
+  WorldRecord,
+  WorldSeed
 } from './types'
 import type { HealthResponse } from './types'
 
@@ -105,6 +107,12 @@ export const api = {
   getWorld: (worldId: string): Promise<WorldRecord> => request<WorldRecord>(`/api/worlds/${encodeURIComponent(worldId)}`),
   createWorld: (payload: Record<string, unknown>): Promise<WorldRecord> =>
     request<WorldRecord>('/api/worlds', jsonBody(payload)),
+  generateWorldDraft: (prompt: string): Promise<WorldSeed> =>
+    request<WorldSeed>('/api/world-drafts', jsonBody({ prompt })),
+  validateWorldDraft: (draft: WorldSeed): Promise<WorldSeed> =>
+    request<WorldSeed>('/api/world-drafts/validate', jsonBody({ draft })),
+  confirmWorldDraft: (draft: WorldSeed, worldId?: string): Promise<WorldConfirmation> =>
+    request<WorldConfirmation>('/api/world-drafts/confirm', jsonBody({ draft, world_id: worldId })),
   listPlaythroughs: (worldId?: string): Promise<PlaythroughRecord[]> =>
     request<PlaythroughRecord[]>(`/api/playthroughs${query({ world_id: worldId })}`),
   getPlaythrough: (playthroughId: string): Promise<PlaythroughRecord> =>

@@ -12,11 +12,43 @@ from src.api.schemas import (
     RootBranchRequest,
     SwitchBranchRequest,
     WorldCreateRequest,
+    WorldDraftGenerateRequest,
+    WorldDraftRequest,
 )
 from src.api.serialization import public_json
 
 router = APIRouter(tags=["resources"])
 _services_dependency = Depends(get_services)
+
+
+@router.post("/world-drafts")
+async def generate_world_draft(
+    payload: WorldDraftGenerateRequest,
+    services: ApplicationContainer = _services_dependency,
+):
+    draft = await services.world_drafts.generate_world_draft(payload.prompt)
+    return public_json(draft)
+
+
+@router.post("/world-drafts/validate")
+async def validate_world_draft(
+    payload: WorldDraftRequest,
+    services: ApplicationContainer = _services_dependency,
+):
+    draft = services.world_drafts.validate_world_draft(payload.draft)
+    return public_json(draft)
+
+
+@router.post("/world-drafts/confirm", status_code=status.HTTP_201_CREATED)
+async def confirm_world_draft(
+    payload: WorldDraftRequest,
+    services: ApplicationContainer = _services_dependency,
+):
+    confirmation = await services.world_drafts.confirm_world_bundle(
+        payload.draft,
+        world_id=payload.world_id,
+    )
+    return public_json(confirmation)
 
 
 @router.get("/worlds")
