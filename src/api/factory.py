@@ -21,6 +21,7 @@ from src.application.contracts.providers import ProviderError
 from src.application.errors import ApplicationError
 from src.config import Settings, get_settings
 from src.paths import PROJECT_ROOT
+from src.services.logger import log_error
 
 _logger = logging.getLogger(__name__)
 
@@ -82,7 +83,17 @@ def create_app(
         )
 
     @app.exception_handler(ProviderError)
-    async def _provider_error(_: Request, error: ProviderError) -> JSONResponse:
+    async def _provider_error(request: Request, error: ProviderError) -> JSONResponse:
+        log_error(
+            "Provider API error",
+            error,
+            method=request.method,
+            path=request.url.path,
+            provider=error.provider,
+            status_code=error.status_code,
+            request_id=error.request_id,
+            attempts=error.attempts,
+        )
         return error_response(
             status_code=502,
             code=error.code,
@@ -96,8 +107,14 @@ def create_app(
         )
 
     @app.exception_handler(Exception)
-    async def _unhandled(_: Request, error: Exception) -> JSONResponse:
+    async def _unhandled(request: Request, error: Exception) -> JSONResponse:
         _logger.exception("Unhandled API exception", exc_info=error)
+        log_error(
+            "Unhandled API exception",
+            error,
+            method=request.method,
+            path=request.url.path,
+        )
         return error_response(
             status_code=500,
             code="internal_error",

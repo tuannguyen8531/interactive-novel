@@ -31,6 +31,12 @@ per-role routing and fallbacks. These non-secret values are persisted in
 The model field discovers available IDs from the selected provider, while still
 allowing a custom model ID when the catalog is unavailable or incomplete.
 
+Provider calls are logged like `novel-ai-trans` under
+`runtime/logs/YYYY-MM-DD/{request,response,error}.log`. Request and response logs
+include full prompts and model output for local debugging; credentials and URL
+query strings are redacted. Set `LOG_RETENTION_DAYS` to control daily-log
+retention (default: 30 days).
+
 Keep `GEMINI_API_KEY`, `OPENROUTER_API_KEY` and other credentials in `.env`.
 The UI stores only an environment-variable name such as `GEMINI_API_KEY`; API
 responses and `runtime/settings.json` never contain the secret value. Shell

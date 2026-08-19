@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = Field(default=8000, ge=1, le=65535)
     api_log_level: str = "info"
+    log_retention_days: int = Field(default=30, ge=1, le=3_650)
     cors_origins: str = "http://localhost:5173"
     # Avoid colliding with deployment environments that reserve DEBUG for a
     # non-boolean release/profile label. Use INTERACTIVE_NOVEL_DEBUG instead.

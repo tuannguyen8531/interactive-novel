@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
+from datetime import date
 from typing import Any
 
 import httpx
@@ -16,6 +17,7 @@ from src.application.contracts.providers import (
     ProviderTarget,
     StructuredSchema,
 )
+from src.services import logger as provider_logger
 from src.services.llm.base import BaseProvider
 from src.services.llm.gemini import GeminiProvider
 from src.services.llm.ollama import OllamaProvider
@@ -91,6 +93,28 @@ async def test_all_adapters_share_text_contract(provider: str) -> None:
     assert result.model == "fixture-model"
     assert result.text == "hello"
     assert result.request_id == "request-1"
+
+
+async def test_provider_call_writes_full_correlated_request_and_response_logs(tmp_path, monkeypatch) -> None:
+    log_root = tmp_path / "logs"
+    monkeypatch.setattr(provider_logger, "LOG_DIR", log_root)
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return await _response_handler("ollama", request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await _provider("ollama", client).generate_text(_request())
+
+    daily = log_root / date.today().isoformat()
+    request_line = (daily / provider_logger.LOG_REQUEST_NAME).read_text(encoding="utf-8")
+    response_line = (daily / provider_logger.LOG_RESPONSE_NAME).read_text(encoding="utf-8")
+    request_entry = json.loads(request_line[request_line.index("{") :])
+    response_entry = json.loads(response_line[response_line.index("{") :])
+
+    assert result.text == "hello"
+    assert request_entry["call_id"] == response_entry["call_id"]
+    assert request_entry["request"]["messages"][1]["content"] == "Return a small answer."
+    assert response_entry["response"]["message"]["content"] == "hello"
 
 
 @pytest.mark.parametrize("provider", [name for name, _ in PROVIDERS])

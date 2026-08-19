@@ -37,6 +37,7 @@ from src.application.contracts.providers import (
     StructuredSchema,
     TokenUsage,
 )
+from src.services.logger import log_api_request_received, log_api_request_sent, log_error
 
 from .structured import parse_structured_text
 
@@ -120,6 +121,17 @@ class BaseProvider(ABC):
     ) -> tuple[httpx.Response, Any]:
         self._check_cancelled(request)
         client = await self._get_client()
+        call_type = str(request.role) if request is not None else self._inferred_call_type(url)
+        metadata = self._log_metadata(request)
+        call_id = log_api_request_sent(
+            call_type=call_type,
+            provider=self.provider_name,
+            url=url,
+            request_body=payload,
+            method=method,
+            **metadata,
+        )
+        started = time.monotonic()
         try:
             response = await client.request(
                 method,
@@ -129,6 +141,14 @@ class BaseProvider(ABC):
                 json=payload,
             )
         except httpx.TimeoutException as error:
+            log_error(
+                "Provider request timed out",
+                error,
+                call_id=call_id,
+                provider=self.provider_name,
+                url=url.partition("?")[0],
+                **metadata,
+            )
             raise ProviderTimeoutError(
                 f"{self.provider_name} request timed out.",
                 provider=self.provider_name,
@@ -136,22 +156,66 @@ class BaseProvider(ABC):
                 fallback_eligible=True,
             ) from error
         except httpx.RequestError as error:
+            log_error(
+                "Provider request failed",
+                error,
+                call_id=call_id,
+                provider=self.provider_name,
+                url=url.partition("?")[0],
+                **metadata,
+            )
             raise ProviderTransportError(
                 f"{self.provider_name} network request failed.",
                 provider=self.provider_name,
                 retryable=True,
                 fallback_eligible=True,
             ) from error
-        self._raise_for_status(response)
+        decode_error: Exception | None = None
         try:
-            return response, response.json()
+            response_payload = response.json()
         except (TypeError, ValueError) as error:
+            decode_error = error
+            response_payload = {"raw_text": response.text}
+        log_api_request_received(
+            call_id=call_id,
+            call_type=call_type,
+            provider=self.provider_name,
+            url=url,
+            response_body=response_payload,
+            status_code=response.status_code,
+            duration_ms=(time.monotonic() - started) * 1000,
+            request_id=self._request_id(response),
+            **metadata,
+        )
+        try:
+            self._raise_for_status(response)
+        except ProviderError as error:
+            log_error(
+                "Provider returned an error response",
+                error,
+                call_id=call_id,
+                provider=self.provider_name,
+                status_code=response.status_code,
+                request_id=self._request_id(response),
+                **metadata,
+            )
+            raise
+        if decode_error is not None:
+            log_error(
+                "Provider returned a non-JSON response",
+                decode_error,
+                call_id=call_id,
+                provider=self.provider_name,
+                status_code=response.status_code,
+                **metadata,
+            )
             raise ProviderProtocolError(
                 f"{self.provider_name} returned a non-JSON response.",
                 provider=self.provider_name,
                 fallback_eligible=True,
                 request_id=self._request_id(response),
-            ) from error
+            ) from decode_error
+        return response, response_payload
 
     @asynccontextmanager
     async def _stream_request(
@@ -166,6 +230,18 @@ class BaseProvider(ABC):
     ) -> AsyncIterator[httpx.Response]:
         self._check_cancelled(request)
         client = await self._get_client()
+        call_type = str(request.role)
+        metadata = self._log_metadata(request)
+        call_id = log_api_request_sent(
+            call_type=call_type,
+            provider=self.provider_name,
+            url=url,
+            request_body=payload,
+            method=method,
+            stream=True,
+            **metadata,
+        )
+        started = time.monotonic()
         try:
             async with client.stream(
                 method,
@@ -174,11 +250,36 @@ class BaseProvider(ABC):
                 params=params,
                 json=payload,
             ) as response:
+                log_api_request_received(
+                    call_id=call_id,
+                    call_type=call_type,
+                    provider=self.provider_name,
+                    url=url,
+                    response_body={"stream": True},
+                    status_code=response.status_code,
+                    duration_ms=(time.monotonic() - started) * 1000,
+                    request_id=self._request_id(response),
+                    **metadata,
+                )
                 self._raise_for_status(response)
                 yield response
-        except ProviderError:
+        except ProviderError as error:
+            log_error(
+                "Provider stream failed",
+                error,
+                call_id=call_id,
+                provider=self.provider_name,
+                **metadata,
+            )
             raise
         except httpx.TimeoutException as error:
+            log_error(
+                "Provider stream timed out",
+                error,
+                call_id=call_id,
+                provider=self.provider_name,
+                **metadata,
+            )
             raise ProviderTimeoutError(
                 f"{self.provider_name} stream timed out.",
                 provider=self.provider_name,
@@ -186,6 +287,13 @@ class BaseProvider(ABC):
                 fallback_eligible=True,
             ) from error
         except httpx.RequestError as error:
+            log_error(
+                "Provider stream request failed",
+                error,
+                call_id=call_id,
+                provider=self.provider_name,
+                **metadata,
+            )
             raise ProviderTransportError(
                 f"{self.provider_name} stream request failed.",
                 provider=self.provider_name,
@@ -234,6 +342,16 @@ class BaseProvider(ABC):
             data = parse_structured_text(response.text, schema, provider=self.provider_name)
             return StructuredResponse(response=response, data=data)
         except StructuredOutputError as first_error:
+            log_error(
+                "Structured provider output failed validation",
+                first_error,
+                provider=self.provider_name,
+                model=self.model,
+                role=str(request.role),
+                physical_call_id=request.physical_call_id,
+                schema=schema.name,
+                repair_attempt=request.repair_attempt,
+            )
             if request.repair_attempt >= 1:
                 raise first_error
             repair_request = replace(
@@ -252,6 +370,16 @@ class BaseProvider(ABC):
                     provider=self.provider_name,
                 )
             except StructuredOutputError as error:
+                log_error(
+                    "Repaired provider output failed validation",
+                    error,
+                    provider=self.provider_name,
+                    model=self.model,
+                    role=str(request.role),
+                    physical_call_id=request.physical_call_id,
+                    schema=schema.name,
+                    repair_attempt=1,
+                )
                 raise error from first_error
             return StructuredResponse(
                 response=repaired_response,
@@ -411,6 +539,27 @@ class BaseProvider(ABC):
             if secret and len(secret) >= 4:
                 redacted = redacted.replace(secret, "[REDACTED]")
         return redacted[:500]
+
+    def _log_metadata(self, request: ProviderRequest | None) -> dict[str, Any]:
+        metadata: dict[str, Any] = {
+            "target": self.target.name,
+            "model": self.model,
+        }
+        if request is not None:
+            metadata.update(
+                {
+                    "role": str(request.role),
+                    "physical_call_id": request.physical_call_id,
+                    "repair_attempt": request.repair_attempt,
+                }
+            )
+        return metadata
+
+    @staticmethod
+    def _inferred_call_type(url: str) -> str:
+        if url.rstrip("/").endswith(("/embed", "/embeddings", ":embedContent")):
+            return "embedding"
+        return "connectivity"
 
     @staticmethod
     def _usage(payload: Mapping[str, Any]) -> TokenUsage | None:
