@@ -6,7 +6,7 @@ import { useTurnJobStore } from './turnJob'
 
 export const useDebugStore = defineStore('debug', () => {
   const playthrough = usePlaythroughStore()
-  const enabled = import.meta.env.VITE_ENABLE_INSPECTOR !== 'false'
+  const enabled = import.meta.env.VITE_ENABLE_INSPECTOR === 'true'
   const inspector = ref<Record<string, unknown> | null>(null)
   const jobs = useTurnJobStore()
   const available = computed(() => enabled && playthrough.playthrough !== null)

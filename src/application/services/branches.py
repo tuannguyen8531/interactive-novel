@@ -134,14 +134,11 @@ class BranchApplicationService:
             if parent_turn is None:
                 raise ResourceNotFoundError(f"Parent turn {turn.parent_turn_id} does not exist.")
 
-            if parent_turn.branch_id == branch.id:
-                parent_branch = branch
-            elif branch.parent_branch_id is not None and branch.fork_turn_id == parent_turn.id:
-                parent_branch = await uow.canonical.get_branch(branch.parent_branch_id)
-                if parent_branch is None:
-                    raise ResourceNotFoundError(f"Parent branch {branch.parent_branch_id} does not exist.")
-            else:
-                raise ResourceConflictError("Turn ancestry cannot be branched safely.")
+            parent_branch = await uow.canonical.get_branch(parent_turn.branch_id)
+            if parent_branch is None or parent_branch.playthrough_id != branch.playthrough_id:
+                raise ResourceNotFoundError(f"Parent branch {parent_turn.branch_id} does not exist.")
+            if parent_branch.lifecycle != "active":
+                raise ResourceConflictError("Cannot branch from an abandoned ancestor.")
 
             child = BranchRecord(
                 id=new_branch_id or BranchRecord.root(playthrough_id=branch.playthrough_id).id,

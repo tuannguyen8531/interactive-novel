@@ -40,9 +40,14 @@ allowing a custom model ID when the catalog is unavailable or incomplete.
 
 Provider calls are logged like `novel-ai-trans` under
 `runtime/logs/YYYY-MM-DD/{request,response,error}.log`. Request and response logs
-include full prompts and model output for local debugging; credentials and URL
+include the complete provider payloads for local debugging. Credentials and URL
 query strings are redacted. Set `LOG_RETENTION_DAYS` to control daily-log
-retention (default: 30 days).
+retention (default: 30 days). These logs may contain private story content and
+should not be shared without review.
+
+Developer Inspector is disabled by default on both sides. Enable the endpoint
+with `INTERACTIVE_NOVEL_DEBUG=true`, then build the UI with
+`VITE_ENABLE_INSPECTOR=true uv run build` when the Inspector is needed.
 
 Keep `GEMINI_API_KEY`, `OPENROUTER_API_KEY` and other credentials in `.env`.
 The UI stores only an environment-variable name such as `GEMINI_API_KEY`; API

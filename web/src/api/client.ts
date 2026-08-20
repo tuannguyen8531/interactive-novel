@@ -208,6 +208,8 @@ export const api = {
     request<TurnJobView[]>(`/api/jobs${query({ playthrough_id: playthroughId, branch_id: branchId })}`),
   cancelJob: (jobId: string): Promise<TurnJobView> =>
     request<TurnJobView>(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' }),
+  retryJob: (jobId: string): Promise<TurnJobView> =>
+    request<TurnJobView>(`/api/jobs/${encodeURIComponent(jobId)}/retry`, { method: 'POST' }),
   jobEventsUrl: (jobId: string): string =>
     `${BASE_URL}/api/jobs/${encodeURIComponent(jobId)}/events`,
   getProviderSettings: (): Promise<ProviderSettings | null> => request<ProviderSettings | null>('/api/providers/settings'),

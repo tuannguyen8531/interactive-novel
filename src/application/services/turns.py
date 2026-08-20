@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass, is_dataclass, replace
 from datetime import UTC, date, datetime
 from enum import Enum
 from typing import Any
+from uuid import NAMESPACE_URL, uuid5
 
 from src.application.contracts.jobs import JobRecord
 from src.application.contracts.persistence import TurnRecord
@@ -23,6 +24,7 @@ from src.application.errors import (
 from src.application.ports.jobs import JobRepository
 from src.application.ports.persistence import UowFactory
 from src.application.ports.turns import TurnRunner
+from src.domain.state import GameState
 
 from .events import InMemoryJobEventBroker
 
@@ -220,6 +222,34 @@ class TurnApplicationService:
             for item in values
             if (playthrough_id is None or item.playthrough_id == playthrough_id)
             and (branch_id is None or item.branch_id == branch_id)
+        )
+
+    async def retry_job(self, job_id: str, *, game_state: GameState) -> TurnJobView:
+        """Retry one terminal failure with a stable, server-owned identity."""
+        if self._job_store is None:
+            raise ResourceNotFoundError(f"Job {job_id} does not exist.")
+        source = await self._job_store.get(job_id)
+        if source is None:
+            raise ResourceNotFoundError(f"Job {job_id} does not exist.")
+        if source.status not in {"failed", "cancelled", "interrupted"}:
+            raise ResourceConflictError("Only a failed, cancelled or interrupted job can be retried.")
+
+        if game_state.playthrough_id != source.playthrough_id or game_state.branch_id != source.branch_id:
+            raise ResourceConflictError("Retry state does not match the source job scope.")
+        retry_identity = str(uuid5(NAMESPACE_URL, f"interactive-novel:retry:{source.id}"))
+        return await self.submit_turn(
+            SubmitTurnCommand(
+                idempotency_key=f"retry:{source.id}",
+                turn_run_id=retry_identity,
+                playthrough_id=source.playthrough_id,
+                branch_id=source.branch_id,
+                base_revision=source.base_revision,
+                raw_input=source.raw_input,
+                actor_id=source.actor_id,
+                game_state=game_state,
+                parent_turn_id=source.parent_turn_id,
+                config_snapshot_id=source.config_snapshot_id,
+            )
         )
 
     async def cancel_turn(self, turn_run_id: str) -> TurnJobView:
@@ -503,10 +533,8 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
-def _placeholder_game_state(record: TurnRecord):
+def _placeholder_game_state(record: TurnRecord) -> GameState:
     """Build only the scope needed for a terminal persisted-turn DTO."""
-    from src.domain.state import GameState
-
     return GameState.empty(
         world_id="unknown",
         playthrough_id=record.playthrough_id,

@@ -140,4 +140,19 @@ describe('API client', () => {
     expect(init.method).toBe('POST')
     expect(init.body).toBe(body)
   })
+
+  it('retries a durable job through its stable server workflow', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ job_id: 'retry-job', status: 'queued' }), {
+        status: 202,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await api.retryJob('job/source')
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/jobs/job%2Fsource/retry')
+    expect((fetchMock.mock.calls[0][1] as RequestInit).method).toBe('POST')
+  })
 })

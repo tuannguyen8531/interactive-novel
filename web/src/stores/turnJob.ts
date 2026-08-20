@@ -12,7 +12,11 @@ export interface TurnRequest {
   actor_id?: string
   parent_turn_id?: string | null
   config_snapshot_id?: string
+  turn_run_id?: string
 }
+
+const RESUME_STORAGE_KEY = 'interactive-novel.active-turn.v1'
+const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled', 'interrupted'])
 
 function errorText(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
@@ -31,13 +35,21 @@ export const useTurnJobStore = defineStore('turnJob', () => {
   const error = ref<string | null>(null)
   const lastRequest = ref<TurnRequest | null>(null)
   let stream: SseClient | null = null
+  let lastEventId: string | null = null
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let reconnectAttempts = 0
+  let streamGeneration = 0
+  let lastIdempotencyKey: string | null = null
   let fixtureCancelled = false
   let lastFixtureCommit: (() => TurnRecord) | null = null
 
-  const active = computed(() => current.value !== null && !['completed', 'failed', 'cancelled', 'interrupted'].includes(current.value.status))
+  const active = computed(() => current.value !== null && !TERMINAL_STATUSES.has(current.value.status))
   const terminal = computed(() => current.value !== null && !active.value)
 
   function closeStream(): void {
+    streamGeneration += 1
+    if (reconnectTimer !== null) clearTimeout(reconnectTimer)
+    reconnectTimer = null
     stream?.close()
     stream = null
   }
@@ -47,18 +59,22 @@ export const useTurnJobStore = defineStore('turnJob', () => {
     loading.value = false
   }
 
-  async function submit(request: TurnRequest): Promise<TurnJobView> {
+  async function submit(request: TurnRequest, existingIdempotencyKey?: string): Promise<TurnJobView> {
     closeStream()
     loading.value = true
     error.value = null
     events.value = []
     progress.value = 'Submitting action…'
-    lastRequest.value = { ...request }
+    const preparedRequest = { ...request, turn_run_id: request.turn_run_id ?? newId('run') }
+    lastRequest.value = preparedRequest
+    lastEventId = null
     lastFixtureCommit = null
     try {
-      const idempotencyKey = newId('turn')
-      const job = await api.submitTurn(request, idempotencyKey)
+      const idempotencyKey = existingIdempotencyKey ?? newId('turn')
+      lastIdempotencyKey = idempotencyKey
+      const job = await api.submitTurn(preparedRequest, idempotencyKey)
       current.value = job
+      persistResumeState()
       const jobId = job.job_id
       if (jobId) openStream(jobId)
       else loading.value = false
@@ -70,16 +86,23 @@ export const useTurnJobStore = defineStore('turnJob', () => {
   }
 
   function openStream(jobId: string): void {
+    closeStream()
+    const generation = streamGeneration
     stream = openSse(api.jobEventsUrl(jobId), {
       onOpen: () => {
+        if (generation !== streamGeneration) return
+        reconnectAttempts = 0
         progress.value = 'Connected to turn progress.'
       },
       onEvent: (raw) => {
+        if (generation !== streamGeneration) return
         try {
           const event = JSON.parse(raw.data) as JobEvent
-          events.value.push(event)
+          lastEventId = raw.id ?? event.id ?? lastEventId
+          if (!events.value.some((existing) => existing.id === event.id)) events.value.push(event)
           progress.value = progressLabel(event)
-          if (event.terminal || ['completed', 'failed', 'cancelled', 'interrupted'].includes(event.event_type)) {
+          persistResumeState()
+          if (event.terminal || TERMINAL_STATUSES.has(event.event_type)) {
             const terminal = terminalJob(event)
             current.value = mergeJob(current.value, terminal)
             if (terminal.status === 'failed' || terminal.status === 'interrupted') {
@@ -87,15 +110,70 @@ export const useTurnJobStore = defineStore('turnJob', () => {
             }
             loading.value = false
             closeStream()
+            clearResumeState()
           }
         } catch (cause) {
           setError(new Error(`Invalid progress event: ${errorText(cause)}`))
         }
       },
       onError: (cause) => {
-        if (!terminal.value) setError(cause)
+        if (generation !== streamGeneration || terminal.value) return
+        progress.value = `Connection lost; reconnecting… (${errorText(cause)})`
+        scheduleReconnect(jobId, generation)
+      },
+      onClose: () => {
+        if (generation !== streamGeneration || terminal.value) return
+        progress.value = 'Progress stream closed; reconnecting…'
+        scheduleReconnect(jobId, generation)
       }
-    })
+    }, { lastEventId })
+  }
+
+  function scheduleReconnect(jobId: string, generation: number): void {
+    if (reconnectTimer !== null || generation !== streamGeneration || terminal.value) return
+    const delayMs = Math.min(500 * 2 ** reconnectAttempts, 5000)
+    reconnectAttempts += 1
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null
+      if (generation === streamGeneration && !terminal.value) openStream(jobId)
+    }, delayMs)
+  }
+
+  async function resume(playthroughId: string): Promise<TurnJobView | null> {
+    closeStream()
+    current.value = null
+    error.value = null
+    events.value = []
+    loading.value = false
+    progress.value = 'idle'
+    const saved = readResumeState()
+    let job: TurnJobView | null = null
+    try {
+      if (saved?.job.playthrough_id === playthroughId && saved.job.job_id) {
+        lastEventId = saved.lastEventId
+        job = await api.getJob(saved.job.job_id)
+      }
+      if (!job || TERMINAL_STATUSES.has(job.status)) {
+        const jobs = await api.listJobs(playthroughId)
+        job = jobs
+          .filter((candidate) => !TERMINAL_STATUSES.has(candidate.status))
+          .sort((left, right) => right.updated_at.localeCompare(left.updated_at))[0] ?? null
+        lastEventId = null
+      }
+      if (!job) {
+        clearResumeState()
+        return null
+      }
+      current.value = job
+      loading.value = true
+      progress.value = 'Resuming turn progress…'
+      persistResumeState()
+      if (job.job_id) openStream(job.job_id)
+      return job
+    } catch (cause) {
+      setError(cause)
+      return null
+    }
   }
 
   async function cancel(): Promise<void> {
@@ -120,7 +198,27 @@ export const useTurnJobStore = defineStore('turnJob', () => {
 
   async function retry(): Promise<TurnJobView | null> {
     if (lastRequest.value && lastFixtureCommit) return runFixture(lastRequest.value, lastFixtureCommit)
-    return lastRequest.value ? submit(lastRequest.value) : null
+    if (current.value?.job_id && TERMINAL_STATUSES.has(current.value.status)) {
+      closeStream()
+      loading.value = true
+      error.value = null
+      events.value = []
+      progress.value = 'Retrying action…'
+      try {
+        const retried = await api.retryJob(current.value.job_id)
+        current.value = retried
+        lastIdempotencyKey = retried.idempotency_key
+        lastEventId = null
+        persistResumeState()
+        if (retried.job_id) openStream(retried.job_id)
+        else loading.value = false
+        return retried
+      } catch (cause) {
+        setError(cause)
+        throw cause
+      }
+    }
+    return lastRequest.value ? submit(lastRequest.value, lastIdempotencyKey ?? undefined) : null
   }
 
   async function runFixture(request: TurnRequest, commit: () => TurnRecord): Promise<TurnJobView> {
@@ -202,6 +300,16 @@ export const useTurnJobStore = defineStore('turnJob', () => {
     progress.value = message
   }
 
+  function persistResumeState(): void {
+    const storage = persistableStorage()
+    if (!storage || !current.value || TERMINAL_STATUSES.has(current.value.status)) return
+    storage.setItem(RESUME_STORAGE_KEY, JSON.stringify({ job: current.value, lastEventId }))
+  }
+
+  function clearResumeState(): void {
+    persistableStorage()?.removeItem(RESUME_STORAGE_KEY)
+  }
+
   function clear(): void {
     closeStream()
     current.value = null
@@ -210,6 +318,9 @@ export const useTurnJobStore = defineStore('turnJob', () => {
     error.value = null
     loading.value = false
     lastFixtureCommit = null
+    lastEventId = null
+    lastIdempotencyKey = null
+    clearResumeState()
   }
 
   return {
@@ -222,12 +333,29 @@ export const useTurnJobStore = defineStore('turnJob', () => {
     active,
     terminal,
     submit,
+    resume,
     cancel,
     retry,
     runFixture,
     clear
   }
 })
+
+function persistableStorage(): Storage | null {
+  return typeof window === 'undefined' ? null : window.sessionStorage
+}
+
+function readResumeState(): { job: TurnJobView; lastEventId: string | null } | null {
+  const storage = persistableStorage()
+  const raw = storage?.getItem(RESUME_STORAGE_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as { job: TurnJobView; lastEventId: string | null }
+  } catch {
+    storage?.removeItem(RESUME_STORAGE_KEY)
+    return null
+  }
+}
 
 function progressLabel(event: JobEvent): string {
   const message = event.payload.message
@@ -254,7 +382,16 @@ function terminalJob(event: JobEvent): TurnJobView {
 }
 
 function mergeJob(current: TurnJobView | null, terminal: TurnJobView): TurnJobView {
-  return current ? { ...current, ...terminal, playthrough_id: current.playthrough_id, branch_id: current.branch_id } : terminal
+  return current
+    ? {
+        ...current,
+        ...terminal,
+        idempotency_key: current.idempotency_key,
+        turn_run_id: current.turn_run_id,
+        playthrough_id: current.playthrough_id,
+        branch_id: current.branch_id
+      }
+    : terminal
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

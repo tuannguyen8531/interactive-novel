@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.api.container import ApplicationContainer
 from src.api.dependencies import get_services
@@ -86,6 +86,8 @@ async def inspect_runtime(
     branch_id: str,
     services: ApplicationContainer = _services_dependency,
 ):
+    if not services.settings.debug:
+        raise HTTPException(status_code=404, detail="Not Found")
     payload = await services.queries.inspect_runtime(playthrough_id=playthrough_id, branch_id=branch_id)
     telemetry = services.telemetry
     turn_runs_value = payload.get("turn_runs", ())

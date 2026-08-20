@@ -187,6 +187,34 @@ async def test_failed_job_terminal_event_carries_diagnostics() -> None:
 
 
 @pytest.mark.asyncio
+async def test_failed_job_retry_uses_one_stable_server_owned_identity() -> None:
+    playthrough, branches = _fixture()
+    store = InMemoryJobStore()
+    service = TurnApplicationService(
+        _factory(playthrough, branches),
+        FailedRunner(),
+        job_store=store,
+    )
+    source = await service.submit_turn(
+        _command(playthrough, branch_id="root", run_id="failed-source-run", key="failed-source-key")
+    )
+    await service.wait_for_turn(source.turn_run_id)
+    state = GameState.empty(
+        world_id=playthrough.world_id,
+        playthrough_id=playthrough.id,
+        branch_id="root",
+    )
+
+    first_retry = await service.retry_job(source.job_id or "", game_state=state)
+    duplicate_retry = await service.retry_job(source.job_id or "", game_state=state)
+
+    assert first_retry.job_id == duplicate_retry.job_id
+    assert first_retry.idempotency_key == f"retry:{source.job_id}"
+    assert first_retry.turn_run_id == duplicate_retry.turn_run_id
+    assert len(store.jobs) == 2
+
+
+@pytest.mark.asyncio
 async def test_failed_job_uses_guard_diagnostic_when_graph_errors_are_empty() -> None:
     playthrough, branches = _fixture()
     service = TurnApplicationService(

@@ -96,6 +96,7 @@ async function openRoute(): Promise<void> {
   if (!routePlaythroughId.value) return
   loadingRoute.value = true
   await playthrough.open(routePlaythroughId.value)
+  if (!playthrough.fixtureMode && playthrough.playthrough) await jobs.resume(playthrough.playthrough.id)
   characters.clear()
   const defaultCharacter = playerCharacter.value ?? playthrough.characters[0]
   if (defaultCharacter) {
@@ -150,6 +151,7 @@ async function regenerateLastTurn(): Promise<void> {
   if (!window.confirm('Regenerate the latest move on a new branch? The existing version will remain available.')) return
   const action = turn.raw_input
   await playthrough.regenerate(turn.id)
+  await refreshSelectedCharacter()
   input.value = action
   await submit()
 }
@@ -159,13 +161,26 @@ async function undoLastTurn(): Promise<void> {
   if (!turn || jobs.active || playthrough.fixtureMode) return
   if (!window.confirm('Undo the latest move on a new branch? No story history will be deleted.')) return
   await playthrough.undo(turn.id)
+  await refreshSelectedCharacter()
 }
 
 async function fork(): Promise<void> {
   if (!selectedForkTurnId.value) return
   await branches.fork(selectedForkTurnId.value)
   selectedForkTurnId.value = null
+  await refreshSelectedCharacter()
   debug.refresh()
+}
+
+async function switchTimeline(branchId: string): Promise<void> {
+  if (branchId === branches.activeBranchId || jobs.active) return
+  await branches.switchBranch(branchId)
+  await refreshSelectedCharacter()
+  debug.refresh()
+}
+
+async function refreshSelectedCharacter(): Promise<void> {
+  if (openCharacterId.value) await characters.select(openCharacterId.value)
 }
 
 async function chooseCharacter(characterId: string): Promise<void> {
@@ -435,7 +450,8 @@ function playerTurnNumber(index: number): number {
               :class="{ active: branch.id === branches.activeBranchId }"
               type="button"
               :title="branch.id"
-              @click="branches.switchBranch(branch.id)"
+              :disabled="jobs.active"
+              @click="switchTimeline(branch.id)"
             >
               <span>{{ branchDisplayName(branch, branches.branches) }}</span>
               <small>{{ branchProgressLabel(branch) }}</small>

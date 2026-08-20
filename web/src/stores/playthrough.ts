@@ -176,8 +176,8 @@ export const usePlaythroughStore = defineStore('playthrough', () => {
         persistFixture()
       } else {
         branch = await api.forkBranch({ parent_branch_id: activeBranch.value.id, fork_turn_id: forkTurnId })
+        await api.switchBranch(branch.id, playthrough.value.id)
         await refresh()
-        selectedBranchId.value = branch.id
       }
       return branch
     } catch (cause) {

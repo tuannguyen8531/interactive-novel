@@ -86,6 +86,18 @@ async def cancel_job(job_id: str, services: ApplicationContainer = _services_dep
     return public_json(await services.turns.cancel_turn(job.turn_run_id))
 
 
+@router.post("/jobs/{job_id}/retry", status_code=status.HTTP_202_ACCEPTED)
+async def retry_job(job_id: str, services: ApplicationContainer = _services_dependency):
+    job = await services.turns.get_job(job_id)
+    if job is None:
+        raise ResourceNotFoundError(f"Job {job_id} does not exist.")
+    game_state = await services.game_states.load(
+        playthrough_id=job.playthrough_id,
+        branch_id=job.branch_id,
+    )
+    return public_json(await services.turns.retry_job(job_id, game_state=game_state))
+
+
 @router.get("/jobs/{job_id}/events")
 async def job_events(
     job_id: str,

@@ -146,7 +146,6 @@ Không chấp nhận một bản văn hay hơn nếu nó phá canon hoặc knowl
 - Runtime mặc định local, single-user.
 - Ollama là tùy chọn; app vẫn khởi động khi Ollama chưa chạy.
 - Cloud API dùng key của người dùng.
-- Raw LLM prompts/outputs không được lưu mặc định.
 - API keys ưu tiên environment hoặc OS keyring, không trả lại client sau khi nhập.
 - Tự động chuyển nội dung từ local provider sang cloud phải được người dùng bật rõ ràng; mặc định không gửi ra ngoài máy.
 

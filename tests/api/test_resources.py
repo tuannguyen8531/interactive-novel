@@ -70,3 +70,19 @@ async def test_regenerate_and_undo_have_dedicated_api_workflows() -> None:
         ("regenerate", {"branch_id": "root", "turn_id": "turn-2", "new_branch_id": None}),
         ("undo", {"branch_id": "root", "head_turn_id": "turn-2", "new_branch_id": None}),
     ]
+
+
+@pytest.mark.asyncio
+async def test_inspector_endpoint_is_not_available_when_debug_is_disabled() -> None:
+    settings = Settings(app_name="resources-api-test", debug=False)
+    app = create_app(
+        settings,
+        services=SimpleNamespace(settings=settings),  # type: ignore[arg-type]
+    )
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/api/playthroughs/playthrough-1/branches/root/inspector")
+
+    assert response.status_code == 404
+    assert response.json()["error"] == {"code": "http_error", "message": "Not Found", "details": {}}

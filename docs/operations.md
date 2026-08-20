@@ -87,11 +87,13 @@ atomically rồi workers mới chạy lại.
   tính và provider metadata, không chứa prompt/output.
 - Mọi provider call được ghi riêng theo ngày vào
   `runtime/logs/YYYY-MM-DD/request.log`, `response.log` và `error.log`, tương tự
-  `novel-ai-trans`. Hai file request/response chứa đầy đủ prompt và model output
-  để debug; credentials và query string được che. Vì nội dung truyện có thể nhạy
-  cảm, không nên chia sẻ các file này nguyên trạng. Số ngày giữ log do
-  `LOG_RETENTION_DAYS` điều khiển (mặc định 30).
-- `INTERACTIVE_NOVEL_DEBUG` mặc định tắt. Không đặt API key trong frontend,
+  `novel-ai-trans`. Request/response chứa đầy đủ payload gửi tới và nhận từ
+  provider; credentials và query string vẫn được che. Log có thể chứa nội
+  dung truyện riêng tư, vì vậy cần kiểm tra trước khi chia sẻ. Số ngày
+  giữ log do `LOG_RETENTION_DAYS` điều khiển (mặc định 30).
+- `INTERACTIVE_NOVEL_DEBUG` và `VITE_ENABLE_INSPECTOR` mặc định tắt. Muốn
+  dùng Inspector phải bật backend, sau đó build frontend với cờ Vite.
+  Không đặt API key trong frontend,
   prompt, event SSE hoặc log.
 - Input người chơi được giới hạn, chuẩn hóa và gắn nhãn untrusted; cờ prompt
   injection không biến input thành system/developer instruction.
