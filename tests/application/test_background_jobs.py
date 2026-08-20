@@ -76,6 +76,24 @@ class FakeRunner:
         self.release.setdefault(turn_run_id, asyncio.Event()).set()
 
 
+class FailedRunner:
+    async def run(self, request: Any) -> dict[str, Any]:
+        del request
+        return {
+            "status": "failed",
+            "errors": (
+                {
+                    "node": "validate_context",
+                    "code": "insufficient_evidence",
+                    "message": "Required evidence was not found.",
+                },
+            ),
+        }
+
+    def cancel(self, turn_run_id: str) -> None:
+        del turn_run_id
+
+
 def _factory(playthrough: PlaythroughRecord, branches: list[BranchRecord]):
     def factory() -> FakeUow:
         return FakeUow(playthrough, branches)
@@ -129,6 +147,27 @@ async def test_durable_job_idempotency_and_terminal_state() -> None:
     completed = await service.wait_for_turn("run-1")
     assert completed.status == "completed"
     assert store.jobs[first.job_id].status == "completed"  # type: ignore[index]
+
+
+@pytest.mark.asyncio
+async def test_failed_job_terminal_event_carries_diagnostics() -> None:
+    playthrough, branches = _fixture()
+    broker = InMemoryJobEventBroker()
+    service = TurnApplicationService(
+        _factory(playthrough, branches),
+        FailedRunner(),
+        job_store=InMemoryJobStore(),
+        event_broker=broker,
+    )
+
+    submitted = await service.submit_turn(_command(playthrough, branch_id="root", run_id="failed-run", key="failed-key"))
+    failed = await service.wait_for_turn("failed-run")
+    history = await broker.history(submitted.job_id or "")
+
+    assert failed.status == "failed"
+    assert failed.error is not None
+    assert history[-1].terminal is True
+    assert history[-1].payload["error"] == failed.error
 
 
 @pytest.mark.asyncio

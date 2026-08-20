@@ -13,7 +13,14 @@ from src.application.services.game_states import GameStateApplicationService
 from src.application.services.world_drafts import WorldDraftApplicationService
 from src.domain.codec import patch_to_payload
 from src.domain.patch import AdvanceClock, StatePatch
-from src.services.persistence.models import BeliefModel, NarrativeHookModel, RelationshipModel
+from src.services.persistence.models import (
+    BeliefModel,
+    CanonFactModel,
+    CharacterStateModel,
+    KnowledgeClaimModel,
+    NarrativeHookModel,
+    RelationshipModel,
+)
 from src.services.persistence.uow import make_uow_factory
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "ai" / "role_outputs.json"
@@ -67,10 +74,27 @@ async def test_confirmed_world_builder_seed_round_trips_all_opening_artifacts(da
             .select_from(RelationshipModel)
             .where(RelationshipModel.playthrough_id == confirmation.playthrough.id)
         )
+        character_states = await session.scalar(
+            select(func.count())
+            .select_from(CharacterStateModel)
+            .where(CharacterStateModel.playthrough_id == confirmation.playthrough.id)
+        )
+        claims = await session.scalar(
+            select(func.count())
+            .select_from(KnowledgeClaimModel)
+            .where(KnowledgeClaimModel.playthrough_id == confirmation.playthrough.id)
+        )
+        canon_facts = await session.scalar(
+            select(func.count())
+            .select_from(CanonFactModel)
+            .where(CanonFactModel.playthrough_id == confirmation.playthrough.id)
+        )
 
     assert beliefs == 1
     assert hooks == 1
     assert stored_relationships == 1
+    assert character_states == len(payload["opening_scene"]["participants"])
+    assert claims == canon_facts == len(payload["initial_claims"]) + len(payload["opening_scene"]["participants"])
 
 
 async def test_game_state_hydrates_seed_replays_turn_and_builds_snapshot(database) -> None:
@@ -89,7 +113,15 @@ async def test_game_state_hydrates_seed_replays_turn_and_builds_snapshot(databas
         seed.player_character.character_id,
         *(character.character_id for character in seed.npc_profiles),
     }
-    assert set(opening.claims) == {claim.proposal_id for claim in seed.initial_claims}
+    assert {claim.proposal_id for claim in seed.initial_claims}.issubset(opening.claims)
+    assert {
+        (claim.subject_id, claim.predicate, claim.object_id)
+        for claim in opening.claims.values()
+        if claim.predicate == "located_at"
+    } == {
+        (character_id, "located_at", seed.locations[0].location_id)
+        for character_id in seed.opening_scene.participants
+    }
     assert len(opening.relationships) == len(seed.initial_relationships)
     assert opening.policy is not None
     assert {event.event_type for event in opening.events.values()} == {"opening_scene"}

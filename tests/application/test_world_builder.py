@@ -161,7 +161,14 @@ async def test_confirm_creates_playable_opening_bundle_with_canonical_artifacts(
     assert result.playthrough.root_branch_id == result.branch.id
     assert result.branch.head_revision == 1
     assert bundle is not None
-    assert len(bundle.claims) == len(bundle.canon_facts) == 1
+    expected_claim_count = len(_seed().initial_claims) + len(_seed().opening_scene.participants)
+    assert len(bundle.claims) == len(bundle.canon_facts) == expected_claim_count
+    assert len(bundle.character_states) == len(_seed().opening_scene.participants)
+    assert {
+        (claim.subject_id, claim.predicate, claim.object_id)
+        for claim in bundle.claims
+        if claim.predicate == "located_at"
+    } == {("player", "located_at", "library"), ("alice", "located_at", "library")}
     assert len(bundle.relationships) == 1
     assert len(bundle.threads) == len(bundle.hooks) == 1
     assert bundle.events[0].event_type == "opening_scene"

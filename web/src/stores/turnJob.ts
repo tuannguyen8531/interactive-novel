@@ -80,7 +80,11 @@ export const useTurnJobStore = defineStore('turnJob', () => {
           events.value.push(event)
           progress.value = progressLabel(event)
           if (event.terminal || ['completed', 'failed', 'cancelled', 'interrupted'].includes(event.event_type)) {
-            current.value = mergeJob(current.value, terminalJob(event))
+            const terminal = terminalJob(event)
+            current.value = mergeJob(current.value, terminal)
+            if (terminal.status === 'failed' || terminal.status === 'interrupted') {
+              error.value = jobErrorText(terminal.error) ?? `Turn ${terminal.status}.`
+            }
             loading.value = false
             closeStream()
           }
@@ -255,6 +259,18 @@ function mergeJob(current: TurnJobView | null, terminal: TurnJobView): TurnJobVi
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+function jobErrorText(value: Record<string, unknown> | null): string | null {
+  if (value === null) return null
+  if (typeof value.message === 'string') return value.message
+  if (Array.isArray(value.diagnostics)) {
+    const messages = value.diagnostics
+      .map((item) => (isRecord(item) && typeof item.message === 'string' ? item.message : null))
+      .filter((item): item is string => item !== null)
+    if (messages.length > 0) return messages.join('; ')
+  }
+  return typeof value.code === 'string' ? value.code : null
 }
 
 function delay(milliseconds: number): Promise<void> {

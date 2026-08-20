@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from src.application.contracts.ai import (
     AddClaimLinkOperation,
@@ -35,6 +35,8 @@ class ClaimExtractor:
         *,
         plan: TurnPlan | None = None,
         actor_id: str | None = None,
+        include_implicit_claim_requirements: bool = True,
+        current_locations: Mapping[str, str | None] | None = None,
     ) -> ClaimExtractionResult:
         claims = self._unique_claims(
             [
@@ -46,8 +48,12 @@ class ClaimExtractor:
         requirements = self._unique_requirements(
             [
                 *simulation.knowledge_requirements,
-                *self._requirements_from_claims(claims, simulation, actor_id=actor_id),
-                *self._requirements_from_patch(simulation.state_patch),
+                *(
+                    self._requirements_from_claims(claims, simulation, actor_id=actor_id)
+                    if include_implicit_claim_requirements
+                    else ()
+                ),
+                *self._requirements_from_patch(simulation.state_patch, current_locations=current_locations),
             ]
         )
         queries = tuple(
@@ -115,12 +121,18 @@ class ClaimExtractor:
         return tuple(requirements)
 
     @staticmethod
-    def _requirements_from_patch(patch: StatePatchProposal | None) -> tuple[KnowledgeRequirement, ...]:
+    def _requirements_from_patch(
+        patch: StatePatchProposal | None,
+        *,
+        current_locations: Mapping[str, str | None] | None = None,
+    ) -> tuple[KnowledgeRequirement, ...]:
         if patch is None:
             return ()
         requirements: list[KnowledgeRequirement] = []
         for index, operation in enumerate(patch.operations):
             if not isinstance(operation, SetCharacterLocationOperation):
+                continue
+            if current_locations is not None and current_locations.get(operation.character_id) == operation.location_id:
                 continue
             requirements.append(
                 KnowledgeRequirement(

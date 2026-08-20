@@ -8,6 +8,7 @@ from typing import Any
 from src.application.contracts.ai import WorldSeed
 from src.application.errors import ResourceNotFoundError
 from src.application.ports.persistence import UowFactory
+from src.application.world_seed import opening_location_claim_id
 from src.domain.characters import Character, CharacterProfile
 from src.domain.content import ContentPolicy
 from src.domain.events import Belief, Event
@@ -172,6 +173,36 @@ def _apply_world_seed(state: GameState, seed: WorldSeed) -> None:
             fact_id=f"world-seed:{claim.claim_id}",
             claim_id=claim.claim_id,
             source_event_or_rule="world_seed",
+            asserted_world_time=seed.opening_scene.world_time,
+        )
+        state.canon_facts[fact.fact_id] = fact
+    opening_location_claims = {
+        (claim.subject_id, claim.predicate, claim.object_id, claim.polarity)
+        for claim in state.claims.values()
+    }
+    for character_id in seed.opening_scene.participants:
+        signature = (character_id, "located_at", opening_location_id, "positive")
+        if signature in opening_location_claims:
+            continue
+        claim = KnowledgeClaim(
+            claim_id=opening_location_claim_id(state.playthrough_id, state.branch_id, character_id),
+            subject_id=character_id,
+            predicate="located_at",
+            object_id=opening_location_id,
+            branch_scope=state.branch_id,
+            valid_time=TimeRange(seed.opening_scene.world_time),
+            provenance=Provenance(
+                source_type="world_seed",
+                source_id=seed.run_id,
+                run_id=seed.run_id,
+                prompt_version=seed.prompt_version,
+            ),
+        )
+        state.claims[claim.claim_id] = claim
+        fact = CanonFact(
+            fact_id=f"world-seed:{claim.claim_id}",
+            claim_id=claim.claim_id,
+            source_event_or_rule="world_seed_opening_location",
             asserted_world_time=seed.opening_scene.world_time,
         )
         state.canon_facts[fact.fact_id] = fact

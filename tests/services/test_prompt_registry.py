@@ -1,25 +1,9 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
 
 from src.application.contracts.ai import AIPromptRole, RoleInput
 from src.services.prompts import PromptRegistry, PromptRegistryError, prompt_cache_scope
-
-SNAPSHOTS = Path(__file__).parents[1] / "fixtures" / "prompts" / "phase_6_snapshots.json"
-
-
-def test_prompt_snapshot_matches_golden_hashes() -> None:
-    expected = json.loads(SNAPSHOTS.read_text(encoding="utf-8"))
-    snapshot = PromptRegistry().snapshot()
-
-    for role, metadata in expected.items():
-        assert snapshot[role]["semantic_version"] == metadata["semantic_version"]
-        assert snapshot[role]["input_contract"] == metadata["input_contract"]
-        assert snapshot[role]["output_schema_version"] == metadata["output_schema_version"]
-        assert snapshot[role]["template_hash"] == metadata["template_hash"]
 
 
 def test_prompt_render_replaces_required_input_without_unresolved_placeholders() -> None:

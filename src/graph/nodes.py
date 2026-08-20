@@ -62,6 +62,7 @@ from src.domain.patch import (
 )
 from src.domain.values import Provenance, TimeRange
 from src.services.llm.safety import normalize_player_input, untrusted_player_context
+from src.services.logger import log_error
 from src.services.retrieval.claims import ClaimExtractor
 from src.services.retrieval.context import ContextAssembler
 
@@ -156,6 +157,14 @@ class TurnGraphNodes:
         except ProviderCancelledError:
             return await self._cancelled(cast(TurnGraphState, working), node)
         except Exception as error:
+            log_error(
+                "Turn graph node failed",
+                error,
+                node=node,
+                turn_run_id=working.get("turn_run_id"),
+                playthrough_id=working.get("playthrough_id"),
+                branch_id=working.get("branch_id"),
+            )
             errors = _append_error(working, node, type(error).__name__, str(error))
             failed = {"status": "failed", "errors": errors}
             merged = {**working, **failed}
@@ -217,7 +226,11 @@ class TurnGraphNodes:
         plan = state.get("plan")
         if not isinstance(plan, TurnPlan):
             return _failure(state, "plan_missing", "Simulator requires a planner artifact.")
-        context = _role_context(state, plan=plan.model_dump(mode="json"))
+        context = _role_context(
+            state,
+            plan=plan.model_dump(mode="json"),
+            repair_feedback=state.get("repair_feedback"),
+        )
         result = await self._execute(
             (AIPromptRole.SIMULATOR,),
             state,
@@ -241,6 +254,11 @@ class TurnGraphNodes:
             simulation,
             plan=plan if isinstance(plan, TurnPlan) else None,
             actor_id=state.get("actor_id"),
+            include_implicit_claim_requirements=False,
+            current_locations={
+                character_id: character.state.location_id
+                for character_id, character in self.runtime.request.game_state.characters.items()
+            },
         )
         return {"claim_extraction": extraction}
 
@@ -306,14 +324,35 @@ class TurnGraphNodes:
                 evidence_manifest_ids=tuple(item.get("retrieval_trace_id", "") for item in manifests),
                 recommended_corrections=("Retrieve authorized evidence or revise the proposed claim.",),
             )
-            return {
+            final_failure = state.get("retry_counters", {}).get("repair", 0) >= self.runtime.max_repair_attempts
+            update: dict[str, Any] = {
                 "consistency_report": report,
-                "status": "failed"
-                if state.get("retry_counters", {}).get("repair", 0) >= self.runtime.max_repair_attempts
-                else "running",
+                "status": "failed" if final_failure else "running",
             }
+            if final_failure:
+                message = violation.description
+                update["errors"] = _append_error(state, "validate_context", violation.code, message)
+                log_error(
+                    "Turn consistency validation failed",
+                    message,
+                    code=violation.code,
+                    turn_run_id=state["turn_run_id"],
+                    playthrough_id=state["playthrough_id"],
+                    branch_id=state["branch_id"],
+                    evidence_manifest_ids=list(report.evidence_manifest_ids),
+                )
+            return update
 
-        context = _role_context(state, targeted_evidence=list(manifests))
+        plan = state.get("plan")
+        simulation = state.get("simulation")
+        extraction = state.get("claim_extraction")
+        context = _role_context(
+            state,
+            targeted_evidence=list(manifests),
+            plan=plan.model_dump(mode="json") if isinstance(plan, TurnPlan) else None,
+            simulation=simulation.model_dump(mode="json") if isinstance(simulation, SimulationResult) else None,
+            claim_extraction=_claim_extraction_context(extraction),
+        )
         result = await self._execute(
             (AIPromptRole.CONTEXT_VALIDATOR,),
             state,
@@ -321,14 +360,28 @@ class TurnGraphNodes:
             call_prefix="validate",
         )
         report = cast(ConsistencyReport, result.artifacts[AIPromptRole.CONTEXT_VALIDATOR])
-        return {
-            "consistency_report": report,
-            "status": "failed"
-            if report.status != ConsistencyStatus.PASS
+        final_failure = (
+            report.status != ConsistencyStatus.PASS
             and state.get("retry_counters", {}).get("repair", 0) >= self.runtime.max_repair_attempts
-            else "running",
+        )
+        update = {
+            "consistency_report": report,
+            "status": "failed" if final_failure else "running",
             **_trace_update(state, result),
         }
+        if final_failure:
+            message = "; ".join(item.description for item in report.violations) or report.status.value
+            update["errors"] = _append_error(state, "validate_context", report.status.value, message)
+            log_error(
+                "Turn consistency validation failed",
+                message,
+                code=report.status.value,
+                turn_run_id=state["turn_run_id"],
+                playthrough_id=state["playthrough_id"],
+                branch_id=state["branch_id"],
+                evidence_manifest_ids=list(report.evidence_manifest_ids),
+            )
+        return update
 
     async def _guard_state(self, state: TurnGraphState) -> dict[str, Any]:
         report = state.get("consistency_report")
@@ -380,9 +433,16 @@ class TurnGraphNodes:
         if attempt >= self.runtime.max_repair_attempts:
             return _failure(state, "repair_limit_exceeded", "Guard/context repair limit was reached.")
         counters["repair"] = attempt + 1
+        report = state.get("consistency_report")
+        feedback: dict[str, Any] = {}
+        if isinstance(report, ConsistencyReport):
+            feedback["consistency_report"] = report.model_dump(mode="json")
+        if state.get("guard_error") is not None:
+            feedback["guard_error"] = dict(state["guard_error"] or {})
         return {
             "retry_counters": counters,
             "repair_requested": True,
+            "repair_feedback": feedback,
             "simulation": None,
             "claim_extraction": None,
             "targeted_evidence": (),
@@ -586,6 +646,18 @@ def _role_context(state: TurnGraphState, **extra: Any) -> dict[str, Any]:
     context["targeted_evidence"] = list(state.get("targeted_evidence", ()))
     context.update(extra)
     return context
+
+
+def _claim_extraction_context(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    return {
+        "proposed_claims": [item.model_dump(mode="json") for item in value.proposed_claims],
+        "proposed_mutations": [item.model_dump(mode="json") for item in value.proposed_mutations],
+        "knowledge_requirements": [item.model_dump(mode="json") for item in value.knowledge_requirements],
+        "validation_queries": [item.model_dump(mode="json") for item in value.validation_queries],
+        "claim_to_mutation": {key: list(items) for key, items in value.claim_to_mutation.items()},
+    }
 
 
 _EVENT_PREFIXES = {

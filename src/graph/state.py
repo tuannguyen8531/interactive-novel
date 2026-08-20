@@ -36,6 +36,7 @@ class TurnGraphState(TypedDict):
     guard_approved: bool
     guard_error: dict[str, Any] | None
     repair_requested: bool
+    repair_feedback: NotRequired[dict[str, Any]]
     revision_count: int
     commit_done: bool
     derived_jobs_queued: bool

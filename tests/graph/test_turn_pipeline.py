@@ -151,6 +151,12 @@ class CandidateSource:
         return self.candidates
 
 
+class EmptyCandidateSource:
+    async def list_candidates(self, scope: RetrievalScope) -> tuple[MemoryCandidate, ...]:
+        del scope
+        return ()
+
+
 class FakeCommitter:
     def __init__(self) -> None:
         self.bundles: list[Any] = []
@@ -195,11 +201,12 @@ def make_pipeline(
     cancellation: Any = None,
     derived_job_handler: Any = None,
     failure_hook: Any = None,
+    candidate_source: Any = None,
 ) -> TurnPipeline:
     dependencies = TurnPipelineDependencies(
         provider=provider,
         committer=committer,
-        candidate_source=CandidateSource(),
+        candidate_source=CandidateSource() if candidate_source is None else candidate_source,
         guard=DomainGuard(),
         cancellation=cancellation,
         execution_mode=ExecutionMode(mode),
@@ -261,6 +268,46 @@ async def test_guard_rejection_repairs_once_before_commit() -> None:
     assert result["status"] == "completed"
     assert result["retry_counters"]["repair"] == 1
     assert len(committer.bundles) == 1
+
+
+@pytest.mark.asyncio
+async def test_new_claim_and_idempotent_location_do_not_require_prior_exact_claim() -> None:
+    simulation = copy.deepcopy(ROLE_OUTPUTS["simulator"])
+    simulation["claim_proposals"][0].update(
+        {
+            "proposal_id": "claim-alice-festival-goal",
+            "predicate": "goal_active",
+            "object_id": "festival-planning",
+        }
+    )
+    simulation["knowledge_requirements"] = []
+    state = make_game_state()
+    state.characters["alice"] = state.characters["alice"].with_state(location_id="library")
+    provider = FakeProvider(sequences={"simulator": (simulation,)})
+    committer = FakeCommitter()
+
+    result = await make_pipeline(
+        provider,
+        committer,
+        candidate_source=EmptyCandidateSource(),
+    ).run(make_request(state, "new-claim-run"))
+
+    assert result["status"] == "completed"
+    assert result.get("targeted_evidence") == ()
+    assert len(committer.bundles) == 1
+    assert committer.bundles[0].claims[0].claim_id == "claim-alice-festival-goal"
+
+
+@pytest.mark.asyncio
+async def test_missing_explicit_evidence_is_reported_as_a_turn_error() -> None:
+    result = await make_pipeline(
+        FakeProvider(),
+        FakeCommitter(),
+        candidate_source=EmptyCandidateSource(),
+    ).run(make_request(make_game_state(), "missing-evidence-run"))
+
+    assert result["status"] == "failed"
+    assert any(error["code"] == "insufficient_evidence" for error in result["errors"])
 
 
 @pytest.mark.asyncio

@@ -356,7 +356,11 @@ class TurnApplicationService:
                     turn_run_id=pending.command.turn_run_id,
                     event_type=pending.view.status,
                     phase="job",
-                    payload={"status": pending.view.status, "result": _json_safe(pending.view.result)},
+                    payload={
+                        "status": pending.view.status,
+                        "result": _json_safe(pending.view.result),
+                        "error": _json_safe(pending.view.error),
+                    },
                     terminal=True,
                 )
             if self._active_by_branch.get(pending.command.branch_id) == pending.command.turn_run_id:

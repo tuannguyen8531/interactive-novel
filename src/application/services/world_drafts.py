@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 from uuid import uuid4
 
@@ -14,6 +14,7 @@ from src.application.contracts.persistence import (
     CanonFactRecord,
     CanonicalTurnBundle,
     CharacterRecord,
+    CharacterStateRecord,
     EmotionalTensionRecord,
     EventRecord,
     KnowledgeClaimRecord,
@@ -27,6 +28,8 @@ from src.application.contracts.persistence import (
 from src.application.errors import ApplicationValidationError
 from src.application.ports.persistence import UowFactory
 from src.application.ports.worlds import WorldDraftGenerator
+from src.application.world_seed import opening_location_claim_id
+from src.domain.characters import CharacterState
 from src.domain.knowledge import KnowledgeClaim
 from src.domain.values import TimeRange
 from src.services.ai.contracts import AIContractValidationError
@@ -171,8 +174,36 @@ def _build_opening_bundle(
     participants = tuple(seed.opening_scene.participants)
     location = seed.locations[0]
     claims = tuple(
-        _claim_record(claim, playthrough_id=playthrough.id, branch_id=branch.id, turn_id=turn_id) for claim in seed.initial_claims
+        _claim_record(
+            claim,
+            playthrough_id=playthrough.id,
+            branch_id=branch.id,
+            turn_id=turn_id,
+            source_event_id=event_id,
+        )
+        for claim in seed.initial_claims
     )
+    location_claims = tuple(
+        _opening_location_claim(
+            character_id,
+            location_id=location.location_id,
+            playthrough_id=playthrough.id,
+            branch_id=branch.id,
+            turn_id=turn_id,
+            event_id=event_id,
+            world_time=world_time,
+            seed=seed,
+        )
+        for character_id in participants
+        if not any(
+            claim.subject_id == character_id
+            and claim.predicate == "located_at"
+            and claim.object_id == location.location_id
+            and claim.polarity == "positive"
+            for claim in claims
+        )
+    )
+    claims = (*claims, *location_claims)
     claim_by_id = {item.claim_id: item for item in claims}
     canon_facts = tuple(
         CanonFactRecord(
@@ -278,6 +309,17 @@ def _build_opening_bundle(
         f"{seed.title} begins in {location.name}. {seed.premise}\n\n"
         f"Present: {', '.join(known_names[item] for item in participants)}."
     )
+    opening_state = asdict(CharacterState(location_id=location.location_id, last_active_world_time=world_time))
+    character_states = tuple(
+        CharacterStateRecord(
+            character_id=character_id,
+            playthrough_id=playthrough.id,
+            branch_id=branch.id,
+            state=opening_state,
+            last_active_turn_id=turn_id,
+        )
+        for character_id in participants
+    )
     return CanonicalTurnBundle(
         playthrough_id=playthrough.id,
         branch_id=branch.id,
@@ -294,6 +336,7 @@ def _build_opening_bundle(
             "opening_scene": seed.opening_scene.model_dump(mode="json"),
         },
         turn_id=turn_id,
+        character_states=character_states,
         events=(event,),
         claims=claims,
         canon_facts=canon_facts,
@@ -359,7 +402,17 @@ def _belief_records(
     return tuple(beliefs), tuple(evidence)
 
 
-def _claim_record(claim: Any, *, playthrough_id: str, branch_id: str, turn_id: str) -> KnowledgeClaimRecord:
+def _claim_record(
+    claim: Any,
+    *,
+    playthrough_id: str,
+    branch_id: str,
+    turn_id: str,
+    source_event_id: str,
+) -> KnowledgeClaimRecord:
+    provenance = claim.provenance.model_dump(mode="json")
+    provenance["source_event_id"] = source_event_id
+    provenance["owner_id"] = "public" if claim.branch_scope == "public" else claim.branch_scope
     return KnowledgeClaimRecord(
         claim_id=claim.proposal_id,
         playthrough_id=playthrough_id,
@@ -377,7 +430,55 @@ def _claim_record(claim: Any, *, playthrough_id: str, branch_id: str, turn_id: s
         branch_scope=claim.branch_scope,
         normalized_fingerprint=_claim_fingerprint(claim),
         schema_version=claim.schema_version,
-        provenance=claim.provenance.model_dump(mode="json"),
+        provenance=provenance,
+    )
+
+
+def _opening_location_claim(
+    character_id: str,
+    *,
+    location_id: str,
+    playthrough_id: str,
+    branch_id: str,
+    turn_id: str,
+    event_id: str,
+    world_time: int,
+    seed: WorldSeed,
+) -> KnowledgeClaimRecord:
+    claim_id = opening_location_claim_id(playthrough_id, branch_id, character_id)
+    claim = KnowledgeClaim(
+        claim_id=claim_id,
+        subject_id=character_id,
+        predicate="located_at",
+        object_id=location_id,
+        branch_scope=branch_id,
+        valid_time=TimeRange(start=world_time),
+    )
+    return KnowledgeClaimRecord(
+        claim_id=claim_id,
+        playthrough_id=playthrough_id,
+        branch_id=branch_id,
+        turn_id=turn_id,
+        claim_type=claim.claim_type,
+        subject_id=claim.subject_id,
+        predicate=claim.predicate,
+        object_id=claim.object_id,
+        typed_value=claim.typed_value,
+        polarity=claim.polarity,
+        qualifiers=dict(claim.qualifiers),
+        valid_time_start=claim.valid_time.start,
+        valid_time_end=claim.valid_time.end,
+        branch_scope=claim.branch_scope,
+        normalized_fingerprint=claim.normalized_fingerprint,
+        schema_version=claim.schema_version,
+        provenance={
+            "source_type": "world_seed",
+            "source_id": seed.run_id,
+            "run_id": seed.run_id,
+            "prompt_version": seed.prompt_version,
+            "source_event_id": event_id,
+            "owner_id": "public",
+        },
     )
 
 

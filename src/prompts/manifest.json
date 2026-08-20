@@ -25,11 +25,11 @@
   },
   "context_validator": {
     "template": "context_validator.md",
-    "semantic_version": "1.0.0",
+    "semantic_version": "1.1.0",
     "input_contract": "role-input-1",
     "output_schema_version": "consistency-report-1",
     "required_variables": ["input_json"],
-    "changelog": "Initial evidence-aware consistency contract."
+    "changelog": "Treat an empty targeted-evidence list as no declared dependency while preserving blocking insufficient manifests."
   },
   "writer": {
     "template": "writer.md",

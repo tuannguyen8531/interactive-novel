@@ -9,7 +9,9 @@ from src.application.contracts.ai import (
     AIProvenance,
     KnowledgeClaimProposal,
     NPCReaction,
+    SetCharacterLocationOperation,
     SimulationResult,
+    StatePatchProposal,
     ValidationQuery,
 )
 from src.application.contracts.providers import EmbeddingResponse, ProviderCapability
@@ -288,6 +290,60 @@ def test_claim_extractor_emits_typed_requirement_and_validation_query() -> None:
     assert len(result.knowledge_requirements) == 1
     assert result.validation_queries[0].target_claim_ids == ("location-proposal",)
     assert result.validation_queries[0].query_type == "authorization"
+
+
+def test_claim_extractor_skips_new_claim_checks_and_idempotent_locations_for_live_turn() -> None:
+    claim = KnowledgeClaimProposal(
+        proposal_id="new-goal-proposal",
+        source_role=AIPromptRole.SIMULATOR,
+        source_run_id="sim-run",
+        subject_id="yuki",
+        predicate="goal_active",
+        object_id="festival-planning",
+        branch_scope="root",
+        provenance=AIProvenance(
+            source_type="simulation",
+            source_id="sim-run",
+            run_id="sim-run",
+            prompt_version="simulator@1.0.0",
+        ),
+    )
+    simulation = SimulationResult(
+        schema_version="simulation-result-1",
+        role=AIPromptRole.SIMULATOR,
+        run_id="sim-run",
+        prompt_version="simulator@1.0.0",
+        npc_reactions=(
+            NPCReaction(
+                character_id="yuki",
+                immediate_reaction="offers a task",
+                agency_goal="prepare for the festival",
+                resistance_or_agreement="agrees",
+                confidence=0.8,
+            ),
+        ),
+        proposed_outcome="Yuki offers a festival task.",
+        claim_proposals=(claim,),
+        state_patch=StatePatchProposal(
+            patch_id="patch-idempotent-location",
+            branch_id="root",
+            base_world_time=0,
+            operations=(SetCharacterLocationOperation(character_id="yuki", location_id="library"),),
+            provenance=claim.provenance,
+        ),
+    )
+
+    result = ClaimExtractor().extract(
+        simulation,
+        include_implicit_claim_requirements=False,
+        current_locations={"yuki": "library"},
+    )
+
+    assert result.proposed_claims == (claim,)
+    assert simulation.state_patch is not None
+    assert result.proposed_mutations == simulation.state_patch.operations
+    assert result.knowledge_requirements == ()
+    assert result.validation_queries == ()
 
 
 def test_cosine_similarity_is_exact_and_zero_safe() -> None:
