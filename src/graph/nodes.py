@@ -867,11 +867,7 @@ def _ensure_turn_clock(
     adds the configured fallback so an accepted action cannot freeze time.
     """
 
-    elapsed = sum(
-        operation.duration_minutes
-        for operation in patch.operations
-        if isinstance(operation, AdvanceClock)
-    )
+    elapsed = sum(operation.duration_minutes for operation in patch.operations if isinstance(operation, AdvanceClock))
     if elapsed > 0 or default_duration_minutes <= 0:
         return patch
     return StatePatch.from_operations(

@@ -166,9 +166,12 @@ def _build_opening_bundle(
     *,
     playthrough: PlaythroughRecord,
     branch: BranchRecord,
+    turn_id: str | None = None,
+    event_id: str | None = None,
+    turn_run_id: str | None = None,
 ) -> CanonicalTurnBundle:
-    turn_id = str(uuid4())
-    event_id = str(uuid4())
+    turn_id = turn_id or str(uuid4())
+    event_id = event_id or str(uuid4())
     world_time = seed.opening_scene.world_time
     known_names = {item.character_id: item.name for item in (seed.player_character, *seed.npc_profiles)}
     participants = tuple(seed.opening_scene.participants)
@@ -328,7 +331,7 @@ def _build_opening_bundle(
         world_time_start=world_time,
         duration_minutes=0,
         world_time_end=world_time,
-        turn_run_id=str(uuid4()),
+        turn_run_id=turn_run_id or str(uuid4()),
         final_narrative=narrative,
         approved_patch={
             "source": "world_builder_confirmation",

@@ -334,6 +334,34 @@ export interface ConnectivityResult {
   request_id: string | null
 }
 
+export interface BackupRecord {
+  name: string
+  size_bytes: number
+  modified_at: string
+  integrity: { path: string; ok: boolean; message: string }
+}
+
+export interface BackupReport {
+  source_path: string
+  destination_path: string
+  size_bytes: number
+  sha256: string
+  integrity: { path: string; ok: boolean; message: string }
+}
+
+export interface InspectorPayload {
+  [key: string]: unknown
+  scope: Record<string, unknown>
+  state: Record<string, unknown> | null
+  characters: CharacterView[]
+  memory: Record<string, MemoryView[]>
+  relationships: RelationshipView[]
+  retrieval_traces: Array<Record<string, unknown>>
+  invariants: Record<string, unknown>
+  llm_traces: Array<Record<string, unknown>>
+  telemetry: Record<string, unknown>
+}
+
 export interface ApiErrorBody {
   error: {
     code: string

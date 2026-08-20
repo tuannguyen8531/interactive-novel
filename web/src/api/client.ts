@@ -1,9 +1,12 @@
 import type {
   ApiErrorBody,
+  BackupRecord,
+  BackupReport,
   BranchRecord,
   CharacterView,
   ConnectivityResult,
   JobEvent,
+  InspectorPayload,
   MemoryView,
   OllamaAccount,
   PlaythroughExport,
@@ -87,6 +90,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T
 }
 
+async function requestBlob(path: string): Promise<Blob> {
+  const response = await fetch(`${BASE_URL}${path}`, { headers: requestHeaders({}) })
+  if (!response.ok) throw new ApiError(`${response.status} ${response.statusText}`, response.status, 'http_error')
+  return response.blob()
+}
+
 function query(params: Record<string, string | number | null | undefined>): string {
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
@@ -130,12 +139,20 @@ export const api = {
     request<BranchRecord>('/api/branches/root', jsonBody(payload)),
   forkBranch: (payload: { parent_branch_id: string; fork_turn_id: string; branch_id?: string }): Promise<BranchRecord> =>
     request<BranchRecord>('/api/branches/fork', jsonBody(payload)),
+  regenerateBranch: (branchId: string, turnId: string): Promise<BranchRecord> =>
+    request<BranchRecord>('/api/branches/regenerate', jsonBody({ branch_id: branchId, turn_id: turnId })),
+  undoBranch: (branchId: string, headTurnId: string): Promise<BranchRecord> =>
+    request<BranchRecord>('/api/branches/undo', jsonBody({ branch_id: branchId, head_turn_id: headTurnId })),
   switchBranch: (branchId: string, playthroughId: string): Promise<BranchRecord> =>
     request<BranchRecord>(`/api/branches/${encodeURIComponent(branchId)}/switch`, jsonBody({ playthrough_id: playthroughId })),
   branchAncestry: (branchId: string): Promise<BranchRecord[]> =>
     request<BranchRecord[]>(`/api/branches/${encodeURIComponent(branchId)}/ancestry`),
   exportPlaythrough: (playthroughId: string): Promise<PlaythroughExport> =>
     request<PlaythroughExport>(`/api/playthroughs/${encodeURIComponent(playthroughId)}/export`),
+  downloadExportBundle: (playthroughId: string): Promise<Blob> =>
+    requestBlob(`/api/playthroughs/${encodeURIComponent(playthroughId)}/export/bundle`),
+  importExportBundle: (body: ArrayBuffer): Promise<PlaythroughExport> =>
+    request<PlaythroughExport>('/api/exports/import', { method: 'POST', body }),
   listCharacters: (playthroughId: string, branchId?: string): Promise<CharacterView[]> =>
     request<CharacterView[]>(
       `/api/playthroughs/${encodeURIComponent(playthroughId)}/characters${query({ branch_id: branchId })}`
@@ -156,6 +173,18 @@ export const api = {
     request<TimelineEvent[]>(
       `/api/playthroughs/${encodeURIComponent(playthroughId)}/branches/${encodeURIComponent(branchId)}/timeline`
     ),
+  inspector: (playthroughId: string, branchId: string): Promise<InspectorPayload> =>
+    request<InspectorPayload>(
+      `/api/playthroughs/${encodeURIComponent(playthroughId)}/branches/${encodeURIComponent(branchId)}/inspector`
+    ),
+  listBackups: (): Promise<BackupRecord[]> => request<BackupRecord[]>('/api/backups'),
+  createBackup: (): Promise<BackupReport> => request<BackupReport>('/api/backups', jsonBody({})),
+  restoreBackup: (name: string): Promise<BackupReport> =>
+    request<BackupReport>('/api/backups/restore', jsonBody({ name })),
+  databaseIntegrity: (): Promise<{ path: string; ok: boolean; message: string }> =>
+    request<{ path: string; ok: boolean; message: string }>('/api/backups/integrity'),
+  submitFeedback: (payload: { rating: number; comment: string; category: string; turn_run_id?: string }): Promise<Record<string, unknown>> =>
+    request<Record<string, unknown>>('/api/feedback', jsonBody(payload)),
   submitTurn: (
     payload: {
       playthrough_id: string

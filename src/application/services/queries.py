@@ -7,6 +7,7 @@ from dataclasses import replace
 from src.application.contracts.queries import CharacterView, MemoryView, RelationshipView, TimelineView
 from src.application.errors import ResourceNotFoundError
 from src.application.ports.persistence import UnitOfWork, UowFactory
+from src.domain.codec import state_to_payload
 
 from .game_states import GameStateApplicationService
 
@@ -144,6 +145,57 @@ class CharacterQueryApplicationService:
             )
             for event in events
         )
+
+    async def inspect_runtime(self, *, playthrough_id: str, branch_id: str) -> dict[str, object]:
+        """Return deep, safe developer diagnostics for one branch scope."""
+        state = await self._game_states.load(playthrough_id=playthrough_id, branch_id=branch_id) if self._game_states else None
+        async with self._uow_factory() as uow:
+            branch = await self._required_branch(uow, playthrough_id=playthrough_id, branch_id=branch_id)
+            playthrough = await uow.playthroughs.get(playthrough_id)
+            if playthrough is None:
+                raise ResourceNotFoundError(f"Playthrough {playthrough_id} does not exist.")
+            characters = await uow.inspection.list_characters(
+                playthrough_id=playthrough_id,
+                world_id=playthrough.world_id,
+                branch_id=branch_id,
+            )
+            relationships = await uow.inspection.inspect_relationships(
+                playthrough_id=playthrough_id,
+                branch_id=branch_id,
+            )
+            memory = {
+                character.id: await uow.inspection.inspect_character_memory(
+                    playthrough_id=playthrough_id,
+                    branch_id=branch_id,
+                    character_id=character.id,
+                    limit=100,
+                )
+                for character in characters
+            }
+            retrieval_traces = await uow.retrieval.list_traces(
+                playthrough_id=playthrough_id,
+                branch_id=branch_id,
+                limit=50,
+            )
+            visible_turns = await uow.canonical.list_visible_turns(branch_id)
+            invariant_report = await uow.canonical.verify_invariants(branch_id)
+        return {
+            "scope": {
+                "playthrough_id": playthrough_id,
+                "branch_id": branch_id,
+                "head_turn_id": branch.head_turn_id,
+                "head_revision": branch.head_revision,
+            },
+            "state": None if state is None else state_to_payload(state),
+            "characters": characters,
+            "memory": memory,
+            "relationships": relationships,
+            "retrieval_traces": retrieval_traces,
+            "turn_runs": tuple(
+                {"turn_id": turn.id, "turn_run_id": turn.turn_run_id, "status": turn.status} for turn in visible_turns
+            ),
+            "invariants": invariant_report,
+        }
 
     async def _scope_branch(self, uow: UnitOfWork, *, playthrough_id: str, branch_id: str | None):
         if branch_id is None:

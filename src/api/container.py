@@ -15,6 +15,7 @@ from src.application.services.export import PlaythroughExportApplicationService
 from src.application.services.feedback import FeedbackApplicationService
 from src.application.services.game_states import GameStateApplicationService
 from src.application.services.jobs import UowJobStore
+from src.application.services.operations import RuntimeOperationsApplicationService
 from src.application.services.playthroughs import PlaythroughApplicationService
 from src.application.services.provider_settings import ProviderSettingsApplicationService
 from src.application.services.queries import CharacterQueryApplicationService
@@ -57,6 +58,7 @@ class ApplicationContainer:
     derived_worker: DerivedJobWorker
     telemetry: TelemetryRecorder
     feedback: FeedbackApplicationService
+    operations: RuntimeOperationsApplicationService
 
     async def start(self) -> None:
         await upgrade_database(self.database.engine)
@@ -129,7 +131,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         branches=BranchApplicationService(uow_factory),
         queries=CharacterQueryApplicationService(uow_factory, game_states=game_states),
         game_states=game_states,
-        exports=PlaythroughExportApplicationService(uow_factory),
+        exports=PlaythroughExportApplicationService(uow_factory, game_states=game_states),
         world_drafts=WorldDraftApplicationService(
             uow_factory,
             generator=ProviderWorldDraftGenerator(provider),
@@ -142,6 +144,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         derived_worker=derived_worker,
         telemetry=telemetry,
         feedback=FeedbackApplicationService(JsonlFeedbackStore(paths.feedback)),
+        operations=RuntimeOperationsApplicationService(paths.game_db, paths.exports),
     )
 
 

@@ -191,8 +191,7 @@ class DerivedJobApplicationService:
             scope,
             uow.retrieval,
             provider=self._embedding_provider,
-            model=getattr(self._embedding_provider, "embedding_model", None)
-            or getattr(self._embedding_provider, "model", None),
+            model=getattr(self._embedding_provider, "embedding_model", None) or getattr(self._embedding_provider, "model", None),
         )
         if report.failed_source_ids:
             raise RuntimeError(f"Embedding rebuild failed for {len(report.failed_source_ids)} sources.")

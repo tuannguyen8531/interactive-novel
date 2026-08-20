@@ -116,6 +116,29 @@ def test_consolidation_keeps_important_detail_and_canonical_provenance() -> None
     assert matching.turn_ids == tuple(f"turn-{index}" for index in range(31, 41))
 
 
+def test_100_turn_memory_gate_preserves_critical_details_across_windows() -> None:
+    turns = tuple(_turn(index) for index in range(1, 101))
+    memories = [
+        _candidate("event-key", time=13, text="Alice hid the brass key under the library atlas.", salience=0.99),
+        _candidate("event-promise", time=55, text="Bob promised to meet Mina beside the old clock.", salience=0.97),
+        _candidate("event-letter", time=92, text="The sealed letter bears a silver fox crest.", salience=0.98),
+    ]
+
+    summaries = MemoryConsolidator(window_turns=10).consolidate(
+        playthrough_id="playthrough-1",
+        branch_id="root",
+        source_revision=100,
+        turns=turns,
+        candidates=memories,
+    )
+
+    combined = " ".join(summary.text for summary in summaries)
+    assert len(summaries) == 10
+    assert "brass key" in combined
+    assert "old clock" in combined
+    assert "silver fox crest" in combined
+
+
 def test_belief_conflict_is_perspective_derived_not_a_canon_mutation() -> None:
     claims = (_claim("claim-positive", polarity="positive"), _claim("claim-negative", polarity="negative"))
     beliefs = (

@@ -348,9 +348,7 @@ class ContextAssembler:
                 )
             except ValueError, TypeError:
                 return hits, False, None, None
-            if not any(
-                (record.metadata.source_id, record.metadata.content_hash) in expected_keys for record in stored_records
-            ):
+            if not any((record.metadata.source_id, record.metadata.content_hash) in expected_keys for record in stored_records):
                 return hits, False, None, None
         try:
             response = await indexer.query_embedding(query_text, provider=provider, model=model)

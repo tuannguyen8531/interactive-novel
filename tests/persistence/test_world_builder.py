@@ -11,6 +11,7 @@ from src.application.contracts.persistence import CanonicalTurnBundle
 from src.application.errors import ResourceNotFoundError
 from src.application.services.canonical_turns import CanonicalTurnApplicationService
 from src.application.services.derived import DerivedJobApplicationService
+from src.application.services.export import PlaythroughExportApplicationService
 from src.application.services.game_states import GameStateApplicationService
 from src.application.services.world_drafts import WorldDraftApplicationService
 from src.application.services.worlds import WorldApplicationService
@@ -174,6 +175,27 @@ async def test_game_state_hydrates_seed_replays_turn_and_builds_snapshot(databas
     assert snapshot.source_turn_id == turn.id
     assert snapshot.world_clock_minutes == rebuilt.world_time
     assert len(jobs) == 3
+
+
+async def test_export_bundle_can_restore_a_deleted_playthrough(database) -> None:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]
+    uow_factory = make_uow_factory(database)
+    confirmation = await WorldDraftApplicationService(uow_factory).confirm_world_bundle(WorldSeed.model_validate(payload))
+    exports = PlaythroughExportApplicationService(uow_factory)
+    bundle = await exports.export_bundle(confirmation.playthrough.id)
+
+    await WorldApplicationService(uow_factory).delete_world(confirmation.world.id)
+    restored = await exports.import_bundle(bundle.as_bytes())
+    state = await GameStateApplicationService(uow_factory).load(
+        playthrough_id=restored.playthrough.id,
+        branch_id=restored.playthrough.root_branch_id or "",
+    )
+
+    assert restored.world.id == confirmation.world.id
+    assert restored.playthrough.id == confirmation.playthrough.id
+    assert len(restored.turns) == 1
+    assert state.world_time == confirmation.opening_scene.world_time
+    assert set(state.characters) == {payload["player_character"]["character_id"], "alice", "bob"}
 
 
 async def test_delete_world_removes_the_complete_confirmed_aggregate(database) -> None:

@@ -93,4 +93,51 @@ describe('API client', () => {
       timeout_seconds: 8
     })
   })
+
+  it('uses dedicated history-preserving regenerate and undo endpoints', async () => {
+    const branch = {
+      id: 'branch-new',
+      playthrough_id: 'play-1',
+      parent_branch_id: 'root',
+      fork_turn_id: 'turn-1',
+      head_turn_id: 'turn-1',
+      depth: 1,
+      head_revision: 0,
+      lifecycle: 'active',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    }
+    const fetchMock = vi.fn().mockImplementation(async () =>
+      new Response(JSON.stringify(branch), { status: 201, headers: { 'Content-Type': 'application/json' } })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await api.regenerateBranch('root', 'turn-2')
+    await api.undoBranch('root', 'turn-2')
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/branches/regenerate')
+    expect(JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))).toEqual({
+      branch_id: 'root',
+      turn_id: 'turn-2'
+    })
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/branches/undo')
+  })
+
+  it('posts a portable bundle as raw JSON bytes for canonical import', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ format_version: 'playthrough-export-1' }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const body = new TextEncoder().encode('{"format_version":"playthrough-export-bundle-1"}').buffer
+
+    await api.importExportBundle(body)
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/exports/import')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe(body)
+  })
 })

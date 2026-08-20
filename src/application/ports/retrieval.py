@@ -48,5 +48,13 @@ class RetrievalRepository(MemoryCandidateSource, EmbeddingStore, Protocol):
 
     async def save_trace(self, trace: RetrievalTrace) -> None: ...
 
+    async def list_traces(
+        self,
+        *,
+        playthrough_id: str,
+        branch_id: str,
+        limit: int = 50,
+    ) -> tuple[dict[str, object], ...]: ...
+
 
 __all__ = ["EmbeddingStore", "MemoryCandidateSource", "RetrievalRepository", "RetrievalTraceStore"]

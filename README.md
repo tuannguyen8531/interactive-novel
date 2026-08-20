@@ -1,7 +1,12 @@
 # Interactive Novel
 
-Local-first AI-powered interactive visual novel/RPG engine. Phase 2 adds the
-SQLite persistence foundation without coupling the domain layer to SQLAlchemy.
+Local-first AI-powered interactive visual novel/RPG engine. The current alpha
+includes the playable Vue application, AI turn pipeline, canonical SQLite
+persistence, branching/regeneration/undo, hybrid memory retrieval, portable
+import/export, backup/restore and developer diagnostics.
+
+See [docs/status.md](docs/status.md) for the implementation matrix. The large
+design document remains a roadmap, not a reliable progress tracker by itself.
 
 ## Development
 
@@ -70,6 +75,7 @@ uv run test --frontend
 uv run test --fix
 uv run build
 uv run migrate
+uv run quality-report
 ```
 
 `uv run test` follows the backend validation flow used by `novel-ai-trans`:
@@ -77,10 +83,16 @@ Ruff, Pyright and Pytest. Add `--frontend` to run the Vue unit tests in the
 same invocation. Extra Pytest arguments go after `--`, for example
 `uv run test -- --maxfail=1 -k health`.
 
+`uv run quality-report` aggregates provider-real latency, token and estimated
+cost samples from opt-in telemetry. It reports zero samples honestly until
+`TELEMETRY_ENABLED=true` has been used for real turns.
+
 `uv run migrate` upgrades the canonical database at `runtime/game.db`. Use
 `uv run migrate --database /path/to/game.db` for a test or alternate runtime.
 The separate `runtime/checkpoints.db` path is reserved for LangGraph execution
 state and is not a save-game database.
 
-Alpha operations, backup/restore, integrity checks and opt-in telemetry are
-documented in [docs/operations.md](docs/operations.md).
+Each saved playthrough has an **Export** action; the **Data** screen provides
+portable story import, verified database backup/restore and the alpha feedback
+form. CLI equivalents and opt-in telemetry are documented in
+[docs/operations.md](docs/operations.md).

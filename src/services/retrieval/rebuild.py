@@ -42,9 +42,7 @@ class EmbeddingRebuildService:
             )
             existing_keys = {(record.metadata.source_id, record.metadata.content_hash) for record in existing}
         pending = tuple(
-            candidate
-            for candidate in candidates
-            if (candidate.source_id, content_hash(candidate.text)) not in existing_keys
+            candidate for candidate in candidates if (candidate.source_id, content_hash(candidate.text)) not in existing_keys
         )
         indexed = len(candidates) - len(pending)
         failed: list[str] = []

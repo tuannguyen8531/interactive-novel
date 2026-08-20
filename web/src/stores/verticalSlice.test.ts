@@ -10,12 +10,12 @@ describe('frontend fixture vertical slice', () => {
     setActivePinia(createPinia())
   })
 
-  it('plays ten turns and keeps the visible branch transcript', async () => {
+  it('passes the 30-turn acceptance loop and keeps the visible branch transcript', async () => {
     const playthrough = usePlaythroughStore()
     const jobs = useTurnJobStore()
     await playthrough.open(FIXTURE_PLAYTHROUGH_ID)
 
-    for (let index = 0; index < 10; index += 1) {
+    for (let index = 0; index < 30; index += 1) {
       await jobs.runFixture(
         {
           playthrough_id: FIXTURE_PLAYTHROUGH_ID,
@@ -27,9 +27,9 @@ describe('frontend fixture vertical slice', () => {
       )
     }
 
-    expect(playthrough.visibleTurns).toHaveLength(10)
-    expect(playthrough.activeBranch?.head_revision).toBe(10)
-    expect(playthrough.latestTurn?.final_narrative).toContain('fixture action 10')
+    expect(playthrough.visibleTurns).toHaveLength(30)
+    expect(playthrough.activeBranch?.head_revision).toBe(30)
+    expect(playthrough.latestTurn?.final_narrative).toContain('fixture action 30')
     expect(jobs.current?.status).toBe('completed')
     expect(jobs.events.some((event) => event.event_type === 'writer_token')).toBe(true)
   })

@@ -7,7 +7,7 @@ const router = useRouter()
 const debug = useDebugStore()
 
 onMounted(() => {
-  debug.refresh()
+  void debug.refresh()
 })
 </script>
 
@@ -23,7 +23,7 @@ onMounted(() => {
         <h1>Scoped runtime view</h1>
         <p class="lede">This metadata is intentionally kept out of the player-facing transcript.</p>
       </div>
-      <button class="secondary" type="button" @click="debug.refresh">Refresh</button>
+      <button class="secondary" type="button" @click="debug.refresh()">Refresh</button>
     </section>
     <section v-if="!debug.available" class="empty-state">Open a playthrough before inspecting it.</section>
     <pre v-else class="inspector-panel">{{ JSON.stringify(debug.inspector, null, 2) }}</pre>

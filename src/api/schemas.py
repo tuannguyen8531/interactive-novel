@@ -78,6 +78,26 @@ class ForkBranchRequest(BaseModel):
     branch_id: str | None = Field(default=None, max_length=160)
 
 
+class RegenerateBranchRequest(BaseModel):
+    branch_id: str = Field(min_length=1, max_length=160)
+    turn_id: str = Field(min_length=1, max_length=160)
+    new_branch_id: str | None = Field(default=None, max_length=160)
+
+
+class UndoBranchRequest(BaseModel):
+    branch_id: str = Field(min_length=1, max_length=160)
+    head_turn_id: str = Field(min_length=1, max_length=160)
+    new_branch_id: str | None = Field(default=None, max_length=160)
+
+
+class BackupCreateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=210)
+
+
+class BackupRestoreRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=210)
+
+
 class SwitchBranchRequest(BaseModel):
     playthrough_id: str = Field(min_length=1, max_length=160)
 
@@ -188,6 +208,8 @@ class FeedbackRequest(BaseModel):
 
 
 __all__ = [
+    "BackupCreateRequest",
+    "BackupRestoreRequest",
     "ErrorEnvelope",
     "FeedbackRequest",
     "ErrorPayload",
@@ -197,9 +219,11 @@ __all__ = [
     "ProviderRouteRequest",
     "ProviderSettingsRequest",
     "ProviderTargetRequest",
+    "RegenerateBranchRequest",
     "RootBranchRequest",
     "SwitchBranchRequest",
     "TurnSubmitRequest",
+    "UndoBranchRequest",
     "WorldCreateRequest",
     "WorldDraftGenerateRequest",
     "WorldDraftRequest",

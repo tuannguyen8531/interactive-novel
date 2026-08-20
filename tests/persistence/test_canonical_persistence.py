@@ -568,6 +568,76 @@ async def test_fork_regenerate_and_visible_history_do_not_mix_branches(database:
     assert child_state.world_time == 2
 
 
+async def test_regenerate_and_undo_branch_before_latest_turn_without_deleting_history(database: Database) -> None:
+    uow_factory, _, playthrough_id, root = await _setup(database)
+    branches = BranchApplicationService(uow_factory)
+    turns = CanonicalTurnApplicationService(uow_factory)
+    first = await turns.commit_turn(
+        _bundle(
+            playthrough_id=playthrough_id,
+            branch_id=root.id,
+            turn_id="turn-first",
+            turn_run_id="run-first",
+            base_revision=0,
+            world_time_start=0,
+        )
+    )
+    second = await turns.commit_turn(
+        _bundle(
+            playthrough_id=playthrough_id,
+            branch_id=root.id,
+            turn_id="turn-second",
+            turn_run_id="run-second",
+            base_revision=1,
+            world_time_start=1,
+            parent_turn_id=first.id,
+        )
+    )
+
+    regenerated = await branches.regenerate_branch(branch_id=root.id, turn_id=second.id)
+    undone = await branches.undo_branch(branch_id=root.id, head_turn_id=second.id)
+
+    assert regenerated.fork_turn_id == first.id
+    assert undone.fork_turn_id == first.id
+    async with uow_factory() as uow:
+        playthrough = await uow.playthroughs.get(playthrough_id)
+        assert playthrough is not None
+        assert playthrough.active_branch_id == undone.id
+        assert playthrough.world_clock_minutes == first.world_time_end
+        assert await uow.canonical.get_turn(second.id) is not None
+
+
+async def test_canonical_persistence_100_turn_soak_keeps_head_and_replay_invariants(database: Database) -> None:
+    uow_factory, _, playthrough_id, root = await _setup(database)
+    turns = CanonicalTurnApplicationService(uow_factory)
+    parent_turn_id: str | None = None
+
+    for index in range(100):
+        turn = await turns.commit_turn(
+            _bundle(
+                playthrough_id=playthrough_id,
+                branch_id=root.id,
+                turn_id=f"turn-soak-{index + 1}",
+                turn_run_id=f"run-soak-{index + 1}",
+                base_revision=index,
+                world_time_start=index,
+                parent_turn_id=parent_turn_id,
+            )
+        )
+        parent_turn_id = turn.id
+
+    report = await turns.verify_invariants(root.id)
+    state = await GameStateApplicationService(uow_factory).load(playthrough_id=playthrough_id, branch_id=root.id)
+
+    assert report.valid is True
+    assert state.world_time == 100
+    async with uow_factory() as uow:
+        branch = await uow.canonical.get_branch(root.id)
+        assert branch is not None
+        assert branch.head_revision == 100
+        assert branch.head_turn_id == "turn-soak-100"
+
+
 async def test_replay_snapshot_fallback_and_derived_failure_leave_canon_intact(database: Database) -> None:
     uow_factory, world_id, playthrough_id, root = await _setup(database)
     turns = CanonicalTurnApplicationService(uow_factory)

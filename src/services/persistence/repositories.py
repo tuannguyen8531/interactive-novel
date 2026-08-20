@@ -231,6 +231,18 @@ class SqlAlchemyPlaythroughRepository:
             raise ValueError(f"Playthrough {playthrough_id} does not exist.")
         await self._session.flush()
 
+    async def set_world_clock(self, playthrough_id: str, world_clock_minutes: int) -> None:
+        if world_clock_minutes < 0:
+            raise ValueError("World clock cannot be negative.")
+        result = await self._session.execute(
+            update(PlaythroughModel)
+            .where(PlaythroughModel.id == playthrough_id)
+            .values(world_clock_minutes=world_clock_minutes, updated_at=datetime.now(UTC))
+        )
+        if getattr(result, "rowcount", None) != 1:
+            raise ValueError(f"Playthrough {playthrough_id} does not exist.")
+        await self._session.flush()
+
     async def update_provider_config_snapshot(self, playthrough_id: str, snapshot: dict[str, object]) -> None:
         result = await self._session.execute(
             update(PlaythroughModel)

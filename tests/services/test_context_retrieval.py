@@ -146,6 +146,69 @@ async def test_coffee_memory_survives_noise_without_embeddings() -> None:
 
 
 @pytest.mark.asyncio
+async def test_100_turn_critical_memory_recall_at_five_gate() -> None:
+    critical = (
+        _candidate(
+            "critical-key-13",
+            kind=MemoryKind.CLAIM,
+            time=13,
+            text="Alice hid the brass key under the library atlas.",
+            salience=0.99,
+            entities=("alice", "library"),
+        ),
+        _candidate(
+            "critical-promise-55",
+            kind=MemoryKind.CLAIM,
+            time=55,
+            text="Bob promised Mina they would meet beside the old clock.",
+            salience=0.98,
+            entities=("bob", "mina"),
+        ),
+        _candidate(
+            "critical-letter-92",
+            kind=MemoryKind.CLAIM,
+            time=92,
+            text="The sealed letter bears a silver fox crest.",
+            salience=0.97,
+            entities=("mina", "letter"),
+        ),
+    )
+    noise = [
+        _candidate(
+            f"noise-{turn}",
+            time=turn,
+            text=f"A routine club task was completed at turn {turn}.",
+            entities=("club",),
+        )
+        for turn in range(1, 101)
+    ]
+    queries = (
+        ("Where did Alice hide the brass key?", ("alice", "library"), "critical-key-13"),
+        ("Where did Bob promise to meet Mina?", ("bob", "mina"), "critical-promise-55"),
+        ("What crest is on Mina's sealed letter?", ("mina", "letter"), "critical-letter-92"),
+    )
+    assembler = ContextAssembler(trace_store=InMemoryRetrievalTraceStore())
+
+    recalled = 0
+    for index, (query_text, entity_ids, expected_id) in enumerate(queries, start=1):
+        manifest = await assembler.build_initial_context(
+            InitialContextRequest(
+                run_id=f"run-recall-{index}",
+                role="simulator",
+                scope=_scope(time=100, owner=None),
+                query_text=query_text,
+                entity_ids=entity_ids,
+                token_budget=500,
+                max_items=5,
+            ),
+            [*critical, *noise],
+        )
+        recalled += expected_id in {entry.source_id for entry in manifest.entries}
+
+    assert recalled / len(queries) == 1.0
+
+
+@pytest.mark.asyncio
 async def test_targeted_retrieval_uses_exact_claim_before_semantic_fallback() -> None:
     exact = _candidate(
         "location-claim",

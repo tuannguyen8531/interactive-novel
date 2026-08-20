@@ -186,6 +186,33 @@ export const usePlaythroughStore = defineStore('playthrough', () => {
     }
   }
 
+  async function regenerate(turnId: string): Promise<BranchRecord | null> {
+    if (!playthrough.value || !activeBranch.value || fixtureMode.value) return null
+    error.value = null
+    try {
+      const branch = await api.regenerateBranch(activeBranch.value.id, turnId)
+      await api.switchBranch(branch.id, playthrough.value.id)
+      await refresh()
+      return branch
+    } catch (cause) {
+      error.value = toError(cause)
+      throw cause
+    }
+  }
+
+  async function undo(headTurnId: string): Promise<BranchRecord | null> {
+    if (!playthrough.value || !activeBranch.value || fixtureMode.value) return null
+    error.value = null
+    try {
+      const branch = await api.undoBranch(activeBranch.value.id, headTurnId)
+      await refresh()
+      return branch
+    } catch (cause) {
+      error.value = toError(cause)
+      throw cause
+    }
+  }
+
   function appendFixture(input: string): TurnRecord {
     if (!fixtureMode.value || !activeBranch.value) throw new Error('Fixture playthrough is not open.')
     const state = currentFixtureState()
@@ -224,6 +251,8 @@ export const usePlaythroughStore = defineStore('playthrough', () => {
     resetFixture,
     switchBranch,
     fork,
+    regenerate,
+    undo,
     appendFixture
   }
 })

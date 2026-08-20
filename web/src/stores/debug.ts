@@ -1,18 +1,23 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { api } from '@/api/client'
 import { usePlaythroughStore } from './playthrough'
 import { useTurnJobStore } from './turnJob'
 
 export const useDebugStore = defineStore('debug', () => {
   const playthrough = usePlaythroughStore()
-  const enabled = import.meta.env.DEV
+  const enabled = import.meta.env.VITE_ENABLE_INSPECTOR !== 'false'
   const inspector = ref<Record<string, unknown> | null>(null)
   const jobs = useTurnJobStore()
   const available = computed(() => enabled && playthrough.playthrough !== null)
 
-  function refresh(): void {
+  async function refresh(): Promise<void> {
     if (!enabled || !playthrough.playthrough || !playthrough.activeBranch) {
       inspector.value = null
+      return
+    }
+    if (!playthrough.fixtureMode) {
+      inspector.value = await api.inspector(playthrough.playthrough.id, playthrough.activeBranch.id)
       return
     }
     inspector.value = {

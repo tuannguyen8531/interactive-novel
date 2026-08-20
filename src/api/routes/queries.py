@@ -80,4 +80,26 @@ async def inspect_timeline(
     return public_json(await services.queries.inspect_timeline(playthrough_id=playthrough_id, branch_id=branch_id))
 
 
+@router.get("/playthroughs/{playthrough_id}/branches/{branch_id}/inspector")
+async def inspect_runtime(
+    playthrough_id: str,
+    branch_id: str,
+    services: ApplicationContainer = _services_dependency,
+):
+    payload = await services.queries.inspect_runtime(playthrough_id=playthrough_id, branch_id=branch_id)
+    telemetry = services.telemetry
+    turn_runs_value = payload.get("turn_runs", ())
+    turn_runs = turn_runs_value if isinstance(turn_runs_value, (list, tuple)) else ()
+    run_ids = {
+        str(item["turn_run_id"]) for item in turn_runs if isinstance(item, dict) and isinstance(item.get("turn_run_id"), str)
+    }
+    payload["llm_traces"] = tuple(event.as_dict() for event in telemetry.events if event.run_id in run_ids)
+    payload["telemetry"] = {
+        "enabled": telemetry.enabled,
+        "summary": telemetry.summary().as_dict(),
+        "note": None if telemetry.enabled else "Enable TELEMETRY_ENABLED to retain secret-safe LLM trace metadata.",
+    }
+    return public_json(payload)
+
+
 __all__ = ["router"]

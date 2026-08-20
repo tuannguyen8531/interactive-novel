@@ -1,6 +1,9 @@
 # Kế hoạch xây dựng AI-powered VN/RPG Engine
 
-> Trạng thái: cổng vào Phase 0 đã được phê duyệt; bản kế hoạch là nguồn tham chiếu chính cho quá trình triển khai.
+> Trạng thái triển khai (2026-08-20): alpha feature set của Phase 1–14 đã được
+> ghép vào một modular monolith; xem `docs/status.md` để biết mục nào đã kiểm
+> chứng, mục nào còn phụ thuộc provider-real. Tài liệu này là roadmap/thiết kế,
+> không còn là bảng tiến độ thực thi.
 >
 > Revision: đã tích hợp architectural review trước Giai đoạn 1, gồm typed knowledge propositions, targeted consistency retrieval, logical-role/physical-call separation, canonical/derived lifecycle, relationship policies, gameplay eval và off-screen simulation boundary.
 >

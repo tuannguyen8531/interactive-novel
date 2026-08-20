@@ -12,6 +12,7 @@ const debug = useDebugStore()
       <nav aria-label="Primary navigation">
         <RouterLink to="/">Home</RouterLink>
         <RouterLink to="/settings">Providers</RouterLink>
+        <RouterLink to="/data">Data</RouterLink>
         <RouterLink v-if="debug.enabled" to="/inspector">Inspector</RouterLink>
       </nav>
     </header>

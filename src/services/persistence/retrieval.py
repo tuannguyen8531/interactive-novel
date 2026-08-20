@@ -213,6 +213,28 @@ class SqlAlchemyRetrievalRepository(SqlAlchemyEmbeddingStore):
     async def save_trace(self, trace: RetrievalTrace) -> None:
         await self.trace_store.save(trace)
 
+    async def list_traces(
+        self,
+        *,
+        playthrough_id: str,
+        branch_id: str,
+        limit: int = 50,
+    ) -> tuple[dict[str, object], ...]:
+        if limit <= 0:
+            raise ValueError("Trace limit must be positive.")
+        models = (
+            await self._session.scalars(
+                select(RetrievalTraceModel)
+                .where(
+                    RetrievalTraceModel.playthrough_id == playthrough_id,
+                    RetrievalTraceModel.branch_id == branch_id,
+                )
+                .order_by(RetrievalTraceModel.created_at.desc(), RetrievalTraceModel.id.desc())
+                .limit(limit)
+            )
+        ).all()
+        return tuple(dict(item.payload) for item in models)
+
     async def list_candidates(self, scope: RetrievalScope) -> tuple[MemoryCandidate, ...]:
         visible = await resolve_visible_branch_scope(self._session, scope.branch_id)
         requested_branch_ids = set(scope.allowed_branch_ids)

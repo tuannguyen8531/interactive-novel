@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useLibraryStore } from '@/stores/library'
+import { api } from '@/api/client'
 import { FIXTURE_PLAYTHROUGH_ID } from '@/fixtures/fixture'
 import type { PlaythroughRecord, WorldRecord } from '@/api/types'
 
@@ -27,6 +28,16 @@ async function deleteWorld(world: WorldRecord): Promise<void> {
     `Delete “${world.name}” and all of its playthroughs? This cannot be undone.`
   )
   if (confirmed) await library.deleteWorld(world.id)
+}
+
+async function exportPlaythrough(playthrough: PlaythroughRecord, world: WorldRecord): Promise<void> {
+  const blob = await api.downloadExportBundle(playthrough.id)
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${world.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'story'}-${playthrough.id.slice(0, 8)}.json`
+  link.click()
+  URL.revokeObjectURL(url)
 }
 </script>
 
@@ -101,13 +112,16 @@ async function deleteWorld(world: WorldRecord): Promise<void> {
         <div v-else class="playthrough-list">
           <div v-for="playthrough in worldPlaythroughs(world.id)" :key="playthrough.id" class="playthrough-row">
             <span class="muted">Clock {{ playthrough.world_clock_minutes }} minutes · {{ playthrough.lifecycle }}</span>
-            <button
-              class="secondary"
-              type="button"
-              @click="router.push({ name: 'play', params: { playthroughId: playthrough.id } })"
-            >
-              Continue
-            </button>
+            <span class="playthrough-actions">
+              <button class="secondary" type="button" @click="exportPlaythrough(playthrough, world)">Export</button>
+              <button
+                class="secondary"
+                type="button"
+                @click="router.push({ name: 'play', params: { playthroughId: playthrough.id } })"
+              >
+                Continue
+              </button>
+            </span>
           </div>
         </div>
       </article>
@@ -236,6 +250,11 @@ async function deleteWorld(world: WorldRecord): Promise<void> {
 
 .playthrough-row button {
   flex: 0 0 auto;
+}
+
+.playthrough-actions {
+  display: flex;
+  gap: 0.45rem;
 }
 
 @media (max-width: 700px) {

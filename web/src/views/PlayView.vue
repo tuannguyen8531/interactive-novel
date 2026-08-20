@@ -35,6 +35,7 @@ const loadingRoute = ref(false)
 const routePlaythroughId = computed(() => String(route.params.playthroughId ?? ''))
 const playerCharacter = computed(() => findPlayerCharacter(playthrough.playthrough, playthrough.characters))
 const playerTurns = computed(() => playthrough.visibleTurns.filter((turn) => !isOpeningTurn(turn)))
+const latestPlayerTurn = computed(() => playerTurns.value.at(-1) ?? null)
 const activeBranchName = computed(() =>
   branches.activeBranch ? branchDisplayName(branches.activeBranch, branches.branches) : 'No timeline'
 )
@@ -141,6 +142,23 @@ async function submit(): Promise<void> {
   } catch {
     input.value = action
   }
+}
+
+async function regenerateLastTurn(): Promise<void> {
+  const turn = latestPlayerTurn.value
+  if (!turn || jobs.active || playthrough.fixtureMode) return
+  if (!window.confirm('Regenerate the latest move on a new branch? The existing version will remain available.')) return
+  const action = turn.raw_input
+  await playthrough.regenerate(turn.id)
+  input.value = action
+  await submit()
+}
+
+async function undoLastTurn(): Promise<void> {
+  const turn = latestPlayerTurn.value
+  if (!turn || jobs.active || playthrough.fixtureMode) return
+  if (!window.confirm('Undo the latest move on a new branch? No story history will be deleted.')) return
+  await playthrough.undo(turn.id)
 }
 
 async function fork(): Promise<void> {
@@ -317,7 +335,27 @@ function playerTurnNumber(index: number): number {
                 {{ playerCharacter ? `What does ${playerCharacter.display_name} do next?` : 'What do you do next?' }}
               </h2>
             </div>
-            <button v-if="jobs.active" class="danger" type="button" @click="jobs.cancel()">Cancel</button>
+            <div class="turn-actions">
+              <button
+                v-if="latestPlayerTurn && !playthrough.fixtureMode"
+                class="secondary small-button"
+                type="button"
+                :disabled="jobs.active"
+                @click="undoLastTurn"
+              >
+                Undo last move
+              </button>
+              <button
+                v-if="latestPlayerTurn && !playthrough.fixtureMode"
+                class="secondary small-button"
+                type="button"
+                :disabled="jobs.active"
+                @click="regenerateLastTurn"
+              >
+                Regenerate
+              </button>
+              <button v-if="jobs.active" class="danger" type="button" @click="jobs.cancel()">Cancel</button>
+            </div>
           </div>
           <p id="player-move-help" class="move-help">
             Write naturally—no command syntax is required. Describe what your character tries to do, say, ask, notice or
@@ -830,6 +868,13 @@ function playerTurnNumber(index: number): number {
   border-radius: 0.65rem;
   background: #fff;
   color: var(--ink);
+}
+
+.turn-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: flex-end;
 }
 
 .action-panel textarea:focus {

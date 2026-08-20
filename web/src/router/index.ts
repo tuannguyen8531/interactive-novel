@@ -7,6 +7,7 @@ export const router = createRouter({
     { path: '/worlds/new', name: 'world-builder', component: () => import('@/views/WorldBuilderView.vue') },
     { path: '/play/:playthroughId', name: 'play', component: () => import('@/views/PlayView.vue') },
     { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
+    { path: '/data', name: 'data', component: () => import('@/views/DataView.vue') },
     { path: '/inspector', name: 'inspector', component: () => import('@/views/InspectorView.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]

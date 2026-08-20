@@ -130,6 +130,14 @@ class FakePlaythroughs:
             updated_at=datetime.now(UTC),
         )
 
+    async def set_world_clock(self, playthrough_id: str, world_clock_minutes: int) -> None:
+        playthrough = self.store.playthroughs[playthrough_id]
+        self.store.playthroughs[playthrough_id] = replace(
+            playthrough,
+            world_clock_minutes=world_clock_minutes,
+            updated_at=datetime.now(UTC),
+        )
+
     async def update_provider_config_snapshot(self, playthrough_id: str, snapshot: dict[str, object]) -> None:
         playthrough = self.store.playthroughs[playthrough_id]
         self.store.playthroughs[playthrough_id] = replace(

@@ -7,10 +7,14 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from src.api.container import ApplicationContainer
 from src.api.dependencies import get_services
 from src.api.schemas import (
+    BackupCreateRequest,
+    BackupRestoreRequest,
     ForkBranchRequest,
     PlaythroughCreateRequest,
+    RegenerateBranchRequest,
     RootBranchRequest,
     SwitchBranchRequest,
+    UndoBranchRequest,
     WorldCreateRequest,
     WorldDraftGenerateRequest,
     WorldDraftRequest,
@@ -110,6 +114,18 @@ async def fork_branch(payload: ForkBranchRequest, services: ApplicationContainer
     return public_json(branch)
 
 
+@router.post("/branches/regenerate", status_code=status.HTTP_201_CREATED)
+async def regenerate_branch(payload: RegenerateBranchRequest, services: ApplicationContainer = _services_dependency):
+    branch = await services.branches.regenerate_branch(**payload.model_dump())
+    return public_json(branch)
+
+
+@router.post("/branches/undo", status_code=status.HTTP_201_CREATED)
+async def undo_branch(payload: UndoBranchRequest, services: ApplicationContainer = _services_dependency):
+    branch = await services.branches.undo_branch(**payload.model_dump())
+    return public_json(branch)
+
+
 @router.get("/playthroughs/{playthrough_id}/branches")
 async def list_branches(playthrough_id: str, services: ApplicationContainer = _services_dependency):
     async with services.uow_factory() as uow:
@@ -158,6 +174,38 @@ async def validate_export_bundle(request: Request, services: ApplicationContaine
         "sha256": bundle.sha256,
         "playthrough_id": bundle.payload.get("playthrough", {}).get("id"),
     }
+
+
+@router.post("/exports/import", status_code=status.HTTP_201_CREATED)
+async def import_export_bundle(request: Request, services: ApplicationContainer = _services_dependency):
+    return public_json(await services.exports.import_bundle(await request.body()))
+
+
+@router.get("/backups")
+async def list_backups(services: ApplicationContainer = _services_dependency):
+    return public_json(await services.operations.list_backups())
+
+
+@router.post("/backups", status_code=status.HTTP_201_CREATED)
+async def create_backup(payload: BackupCreateRequest, services: ApplicationContainer = _services_dependency):
+    return public_json(await services.operations.create_backup(payload.name))
+
+
+@router.get("/backups/integrity")
+async def database_integrity(services: ApplicationContainer = _services_dependency):
+    return public_json(await services.operations.integrity_check())
+
+
+@router.post("/backups/restore")
+async def restore_backup(payload: BackupRestoreRequest, services: ApplicationContainer = _services_dependency):
+    await services.turns.shutdown()
+    await services.derived_worker.stop()
+    await services.database.dispose()
+    try:
+        return public_json(await services.operations.restore_backup(payload.name))
+    finally:
+        await services.turns.start()
+        await services.derived_worker.start()
 
 
 __all__ = ["router"]
