@@ -15,6 +15,7 @@ from src.application.ports.persistence import UowFactory
 from src.application.ports.providers import ProviderPort
 from src.domain.codec import state_to_payload
 from src.services.memory.analysis import MemoryConsolidator
+from src.services.retrieval.embeddings import DEFAULT_EMBEDDING_VERSION
 from src.services.retrieval.rebuild import EmbeddingRebuildService
 
 from .game_states import GameStateApplicationService
@@ -31,7 +32,7 @@ class DerivedJobApplicationService:
         *,
         embedding_provider: ProviderPort | None = None,
         game_states: GameStateApplicationService | None = None,
-        embedding_version: str = "phase-13-embedding-1",
+        embedding_version: str = DEFAULT_EMBEDDING_VERSION,
         summary_window_turns: int = 10,
     ) -> None:
         self._uow_factory = uow_factory
@@ -190,6 +191,8 @@ class DerivedJobApplicationService:
             scope,
             uow.retrieval,
             provider=self._embedding_provider,
+            model=getattr(self._embedding_provider, "embedding_model", None)
+            or getattr(self._embedding_provider, "model", None),
         )
         if report.failed_source_ids:
             raise RuntimeError(f"Embedding rebuild failed for {len(report.failed_source_ids)} sources.")

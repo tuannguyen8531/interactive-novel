@@ -127,10 +127,16 @@ Initial retrieval và targeted retrieval đều áp hard filter theo:
 4. owner/observer;
 5. entity/thread scope.
 
-Semantic/vector ranking chỉ chạy trên candidate đã được filter. Context manifest
-ghi IDs, scopes, revision, budget và role. Simulator có thể nhận hidden state
-cần để mô phỏng; Writer chỉ nhận phần SceneSpec cho phép biểu đạt. Player mode
-không đưa internal beliefs, hidden goals hay numeric relationship vào store/UI.
+Semantic/vector ranking chỉ chạy trên candidate đã được filter. Exact
+claim/fingerprint luôn được ưu tiên; các truy vấn còn lại hợp nhất điểm
+rule/keyword (55%) với cosine similarity (45%). Vector memory được tái sử dụng
+từ SQLite theo source ID, content hash, model và embedding version; mỗi search
+chỉ tạo embedding mới cho câu query. Nếu provider hoặc vector không khả dụng,
+retrieval tự quay về deterministic ranking. Context manifest và retrieval trace
+ghi IDs, scopes, scores, match reasons, model, revision, budget và role.
+Simulator có thể nhận hidden state cần để mô phỏng; Writer chỉ nhận phần
+SceneSpec cho phép biểu đạt. Player mode không đưa internal beliefs, hidden goals
+hay numeric relationship vào store/UI.
 
 ## 7. Logical role và physical call
 

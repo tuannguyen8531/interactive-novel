@@ -137,6 +137,13 @@ class ProviderRouter(ProviderGateway):
         self._planner = planner or PhysicalCallPlanner()
         self._providers: dict[str, ProviderPort] = {}
 
+    @property
+    def embedding_model(self) -> str:
+        """Return the currently routed primary embedding model without creating an adapter."""
+
+        route = self._route("embedding")
+        return self.config.targets[route.primary_target].model
+
     def _route(self, role: LogicalRole | str) -> ProviderRoute:
         route = self.config.role_routes.get(str(role))
         if route is None:

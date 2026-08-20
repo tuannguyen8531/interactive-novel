@@ -21,7 +21,7 @@ from src.application.contracts.queries import CharacterView, MemoryView, Relatio
 
 from .derived import DerivedArtifactRepository
 from .jobs import JobRepository
-from .retrieval import MemoryCandidateSource
+from .retrieval import RetrievalRepository
 
 
 class WorldRepository(Protocol):
@@ -160,7 +160,7 @@ class UnitOfWork(Protocol):
     derived: DerivedArtifactRepository
 
     @property
-    def retrieval(self) -> MemoryCandidateSource: ...
+    def retrieval(self) -> RetrievalRepository: ...
 
     async def __aenter__(self) -> UnitOfWork: ...
 

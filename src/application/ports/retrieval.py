@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Protocol
 
 from src.application.contracts.retrieval import EmbeddingRecord, MemoryCandidate, RetrievalScope, RetrievalTrace
@@ -27,6 +28,14 @@ class EmbeddingStore(Protocol):
         embedding_version: str,
     ) -> EmbeddingRecord | None: ...
 
+    async def list_for_sources(
+        self,
+        source_ids: Iterable[str],
+        *,
+        model: str,
+        embedding_version: str,
+    ) -> tuple[EmbeddingRecord, ...]: ...
+
 
 class RetrievalTraceStore(Protocol):
     """Persist safe retrieval metadata for debugging and evaluation."""
@@ -34,4 +43,10 @@ class RetrievalTraceStore(Protocol):
     async def save(self, trace: RetrievalTrace) -> None: ...
 
 
-__all__ = ["EmbeddingStore", "MemoryCandidateSource", "RetrievalTraceStore"]
+class RetrievalRepository(MemoryCandidateSource, EmbeddingStore, Protocol):
+    """Combined persistence adapter exposed by the application UoW."""
+
+    async def save_trace(self, trace: RetrievalTrace) -> None: ...
+
+
+__all__ = ["EmbeddingStore", "MemoryCandidateSource", "RetrievalRepository", "RetrievalTraceStore"]

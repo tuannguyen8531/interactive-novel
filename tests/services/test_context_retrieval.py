@@ -14,12 +14,15 @@ from src.application.contracts.ai import (
     StatePatchProposal,
     ValidationQuery,
 )
-from src.application.contracts.providers import EmbeddingResponse, ProviderCapability
+from src.application.contracts.providers import EmbeddingResponse, ProviderCapability, ProviderError
 from src.application.contracts.retrieval import (
+    EmbeddingMetadata,
+    EmbeddingRecord,
     InitialContextRequest,
     MemoryCandidate,
     MemoryKind,
     RetrievalScope,
+    content_hash,
 )
 from src.application.ports.providers import ProviderPort
 from src.services.retrieval.claims import ClaimExtractor
@@ -363,6 +366,179 @@ class _FakeEmbeddingProvider:
             model=model or self.model,
             embeddings=tuple((float(len(text)), 1.0) for text in texts),
         )
+
+
+class _QueryOnlyEmbeddingProvider:
+    provider_name = "ollama"
+    model = "nomic-embed-text"
+    capabilities = frozenset({ProviderCapability.EMBEDDING})
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, ...]] = []
+
+    async def embed(self, texts: tuple[str, ...], *, model: str | None = None) -> EmbeddingResponse:
+        self.calls.append(tuple(texts))
+        return EmbeddingResponse(
+            provider=self.provider_name,
+            model=model or self.model,
+            embeddings=tuple((1.0, 0.0) for _ in texts),
+        )
+
+
+class _UnavailableEmbeddingProvider(_QueryOnlyEmbeddingProvider):
+    async def embed(self, texts: tuple[str, ...], *, model: str | None = None) -> EmbeddingResponse:
+        del texts, model
+        raise ProviderError("embedding unavailable", provider=self.provider_name)
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_recovers_semantic_memory_without_reembedding_candidates() -> None:
+    semantic = _candidate(
+        "semantic-memory",
+        time=20,
+        text="A silver locket rests beneath the loose floorboard.",
+    )
+    lexical_decoy = _candidate(
+        "lexical-decoy",
+        time=20,
+        text="The club reviews its lost keepsake policy.",
+    )
+    store = InMemoryEmbeddingStore()
+    for candidate, vector in ((semantic, (1.0, 0.0)), (lexical_decoy, (0.0, 1.0))):
+        await store.save(
+            EmbeddingRecord(
+                metadata=EmbeddingMetadata(
+                    source_id=candidate.source_id,
+                    source_kind=candidate.kind,
+                    playthrough_id=candidate.playthrough_id,
+                    branch_id=candidate.branch_id,
+                    model="nomic-embed-text",
+                    dimensions=2,
+                    embedding_version="hybrid-v1",
+                    content_hash=content_hash(candidate.text),
+                ),
+                vector=vector,
+            )
+        )
+    provider = _QueryOnlyEmbeddingProvider()
+    traces = InMemoryRetrievalTraceStore()
+    assembler = ContextAssembler(
+        embedding_store=store,
+        embedding_indexer=OllamaEmbeddingIndexer(store, enabled=True, embedding_version="hybrid-v1"),
+        trace_store=traces,
+    )
+
+    manifest = await assembler.build_initial_context(
+        InitialContextRequest(
+            run_id="run-hybrid",
+            role="planner",
+            scope=_scope(time=20, owner=None),
+            query_text="lost keepsake",
+            token_budget=100,
+            max_items=1,
+        ),
+        [lexical_decoy, semantic],
+        provider=cast(ProviderPort, provider),
+    )
+
+    assert manifest.entries[0].source_id == "semantic-memory"
+    assert "semantic_match" in manifest.entries[0].match_reasons
+    assert manifest.embedding_model == "nomic-embed-text"
+    assert provider.calls == [("lost keepsake",)]
+    trace = (await traces.list())[0]
+    assert trace.embedding_enabled is True
+    assert {hit.source_id: hit.embedding_score for hit in trace.hits} == {
+        "semantic-memory": pytest.approx(1.0),
+        "lexical-decoy": pytest.approx(0.0),
+    }
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_falls_back_to_deterministic_ranking_when_provider_is_unavailable() -> None:
+    lexical = _candidate("lexical", text="Mina searches for a lost keepsake.", time=20)
+    store = InMemoryEmbeddingStore()
+    await store.save(
+        EmbeddingRecord(
+            metadata=EmbeddingMetadata(
+                source_id=lexical.source_id,
+                source_kind=lexical.kind,
+                playthrough_id=lexical.playthrough_id,
+                branch_id=lexical.branch_id,
+                model="nomic-embed-text",
+                dimensions=2,
+                embedding_version="hybrid-v1",
+                content_hash=content_hash(lexical.text),
+            ),
+            vector=(1.0, 0.0),
+        )
+    )
+    traces = InMemoryRetrievalTraceStore()
+    assembler = ContextAssembler(
+        embedding_store=store,
+        embedding_indexer=OllamaEmbeddingIndexer(store, enabled=True, embedding_version="hybrid-v1"),
+        trace_store=traces,
+    )
+
+    manifest = await assembler.build_initial_context(
+        InitialContextRequest(
+            run_id="run-fallback",
+            role="planner",
+            scope=_scope(time=20, owner=None),
+            query_text="lost keepsake",
+            token_budget=100,
+            max_items=1,
+        ),
+        [lexical],
+        provider=cast(ProviderPort, _UnavailableEmbeddingProvider()),
+    )
+
+    assert manifest.entries[0].source_id == "lexical"
+    assert manifest.embedding_model is None
+    assert (await traces.list())[0].embedding_enabled is False
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_does_not_reuse_embedding_after_candidate_text_changes() -> None:
+    candidate = _candidate("changed-memory", text="The corrected memory text.", time=20)
+    store = InMemoryEmbeddingStore()
+    await store.save(
+        EmbeddingRecord(
+            metadata=EmbeddingMetadata(
+                source_id=candidate.source_id,
+                source_kind=candidate.kind,
+                playthrough_id=candidate.playthrough_id,
+                branch_id=candidate.branch_id,
+                model="nomic-embed-text",
+                dimensions=2,
+                embedding_version="hybrid-v1",
+                content_hash=content_hash("The old memory text."),
+            ),
+            vector=(1.0, 0.0),
+        )
+    )
+    traces = InMemoryRetrievalTraceStore()
+    assembler = ContextAssembler(
+        embedding_store=store,
+        embedding_indexer=OllamaEmbeddingIndexer(store, enabled=True, embedding_version="hybrid-v1"),
+        trace_store=traces,
+    )
+
+    manifest = await assembler.build_initial_context(
+        InitialContextRequest(
+            run_id="run-stale",
+            role="planner",
+            scope=_scope(time=20, owner=None),
+            query_text="corrected memory",
+            token_budget=100,
+            max_items=1,
+        ),
+        [candidate],
+        provider=cast(ProviderPort, _QueryOnlyEmbeddingProvider()),
+    )
+
+    assert manifest.entries[0].source_id == candidate.source_id
+    assert manifest.embedding_model is None
+    assert (await traces.list())[0].embedding_enabled is False
 
 
 @pytest.mark.asyncio

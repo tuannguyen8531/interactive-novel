@@ -19,7 +19,14 @@ from src.application.contracts.providers import (
     StructuredResponse,
     StructuredSchema,
 )
-from src.application.contracts.retrieval import MemoryCandidate, MemoryKind, RetrievalScope
+from src.application.contracts.retrieval import (
+    EmbeddingMetadata,
+    EmbeddingRecord,
+    MemoryCandidate,
+    MemoryKind,
+    RetrievalScope,
+    content_hash,
+)
 from src.application.ports.providers import ProviderPort
 from src.domain.characters import Character, CharacterProfile, CharacterState
 from src.domain.content import ContentPolicy
@@ -28,6 +35,8 @@ from src.domain.state import GameState
 from src.graph import TurnPipeline, TurnPipelineDependencies, TurnPipelineRequest
 from src.graph.checkpoint import build_in_memory_checkpointer
 from src.services.ai.contracts import AIContractRegistry
+from src.services.retrieval.embeddings import DEFAULT_EMBEDDING_VERSION, InMemoryEmbeddingStore
+from src.services.retrieval.tracing import InMemoryRetrievalTraceStore
 
 FIXTURE_ROOT = Path(__file__).resolve().parents[1] / "fixtures" / "ai"
 ROLE_OUTPUTS = json.loads((FIXTURE_ROOT / "role_outputs.json").read_text(encoding="utf-8"))
@@ -202,11 +211,15 @@ def make_pipeline(
     derived_job_handler: Any = None,
     failure_hook: Any = None,
     candidate_source: Any = None,
+    embedding_store: Any = None,
+    retrieval_trace_store: Any = None,
 ) -> TurnPipeline:
     dependencies = TurnPipelineDependencies(
         provider=provider,
         committer=committer,
         candidate_source=CandidateSource() if candidate_source is None else candidate_source,
+        embedding_store=embedding_store,
+        retrieval_trace_store=retrieval_trace_store,
         guard=DomainGuard(),
         cancellation=cancellation,
         execution_mode=ExecutionMode(mode),
@@ -235,6 +248,46 @@ async def test_fake_pipeline_commits_one_canonical_turn() -> None:
     assert committer.bundles[0].claims[0].claim_id == "claim-alice-library"
     assert [item["kind"] for item in committer.bundles[0].suggested_actions] == ["act", "speak", "observe", "think"]
     assert any(item["event_type"] == "completed" for item in result["node_events"])
+
+
+@pytest.mark.asyncio
+async def test_pipeline_uses_stored_embeddings_and_records_retrieval_trace() -> None:
+    provider = FakeProvider()
+    candidate_source = CandidateSource()
+    candidate = candidate_source.candidates[0]
+    store = InMemoryEmbeddingStore()
+    await store.save(
+        EmbeddingRecord(
+            metadata=EmbeddingMetadata(
+                source_id=candidate.source_id,
+                source_kind=candidate.kind,
+                playthrough_id=candidate.playthrough_id,
+                branch_id=candidate.branch_id,
+                model=provider.model,
+                dimensions=1,
+                embedding_version=DEFAULT_EMBEDDING_VERSION,
+                content_hash=content_hash(candidate.text),
+            ),
+            vector=(1.0,),
+        )
+    )
+    traces = InMemoryRetrievalTraceStore()
+    pipeline = make_pipeline(
+        provider,
+        FakeCommitter(),
+        candidate_source=candidate_source,
+        embedding_store=store,
+        retrieval_trace_store=traces,
+    )
+
+    result = await pipeline.run(make_request(make_game_state(), "hybrid-run"))
+
+    assert result["status"] == "completed"
+    assert result.get("context_manifest", {}).get("embedding_model") == provider.model
+    saved_traces = await traces.list()
+    assert saved_traces
+    assert saved_traces[0].embedding_enabled is True
+    assert saved_traces[0].hits[0].embedding_score == pytest.approx(1.0)
 
 
 @pytest.mark.asyncio

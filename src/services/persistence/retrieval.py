@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from hashlib import sha256
 from struct import pack, unpack
@@ -131,21 +132,47 @@ class SqlAlchemyEmbeddingStore:
         )
         if stored is None:
             return None
-        metadata = EmbeddingMetadata(
-            source_id=stored.source_id,
-            source_kind=stored.source_kind,
-            playthrough_id=stored.playthrough_id,
-            branch_id=stored.branch_id,
-            model=stored.model,
-            dimensions=stored.dimensions,
-            embedding_version=stored.embedding_version,
-            content_hash=stored.content_hash,
-            created_at=_as_utc(stored.created_at),
-        )
-        return EmbeddingRecord(
-            metadata=metadata,
-            vector=_deserialize_vector(stored.vector, stored.dimensions),
-        )
+        return _embedding_record(stored)
+
+    async def list_for_sources(
+        self,
+        source_ids: Iterable[str],
+        *,
+        model: str,
+        embedding_version: str,
+    ) -> tuple[EmbeddingRecord, ...]:
+        identifiers = tuple(dict.fromkeys(source_ids))
+        if not identifiers:
+            return ()
+        stored: list[MemoryEmbeddingModel] = []
+        for offset in range(0, len(identifiers), 500):
+            stored.extend(
+                (
+                    await self._session.scalars(
+                        select(MemoryEmbeddingModel).where(
+                            MemoryEmbeddingModel.source_id.in_(identifiers[offset : offset + 500]),
+                            MemoryEmbeddingModel.model == model,
+                            MemoryEmbeddingModel.embedding_version == embedding_version,
+                        )
+                    )
+                ).all()
+            )
+        return tuple(_embedding_record(item) for item in stored)
+
+
+def _embedding_record(stored: MemoryEmbeddingModel) -> EmbeddingRecord:
+    metadata = EmbeddingMetadata(
+        source_id=stored.source_id,
+        source_kind=stored.source_kind,
+        playthrough_id=stored.playthrough_id,
+        branch_id=stored.branch_id,
+        model=stored.model,
+        dimensions=stored.dimensions,
+        embedding_version=stored.embedding_version,
+        content_hash=stored.content_hash,
+        created_at=_as_utc(stored.created_at),
+    )
+    return EmbeddingRecord(metadata=metadata, vector=_deserialize_vector(stored.vector, stored.dimensions))
 
 
 class SqlAlchemyRetrievalTraceStore:

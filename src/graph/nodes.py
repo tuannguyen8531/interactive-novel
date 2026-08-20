@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any, TypeVar, cast
 
@@ -65,6 +66,7 @@ from src.services.llm.safety import normalize_player_input, untrusted_player_con
 from src.services.logger import log_error
 from src.services.retrieval.claims import ClaimExtractor
 from src.services.retrieval.context import ContextAssembler
+from src.services.retrieval.embeddings import OllamaEmbeddingIndexer
 
 from .events import NodeEvent, publish_event
 from .execution import RoleExecutionResult, RoleExecutor
@@ -80,7 +82,20 @@ class TurnGraphNodes:
 
     def __init__(self, runtime: TurnGraphRuntime) -> None:
         self.runtime = runtime
-        self.assembler = ContextAssembler()
+        embedding_indexer = (
+            OllamaEmbeddingIndexer(
+                runtime.embedding_store,
+                embedding_version=runtime.embedding_version,
+                enabled=True,
+            )
+            if runtime.embedding_store is not None
+            else None
+        )
+        self.assembler = ContextAssembler(
+            embedding_indexer=embedding_indexer,
+            embedding_store=runtime.embedding_store,
+            trace_store=runtime.retrieval_trace_store,
+        )
         self.extractor = ClaimExtractor()
 
     async def normalize_input(self, state: TurnGraphState) -> dict[str, Any]:
@@ -193,15 +208,19 @@ class TurnGraphNodes:
             role=AIPromptRole.PLANNER.value,
             scope=scope,
             query_text=state.get("normalized_input", state["raw_input"]),
-            entity_ids=tuple(game_state.characters),
+            entity_ids=_query_entity_ids(state, game_state),
             token_budget=2_000,
             max_items=40,
             recent_event_limit=8,
         )
         if self.runtime.candidate_source is None:
-            manifest = await self.assembler.build_initial_context(request, [])
+            manifest = await self.assembler.build_initial_context(request, [], provider=self.runtime.provider)
         else:
-            manifest = await self.assembler.build_initial_context_from_source(request, self.runtime.candidate_source)
+            manifest = await self.assembler.build_initial_context_from_source(
+                request,
+                self.runtime.candidate_source,
+                provider=self.runtime.provider,
+            )
         context_manifest = manifest.as_context()
         context_manifest["authoritative_ids"] = _authoritative_ids(game_state)
         return {"context_manifest": context_manifest}
@@ -297,6 +316,7 @@ class TurnGraphNodes:
                 scope=scope,
                 requirement=requirement,
                 run_id=state["turn_run_id"],
+                provider=self.runtime.provider,
             )
             manifests.append(manifest.model_dump(mode="json"))
         return {"targeted_evidence": tuple(manifests)}
@@ -749,6 +769,32 @@ def _append_error(state: Mapping[str, Any], node: str, code: str, message: str) 
 
 def _failure(state: TurnGraphState, code: str, message: str) -> dict[str, Any]:
     return {"status": "failed", "errors": _append_error(state, "pipeline", code, message)}
+
+
+def _query_entity_ids(state: TurnGraphState, game_state: Any) -> tuple[str, ...]:
+    """Boost only the actor and entities actually mentioned in this move."""
+
+    query_text = str(state.get("normalized_input", state["raw_input"])).casefold()
+    identifiers: list[str] = []
+
+    def add(identifier: str) -> None:
+        if identifier and identifier not in identifiers:
+            identifiers.append(identifier)
+
+    add(str(state.get("actor_id", "")))
+    for character_id, character in game_state.characters.items():
+        names = (character_id, character.profile.display_name, *character.profile.aliases)
+        if any(_mentions_entity(query_text, name) for name in names):
+            add(character_id)
+    for location_id in game_state.locations:
+        if _mentions_entity(query_text, location_id):
+            add(location_id)
+    return tuple(identifiers)
+
+
+def _mentions_entity(query_text: str, name: str) -> bool:
+    normalized = name.strip().casefold()
+    return bool(normalized and re.search(rf"(?<!\w){re.escape(normalized)}(?!\w)", query_text))
 
 
 def _authoritative_ids(game_state: Any) -> dict[str, list[str]]:

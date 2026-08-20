@@ -26,7 +26,7 @@ from src.application.contracts.persistence import (
     SnapshotRecord,
     utc_now,
 )
-from src.application.contracts.retrieval import RetrievalScope
+from src.application.contracts.retrieval import EmbeddingMetadata, EmbeddingRecord, RetrievalScope, content_hash
 from src.application.errors import IdempotencyConflictError, StaleBranchRevisionError
 from src.application.ports.persistence import UowFactory
 from src.application.services.branches import BranchApplicationService
@@ -659,3 +659,42 @@ def test_snapshot_codec_round_trips_consent_and_player_policy() -> None:
 
     assert restored.consents[("scene-1", "char-yuki", "dating")].state == ConsentState.REQUESTED
     assert restored.policy == policy
+
+
+async def test_embedding_store_bulk_loads_only_requested_model_and_version(database: Database) -> None:
+    uow_factory, _, playthrough_id, root = await _setup(database)
+    records = tuple(
+        EmbeddingRecord(
+            metadata=EmbeddingMetadata(
+                source_id=f"memory-{index}",
+                source_kind="event",
+                playthrough_id=playthrough_id,
+                branch_id=root.id,
+                model="nomic-embed-text",
+                dimensions=2,
+                embedding_version="hybrid-v1",
+                content_hash=content_hash(f"memory text {index}"),
+            ),
+            vector=(float(index), 1.0),
+        )
+        for index in range(2)
+    )
+    async with uow_factory() as uow:
+        for record in records:
+            await uow.retrieval.save(record)
+        await uow.commit()
+
+    async with uow_factory() as uow:
+        loaded = await uow.retrieval.list_for_sources(
+            ("memory-0", "memory-1", "missing"),
+            model="nomic-embed-text",
+            embedding_version="hybrid-v1",
+        )
+        wrong_version = await uow.retrieval.list_for_sources(
+            ("memory-0", "memory-1"),
+            model="nomic-embed-text",
+            embedding_version="hybrid-v2",
+        )
+
+    assert {record.metadata.source_id for record in loaded} == {"memory-0", "memory-1"}
+    assert wrong_version == ()

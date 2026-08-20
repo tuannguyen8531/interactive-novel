@@ -15,6 +15,8 @@ from src.application.contracts.retrieval import (
 from src.application.ports.providers import ProviderPort
 from src.application.ports.retrieval import EmbeddingStore
 
+DEFAULT_EMBEDDING_VERSION = "phase-13-embedding-1"
+
 
 class InMemoryEmbeddingStore:
     """Small derived store used by tests and the local MVP runner.
@@ -42,9 +44,21 @@ class InMemoryEmbeddingStore:
     ) -> EmbeddingRecord | None:
         return self._records.get((source_id, content_hash, model, embedding_version))
 
-    async def list_for_sources(self, source_ids: Iterable[str]) -> tuple[EmbeddingRecord, ...]:
+    async def list_for_sources(
+        self,
+        source_ids: Iterable[str],
+        *,
+        model: str,
+        embedding_version: str,
+    ) -> tuple[EmbeddingRecord, ...]:
         wanted = set(source_ids)
-        return tuple(record for record in self._records.values() if record.metadata.source_id in wanted)
+        return tuple(
+            record
+            for record in self._records.values()
+            if record.metadata.source_id in wanted
+            and record.metadata.model == model
+            and record.metadata.embedding_version == embedding_version
+        )
 
 
 def _validate_embedding_response(response: EmbeddingResponse, expected_count: int) -> int:
@@ -68,7 +82,7 @@ class OllamaEmbeddingIndexer:
         self,
         store: EmbeddingStore,
         *,
-        embedding_version: str = "embedding-1",
+        embedding_version: str = DEFAULT_EMBEDDING_VERSION,
         enabled: bool = False,
     ) -> None:
         if not embedding_version.strip():
@@ -106,18 +120,18 @@ class OllamaEmbeddingIndexer:
             records.append(record)
         return tuple(records)
 
-    async def ensure_query_embedding(
+    async def query_embedding(
         self,
         query_text: str,
         *,
         provider: ProviderPort | None,
         model: str | None = None,
-    ) -> tuple[float, ...] | None:
+    ) -> EmbeddingResponse | None:
         if not self.enabled or provider is None or not query_text.strip():
             return None
         response = await provider.embed((query_text,), model=model)
         _validate_embedding_response(response, 1)
-        return tuple(response.embeddings[0])
+        return response
 
 
 def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
@@ -146,4 +160,4 @@ def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
     return float(np.dot(left_array, right_array) / (left_norm * right_norm))
 
 
-__all__ = ["InMemoryEmbeddingStore", "OllamaEmbeddingIndexer", "cosine_similarity"]
+__all__ = ["DEFAULT_EMBEDDING_VERSION", "InMemoryEmbeddingStore", "OllamaEmbeddingIndexer", "cosine_similarity"]

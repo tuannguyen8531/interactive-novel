@@ -33,6 +33,9 @@ from .tracing import InMemoryRetrievalTraceStore
 class ContextAssembler:
     """Build context only after hard scope filtering has completed."""
 
+    _BASE_SCORE_WEIGHT = 0.55
+    _SEMANTIC_SCORE_WEIGHT = 0.45
+
     def __init__(
         self,
         *,
@@ -60,7 +63,9 @@ class ContextAssembler:
         provider: ProviderPort | None = None,
         embedding_model: str | None = None,
     ) -> InitialContextManifest:
-        effective_embedding_model = embedding_model or (provider.model if provider is not None else None)
+        effective_embedding_model = (
+            embedding_model or getattr(provider, "embedding_model", None) or getattr(provider, "model", None)
+        )
         query = RetrievalQuery(
             phase=RetrievalPhase.INITIAL,
             query_text=request.query_text,
@@ -72,7 +77,7 @@ class ContextAssembler:
         )
         eligible, rejected = self._eligible(candidates, request.scope, request.include_kinds)
         hits = self._rank(eligible, query, recent_event_limit=request.recent_event_limit)
-        hits, embedding_enabled, embedding_version = await self._maybe_embedding_rerank(
+        hits, embedding_enabled, resolved_embedding_model, embedding_version = await self._maybe_hybrid_rank(
             hits,
             query_text=request.query_text,
             provider=provider,
@@ -96,7 +101,7 @@ class ContextAssembler:
             token_budget=request.token_budget,
             estimated_tokens=used,
             embedding_enabled=embedding_enabled,
-            embedding_model=effective_embedding_model if embedding_enabled else None,
+            embedding_model=resolved_embedding_model,
             embedding_version=embedding_version,
         )
         await self.trace_store.save(trace)
@@ -108,7 +113,7 @@ class ContextAssembler:
             token_budget=request.token_budget,
             estimated_tokens=used,
             retrieval_trace_ids=(trace.trace_id,),
-            embedding_model=embedding_model if embedding_enabled else None,
+            embedding_model=resolved_embedding_model,
             embedding_version=embedding_version,
         )
 
@@ -144,7 +149,9 @@ class ContextAssembler:
     ) -> TargetedEvidenceManifest:
         if limit <= 0:
             raise ValueError("Targeted evidence limit must be positive.")
-        effective_embedding_model = embedding_model or (provider.model if provider is not None else None)
+        effective_embedding_model = (
+            embedding_model or getattr(provider, "embedding_model", None) or getattr(provider, "model", None)
+        )
         retrieval_query = RetrievalQuery(
             query_id=query.query_id,
             phase=RetrievalPhase.TARGETED,
@@ -165,11 +172,12 @@ class ContextAssembler:
         # validation.  Semantic fallback is used only when no exact candidate
         # survived the hard scope boundary.
         embedding_enabled = False
+        resolved_embedding_model: str | None = None
         embedding_version: str | None = None
         if exact_hits:
             selected_hits = exact_hits
         else:
-            hits, embedding_enabled, embedding_version = await self._maybe_embedding_rerank(
+            hits, embedding_enabled, resolved_embedding_model, embedding_version = await self._maybe_hybrid_rank(
                 hits,
                 query_text=query.question,
                 provider=provider,
@@ -189,7 +197,7 @@ class ContextAssembler:
             token_budget=0,
             estimated_tokens=0,
             embedding_enabled=embedding_enabled,
-            embedding_model=effective_embedding_model if embedding_enabled else None,
+            embedding_model=resolved_embedding_model,
             embedding_version=embedding_version,
         )
         await self.trace_store.save(trace)
@@ -304,7 +312,7 @@ class ContextAssembler:
                 )
             )
         hits.sort(key=lambda hit: (hit.score.total, hit.candidate.world_time, hit.source_id), reverse=True)
-        return tuple(hits[: query.limit])
+        return tuple(hits)
 
     def _rank_targeted(self, candidates: tuple[MemoryCandidate, ...], query: RetrievalQuery) -> tuple[RetrievalHit, ...]:
         hits = [
@@ -316,51 +324,80 @@ class ContextAssembler:
             for candidate in candidates
         ]
         hits.sort(key=lambda hit: (hit.score.exact_match, hit.score.total, hit.candidate.world_time, hit.source_id), reverse=True)
-        return tuple(hits[: query.limit])
+        return tuple(hits)
 
-    async def _maybe_embedding_rerank(
+    async def _maybe_hybrid_rank(
         self,
         hits: tuple[RetrievalHit, ...],
         *,
         query_text: str,
         provider: ProviderPort | None,
         model: str | None,
-    ) -> tuple[tuple[RetrievalHit, ...], bool, str | None]:
+    ) -> tuple[tuple[RetrievalHit, ...], bool, str | None, str | None]:
         indexer = self.embedding_indexer
         if indexer is None or not indexer.enabled or provider is None or not query_text.strip() or not hits:
-            return hits, False, None
+            return hits, False, None, None
+        expected_keys = {(hit.source_id, content_hash(hit.candidate.text)) for hit in hits}
+        stored_records = ()
+        if model:
+            try:
+                stored_records = await self.embedding_store.list_for_sources(
+                    (hit.source_id for hit in hits),
+                    model=model,
+                    embedding_version=indexer.embedding_version,
+                )
+            except ValueError, TypeError:
+                return hits, False, None, None
+            if not any(
+                (record.metadata.source_id, record.metadata.content_hash) in expected_keys for record in stored_records
+            ):
+                return hits, False, None, None
         try:
-            await indexer.index(tuple(hit.candidate for hit in hits), provider=provider, model=model)
-            query_vector = await indexer.ensure_query_embedding(query_text, provider=provider, model=model)
+            response = await indexer.query_embedding(query_text, provider=provider, model=model)
         except ProviderError, ValueError, TypeError:
             # Embeddings are derived and optional; lexical/entity retrieval is
             # the required fallback when Ollama is unavailable or malformed.
-            return hits, False, None
-        if query_vector is None:
-            return hits, False, None
+            return hits, False, None, None
+        if response is None:
+            return hits, False, None, None
+        query_vector = response.embeddings[0]
+        if not model or response.model != model:
+            try:
+                stored_records = await self.embedding_store.list_for_sources(
+                    (hit.source_id for hit in hits),
+                    model=response.model,
+                    embedding_version=indexer.embedding_version,
+                )
+            except ValueError, TypeError:
+                return hits, False, None, None
+        records = {
+            (record.metadata.source_id, record.metadata.content_hash): record
+            for record in stored_records
+            if record.metadata.dimensions == len(query_vector)
+            and (record.metadata.source_id, record.metadata.content_hash) in expected_keys
+        }
+        if not records:
+            return hits, False, None, None
+
         reranked: list[RetrievalHit] = []
         for hit in hits:
-            record = await self.embedding_store.get(
-                source_id=hit.candidate.source_id,
-                content_hash=content_hash(hit.candidate.text),
-                model=model or getattr(provider, "model", ""),
-                embedding_version=indexer.embedding_version,
-            )
+            record = records.get((hit.source_id, content_hash(hit.candidate.text)))
             if record is None:
                 reranked.append(hit)
                 continue
-            semantic = max(0.0, min(1.0, (cosine_similarity(query_vector, record.vector) + 1.0) / 2.0))
-            blended = max(hit.score.total, 0.7 * hit.score.total + 0.3 * semantic)
+            semantic = max(0.0, min(1.0, cosine_similarity(query_vector, record.vector)))
+            blended = self._BASE_SCORE_WEIGHT * hit.score.total + self._SEMANTIC_SCORE_WEIGHT * semantic
+            reasons = (*hit.match_reasons, "semantic_match" if semantic >= 0.65 else "embedding_rerank")
             reranked.append(
                 replace(
                     hit,
                     score=replace(hit.score, total=blended),
                     embedding_score=semantic,
-                    match_reasons=(*hit.match_reasons, "embedding_rerank"),
+                    match_reasons=reasons,
                 )
             )
         reranked.sort(key=lambda hit: (hit.score.total, hit.candidate.world_time, hit.source_id), reverse=True)
-        return tuple(reranked), True, indexer.embedding_version
+        return tuple(reranked), True, response.model, indexer.embedding_version
 
     @staticmethod
     def _trace(
@@ -392,6 +429,7 @@ class ContextAssembler:
                     selected=hit.source_id in selected_ids,
                     dropped_reason=dropped_ids.get(hit.source_id),
                     embedding_score=hit.embedding_score,
+                    match_reasons=hit.match_reasons,
                 )
                 for hit in hits
             ),

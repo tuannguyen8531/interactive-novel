@@ -9,7 +9,7 @@ from typing import Any, Protocol
 from src.application.contracts.persistence import CanonicalTurnBundle
 from src.application.contracts.providers import CancellationToken, ExecutionMode
 from src.application.ports.providers import ProviderPort
-from src.application.ports.retrieval import MemoryCandidateSource
+from src.application.ports.retrieval import EmbeddingStore, MemoryCandidateSource, RetrievalTraceStore
 from src.application.ports.telemetry import TelemetryRecorderPort
 from src.domain.guard import DomainGuard
 from src.domain.state import GameState
@@ -59,6 +59,8 @@ class TurnGraphRuntime:
     candidate_source: MemoryCandidateSource | None
     committer: TurnCommitter
     guard: DomainGuard
+    embedding_store: EmbeddingStore | None = None
+    retrieval_trace_store: RetrievalTraceStore | None = None
     cancellation: CancellationToken | None = None
     execution_mode: ExecutionMode = ExecutionMode.QUALITY
     event_sink: EventSink | AsyncEventCallback | None = None
@@ -69,6 +71,7 @@ class TurnGraphRuntime:
     failure_hook: Callable[[str], None] | None = None
     telemetry: TelemetryRecorderPort | None = None
     input_max_chars: int = 20_000
+    embedding_version: str = "phase-13-embedding-1"
 
 
 __all__ = [

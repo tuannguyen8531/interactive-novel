@@ -10,7 +10,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from src.application.contracts.providers import CancellationToken, ExecutionMode
 from src.application.ports.providers import ProviderPort
-from src.application.ports.retrieval import MemoryCandidateSource
+from src.application.ports.retrieval import EmbeddingStore, MemoryCandidateSource, RetrievalTraceStore
 from src.application.ports.telemetry import TelemetryRecorderPort
 from src.domain.guard import DomainGuard
 
@@ -28,6 +28,8 @@ class TurnPipelineDependencies:
     provider: ProviderPort
     committer: TurnCommitter
     candidate_source: MemoryCandidateSource | None = None
+    embedding_store: EmbeddingStore | None = None
+    retrieval_trace_store: RetrievalTraceStore | None = None
     guard: DomainGuard | None = None
     cancellation: CancellationToken | None = None
     execution_mode: ExecutionMode = ExecutionMode.QUALITY
@@ -39,6 +41,7 @@ class TurnPipelineDependencies:
     failure_hook: Callable[[str], None] | None = None
     telemetry: TelemetryRecorderPort | None = None
     input_max_chars: int = 20_000
+    embedding_version: str = "phase-13-embedding-1"
 
 
 class TurnPipeline:
@@ -87,6 +90,8 @@ class TurnPipeline:
             request=request,
             provider=self.dependencies.provider,
             candidate_source=self.dependencies.candidate_source,
+            embedding_store=self.dependencies.embedding_store,
+            retrieval_trace_store=self.dependencies.retrieval_trace_store,
             committer=self.dependencies.committer,
             guard=self.dependencies.guard or DomainGuard(),
             cancellation=token,
@@ -99,6 +104,7 @@ class TurnPipeline:
             failure_hook=self.dependencies.failure_hook,
             telemetry=self.dependencies.telemetry,
             input_max_chars=self.dependencies.input_max_chars,
+            embedding_version=self.dependencies.embedding_version,
         )
 
 

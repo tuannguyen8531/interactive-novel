@@ -387,6 +387,7 @@ class RetrievalTraceHit:
     selected: bool
     dropped_reason: str | None = None
     embedding_score: float | None = None
+    match_reasons: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -429,6 +430,7 @@ class RetrievalTrace:
                     "source_id": hit.source_id,
                     "score": hit.score.as_dict(),
                     "embedding_score": hit.embedding_score,
+                    "match_reasons": list(hit.match_reasons),
                     "selected": hit.selected,
                     "dropped_reason": hit.dropped_reason,
                 }

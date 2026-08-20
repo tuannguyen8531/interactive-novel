@@ -251,7 +251,11 @@ class _EmbeddingProvider:
     provider_name = "fake"
     model = "fake-embedding"
 
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, ...]] = []
+
     async def embed(self, texts: Sequence[str], *, model: str | None = None) -> EmbeddingResponse:
+        self.calls.append(tuple(texts))
         return EmbeddingResponse(
             provider=self.provider_name,
             model=model or self.model,
@@ -265,14 +269,23 @@ async def test_embedding_rebuild_only_writes_derived_vectors() -> None:
     store = InMemoryEmbeddingStore()
     scope = RetrievalScope(playthrough_id="playthrough-1", branch_id="root", world_time=2)
 
-    report = await EmbeddingRebuildService(store).rebuild(
+    provider = _EmbeddingProvider()
+    service = EmbeddingRebuildService(store)
+    report = await service.rebuild(
         scope,
         _CandidateSource(candidates),
-        provider=cast(ProviderPort, _EmbeddingProvider()),
+        provider=cast(ProviderPort, provider),
+    )
+    repeated = await service.rebuild(
+        scope,
+        _CandidateSource(candidates),
+        provider=cast(ProviderPort, provider),
     )
 
     assert report.candidate_count == report.indexed_count == 1
+    assert repeated.candidate_count == repeated.indexed_count == 1
     assert report.failed_source_ids == ()
+    assert provider.calls == [("A canonical event.",)]
     assert (
         await store.get(
             source_id="event-1",
