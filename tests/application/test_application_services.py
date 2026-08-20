@@ -515,6 +515,30 @@ async def test_provider_settings_store_secret_free_snapshot_and_connection_check
     assert connectivity[0].reachable is True
 
 
+async def test_provider_settings_initialize_seeds_a_missing_settings_file(tmp_path: Path) -> None:
+    path = tmp_path / "runtime" / "settings.json"
+    config = ProviderRoutingConfig(
+        targets={
+            "gemini": ProviderTarget(
+                name="gemini",
+                provider=ProviderName.GEMINI,
+                model="gemini-from-env",
+                api_key_env="GEMINI_API_KEY",
+                api_key="must-not-be-persisted",
+            )
+        },
+        role_routes={LogicalRole.PLANNER: ProviderRoute("gemini")},
+        allow_cloud=True,
+    )
+
+    snapshot = await ProviderSettingsApplicationService(JsonProviderSettingsStore(path)).initialize(config)
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+
+    assert snapshot.targets["gemini"]["model"] == "gemini-from-env"
+    assert persisted["targets"]["gemini"]["api_key_env"] == "GEMINI_API_KEY"
+    assert "must-not-be-persisted" not in path.read_text(encoding="utf-8")
+
+
 async def test_provider_settings_survive_restart_and_reconfigure_gateway(tmp_path: Path) -> None:
     path = tmp_path / "provider-settings.json"
     config = ProviderRoutingConfig(

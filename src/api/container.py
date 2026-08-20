@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, cast
 
-from src.application.contracts.providers import LogicalRole, ProviderRoute, ProviderRoutingConfig, ProviderTarget
+from src.application.contracts.providers import ExecutionMode, LogicalRole, ProviderRoute, ProviderRoutingConfig, ProviderTarget
 from src.application.contracts.telemetry import TelemetryConfig
 from src.application.ports.providers import ProviderGateway, ProviderPort
 from src.application.services.branches import BranchApplicationService
@@ -146,7 +146,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
 
 
 def _default_provider_config(settings: Settings) -> ProviderRoutingConfig:
-    completion = ProviderTarget(
+    local = ProviderTarget(
         name="local",
         provider="ollama",
         model=settings.ollama_model,
@@ -158,8 +158,31 @@ def _default_provider_config(settings: Settings) -> ProviderRoutingConfig:
         model=settings.ollama_embedding_model,
         base_url=settings.ollama_base_url,
     )
+    gemini = ProviderTarget(
+        name="gemini",
+        provider="gemini",
+        model=settings.gemini_model,
+        api_key_env="GEMINI_API_KEY",
+    )
+    openrouter = ProviderTarget(
+        name="openrouter",
+        provider="openrouter",
+        model=settings.openrouter_model,
+        api_key_env="OPENROUTER_API_KEY",
+    )
+    target_names = {
+        "ollama": local.name,
+        "gemini": gemini.name,
+        "openrouter": openrouter.name,
+    }
+    primary_target = target_names[settings.llm_provider]
+    fallback_targets = (
+        (target_names[settings.fallback_provider],)
+        if settings.fallback_provider and settings.fallback_provider != settings.llm_provider
+        else ()
+    )
     roles: dict[str, ProviderRoute] = {
-        role.value: ProviderRoute("local")
+        role.value: ProviderRoute(primary_target, fallback_targets)
         for role in (
             LogicalRole.PLANNER,
             LogicalRole.SIMULATOR,
@@ -168,11 +191,13 @@ def _default_provider_config(settings: Settings) -> ProviderRoutingConfig:
             LogicalRole.CRITIC,
         )
     }
-    roles["world_builder"] = ProviderRoute("local")
+    roles["world_builder"] = ProviderRoute(primary_target, fallback_targets)
     roles["embedding"] = ProviderRoute("local-embedding")
     return ProviderRoutingConfig(
-        targets={completion.name: completion, embedding.name: embedding},
+        targets={target.name: target for target in (local, embedding, gemini, openrouter)},
         role_routes=roles,
+        mode=ExecutionMode(settings.execution_mode),
+        allow_cloud=settings.allow_cloud_routing,
     )
 
 

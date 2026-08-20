@@ -25,9 +25,11 @@ Create the local environment file once:
 cp .env.example .env
 ```
 
-The Settings / Providers screen edits provider targets, model IDs, base URLs,
-per-role routing and fallbacks. These non-secret values are persisted in
-`runtime/settings.json` and applied to the running provider router when saved.
+On the first launch, provider targets, model IDs, execution mode and routing are
+seeded from `.env` into `runtime/settings.json`. The Settings / Providers screen
+then edits this persisted configuration and applies it to the running provider
+router when saved. Remove only `runtime/settings.json` to seed it from `.env`
+again without deleting worlds or logs.
 The model field discovers available IDs from the selected provider, while still
 allowing a custom model ID when the catalog is unavailable or incomplete.
 

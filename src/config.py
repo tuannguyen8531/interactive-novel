@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 from pydantic import Field
@@ -54,9 +55,15 @@ class Settings(BaseSettings):
     telemetry_completion_cost_per_1k_tokens: float = Field(default=0.0, ge=0.0)
     telemetry_max_samples: int = Field(default=10_000, ge=1, le=1_000_000)
     input_max_chars: int = Field(default=20_000, ge=256, le=100_000)
+    llm_provider: Literal["ollama", "gemini", "openrouter"] = "ollama"
+    fallback_provider: Literal["", "ollama", "gemini", "openrouter"] = ""
+    execution_mode: Literal["quality", "fast"] = "quality"
+    allow_cloud_routing: bool = False
     ollama_base_url: str = "http://localhost:11434/api"
     ollama_model: str = "llama3.2:3b"
     ollama_embedding_model: str = "nomic-embed-text:latest"
+    gemini_model: str = "gemini-2.5-flash"
+    openrouter_model: str = "qwen/qwen3-8b"
 
     def cors_origin_list(self) -> list[str]:
         """Return configured exact CORS origins in stable order."""
