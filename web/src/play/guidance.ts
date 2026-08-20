@@ -1,4 +1,4 @@
-import type { CharacterView, PlaythroughRecord, TimelineEvent, TurnRecord, WorldRecord } from '@/api/types'
+import type { BranchRecord, CharacterView, PlaythroughRecord, TimelineEvent, TurnRecord, WorldRecord } from '@/api/types'
 
 export interface PlayGuidance {
   locationName: string | null
@@ -21,6 +21,19 @@ export function findPlayerCharacter(
 
 export function isOpeningTurn(turn: TurnRecord): boolean {
   return turn.approved_patch?.source === 'world_builder_confirmation'
+}
+
+export function branchDisplayName(branch: BranchRecord, branches: BranchRecord[]): string {
+  if (branch.parent_branch_id === null) return 'Main timeline'
+  const forkIndex = branches.filter((candidate) => candidate.parent_branch_id !== null).findIndex((candidate) => candidate.id === branch.id)
+  return forkIndex < 0 ? 'Fork' : `Fork ${forkIndex + 1}`
+}
+
+export function branchProgressLabel(branch: BranchRecord): string {
+  const openingRevision = branch.parent_branch_id === null && branch.head_revision > 0 ? 1 : 0
+  const moveCount = Math.max(0, branch.head_revision - openingRevision)
+  if (moveCount === 0) return 'No moves yet'
+  return `${moveCount} ${moveCount === 1 ? 'move' : 'moves'}`
 }
 
 export function buildPlayGuidance(

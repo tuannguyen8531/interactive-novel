@@ -6,7 +6,8 @@ import { useCharacterStore } from '@/stores/character'
 import { useDebugStore } from '@/stores/debug'
 import { usePlaythroughStore } from '@/stores/playthrough'
 import { useTurnJobStore, type TurnRequest } from '@/stores/turnJob'
-import { buildPlayGuidance, findPlayerCharacter, isOpeningTurn } from '@/play/guidance'
+import { branchDisplayName, branchProgressLabel, buildPlayGuidance, findPlayerCharacter, isOpeningTurn } from '@/play/guidance'
+import type { CharacterView, MemoryView } from '@/api/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,6 +18,7 @@ const jobs = useTurnJobStore()
 const debug = useDebugStore()
 const input = ref('')
 const actionInput = ref<HTMLTextAreaElement | null>(null)
+const transcriptScroll = ref<HTMLElement | null>(null)
 const selectedForkTurnId = ref<string | null>(null)
 const openCharacterId = ref<string | null>(null)
 const loadingRoute = ref(false)
@@ -24,7 +26,9 @@ const loadingRoute = ref(false)
 const routePlaythroughId = computed(() => String(route.params.playthroughId ?? ''))
 const playerCharacter = computed(() => findPlayerCharacter(playthrough.playthrough, playthrough.characters))
 const playerTurns = computed(() => playthrough.visibleTurns.filter((turn) => !isOpeningTurn(turn)))
-const turnCount = computed(() => playerTurns.value.length)
+const activeBranchName = computed(() =>
+  branches.activeBranch ? branchDisplayName(branches.activeBranch, branches.branches) : 'No timeline'
+)
 const canFork = computed(() => selectedForkTurnId.value !== null && !jobs.active)
 const selectedCharacter = computed(() => characters.selected)
 const guidance = computed(() =>
@@ -53,6 +57,15 @@ watch(routePlaythroughId, () => {
 })
 
 watch(
+  () => playthrough.visibleTurns.length,
+  async (turns, previousTurns) => {
+    if (turns <= previousTurns) return
+    await nextTick()
+    scrollTranscriptToEnd('smooth')
+  }
+)
+
+watch(
   () => jobs.terminal,
   async (terminal, wasTerminal) => {
     if (!terminal || wasTerminal || playthrough.fixtureMode) return
@@ -73,6 +86,14 @@ async function openRoute(): Promise<void> {
   }
   debug.refresh()
   loadingRoute.value = false
+  await nextTick()
+  scrollTranscriptToEnd('auto')
+}
+
+function scrollTranscriptToEnd(behavior: ScrollBehavior): void {
+  const element = transcriptScroll.value
+  if (!element) return
+  element.scrollTo({ top: element.scrollHeight, behavior })
 }
 
 function request(): TurnRequest | null {
@@ -129,13 +150,44 @@ async function chooseSuggestedAction(action: string): Promise<void> {
 }
 
 function profileText(key: string): string | null {
-  const value = playerCharacter.value?.public_profile[key]
+  return characterProfileText(playerCharacter.value, key)
+}
+
+function characterProfileText(character: CharacterView | null, key: string): string | null {
+  const value = character?.public_profile[key]
   return typeof value === 'string' || typeof value === 'number' ? String(value) : null
 }
 
 function profileList(key: string): string[] {
-  const value = playerCharacter.value?.public_profile[key]
+  return characterProfileList(playerCharacter.value, key)
+}
+
+function characterProfileList(character: CharacterView | null, key: string): string[] {
+  const value = character?.public_profile[key]
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function selectedProfileText(key: string): string | null {
+  return characterProfileText(selectedCharacter.value, key)
+}
+
+function selectedProfileList(key: string): string[] {
+  return characterProfileList(selectedCharacter.value, key)
+}
+
+function selectedStateText(key: string): string | null {
+  const value = selectedCharacter.value?.state?.[key]
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function memoryLabel(memory: MemoryView): string {
+  const qualifier = memory.kind === 'belief' ? memory.payload.stance : memory.payload.method
+  const detail = typeof qualifier === 'string' && qualifier.trim() ? ` · ${qualifier.replaceAll('_', ' ')}` : ''
+  return `${memory.kind.replaceAll('_', ' ')}${detail}`
+}
+
+function memoryConfidence(memory: MemoryView): string | null {
+  return memory.confidence === null ? null : `${Math.round(memory.confidence * 100)}% confidence`
 }
 
 function playerTurnNumber(index: number): number {
@@ -158,12 +210,8 @@ function playerTurnNumber(index: number): number {
         <h1>{{ playthrough.world.name }}</h1>
         <p class="scene-meta">
           {{ playthrough.world.tone || 'A new scene' }} · {{ playthrough.worldTime }} minutes ·
-          {{ branches.activeBranch?.id }}
+          {{ activeBranchName }}
         </p>
-      </div>
-      <div class="turn-counter" aria-label="turn count">
-        <strong>{{ turnCount }}</strong>
-        <span>your moves</span>
       </div>
     </section>
 
@@ -211,31 +259,33 @@ function playerTurnNumber(index: number): number {
             <span v-if="playthrough.fixtureMode" class="fixture-badge">browser fixture</span>
           </div>
 
-          <div v-if="playthrough.visibleTurns.length === 0" class="opening-scene">
-            <p class="eyebrow">Opening scene</p>
-            <p>{{ playthrough.world.premise }}</p>
-            <p class="muted">Write an action below. The fixture remembers this branch locally after every turn.</p>
-          </div>
-          <div v-else class="transcript">
-            <article v-for="(turn, index) in playthrough.visibleTurns" :key="turn.id" class="turn-entry">
-              <div class="turn-label">
-                <span>{{ isOpeningTurn(turn) ? 'Opening scene' : `Move ${playerTurnNumber(index)}` }}</span>
-                <time :datetime="turn.created_at">{{ turn.world_time_end }} min</time>
-              </div>
-              <p v-if="!isOpeningTurn(turn)" class="player-action">
-                {{ playerCharacter?.display_name || 'You' }} · {{ turn.raw_input }}
-              </p>
-              <p class="narrative">{{ narrative(turn) }}</p>
-              <button
-                class="fork-chip"
-                :class="{ selected: selectedForkTurnId === turn.id }"
-                type="button"
-                :disabled="jobs.active || !canForkFromTurn(turn.branch_id)"
-                @click="selectedForkTurnId = selectedForkTurnId === turn.id ? null : turn.id"
-              >
-                {{ canForkFromTurn(turn.branch_id) ? (selectedForkTurnId === turn.id ? 'Selected for fork' : 'Fork here') : 'Inherited' }}
-              </button>
-            </article>
+          <div ref="transcriptScroll" class="transcript-scroll">
+            <div v-if="playthrough.visibleTurns.length === 0" class="opening-scene">
+              <p class="eyebrow">Opening scene</p>
+              <p>{{ playthrough.world.premise }}</p>
+              <p class="muted">Write an action below. The fixture remembers this branch locally after every turn.</p>
+            </div>
+            <div v-else class="transcript">
+              <article v-for="(turn, index) in playthrough.visibleTurns" :key="turn.id" class="turn-entry">
+                <div class="turn-label">
+                  <span>{{ isOpeningTurn(turn) ? 'Opening scene' : `Move ${playerTurnNumber(index)}` }}</span>
+                  <time :datetime="turn.created_at">{{ turn.world_time_end }} min</time>
+                </div>
+                <p v-if="!isOpeningTurn(turn)" class="player-action">
+                  {{ playerCharacter?.display_name || 'You' }} · {{ turn.raw_input }}
+                </p>
+                <p class="narrative">{{ narrative(turn) }}</p>
+                <button
+                  class="fork-chip"
+                  :class="{ selected: selectedForkTurnId === turn.id }"
+                  type="button"
+                  :disabled="jobs.active || !canForkFromTurn(turn.branch_id)"
+                  @click="selectedForkTurnId = selectedForkTurnId === turn.id ? null : turn.id"
+                >
+                  {{ canForkFromTurn(turn.branch_id) ? (selectedForkTurnId === turn.id ? 'Selected for fork' : 'Fork here') : 'Inherited' }}
+                </button>
+              </article>
+            </div>
           </div>
         </section>
 
@@ -320,10 +370,11 @@ function playerTurnNumber(index: number): number {
               class="branch-item"
               :class="{ active: branch.id === branches.activeBranchId }"
               type="button"
+              :title="branch.id"
               @click="branches.switchBranch(branch.id)"
             >
-              <span>{{ branch.id.replace('fixture-', '') }}</span>
-              <small>rev {{ branch.head_revision }}</small>
+              <span>{{ branchDisplayName(branch, branches.branches) }}</span>
+              <small>{{ branchProgressLabel(branch) }}</small>
             </button>
           </div>
         </section>
@@ -354,12 +405,81 @@ function playerTurnNumber(index: number): number {
             </button>
           </div>
           <div v-if="selectedCharacter" class="character-detail">
-            <h3>{{ selectedCharacter.display_name }}</h3>
-            <p v-for="(value, key) in selectedCharacter.public_profile" :key="key" class="detail-row">
-              <strong>{{ key }}</strong> {{ value }}
-            </p>
-            <p v-if="characters.loading" class="muted">Loading scoped memory…</p>
-            <p v-else-if="characters.memories.length === 0" class="muted">No visible memories yet.</p>
+            <div class="character-detail-header">
+              <span class="avatar detail-avatar">{{ selectedCharacter.display_name.slice(0, 1) }}</span>
+              <div>
+                <span class="character-kind">
+                  {{ selectedCharacter.id === playthrough.playthrough.player_character_id ? 'Player character' : 'Story character' }}
+                </span>
+                <h3>{{ selectedCharacter.display_name }}</h3>
+                <p v-if="selectedCharacter.aliases.length" class="character-aliases">
+                  Also known as {{ selectedCharacter.aliases.join(', ') }}
+                </p>
+              </div>
+            </div>
+
+            <div v-if="selectedProfileText('age') || selectedProfileText('role')" class="character-facts">
+              <div v-if="selectedProfileText('age')">
+                <span>Age</span>
+                <strong>{{ selectedProfileText('age') }}</strong>
+              </div>
+              <div v-if="selectedProfileText('role')">
+                <span>Role</span>
+                <strong>{{ selectedProfileText('role') }}</strong>
+              </div>
+            </div>
+
+            <div v-if="selectedStateText('location_id') || selectedStateText('physical_condition')" class="character-status">
+              <span v-if="selectedStateText('location_id')">At {{ selectedStateText('location_id')?.replaceAll('_', ' ') }}</span>
+              <span v-if="selectedStateText('physical_condition')">
+                {{ selectedStateText('physical_condition')?.replaceAll('_', ' ') }}
+              </span>
+            </div>
+
+            <section v-if="selectedProfileText('background')" class="profile-section">
+              <h4>Background</h4>
+              <p>{{ selectedProfileText('background') }}</p>
+            </section>
+
+            <section v-if="selectedProfileText('voice')" class="profile-section voice-section">
+              <h4>Voice</h4>
+              <p>“{{ selectedProfileText('voice') }}”</p>
+            </section>
+
+            <section v-if="selectedProfileList('traits').length" class="profile-section">
+              <h4>Traits</h4>
+              <div class="profile-chip-list">
+                <span v-for="trait in selectedProfileList('traits')" :key="trait">{{ trait }}</span>
+              </div>
+            </section>
+
+            <section v-if="selectedProfileList('values').length" class="profile-section">
+              <h4>Values</h4>
+              <div class="profile-chip-list value-chips">
+                <span v-for="value in selectedProfileList('values')" :key="value">{{ value }}</span>
+              </div>
+            </section>
+
+            <section class="memory-section">
+              <div class="memory-heading">
+                <h4>Visible memories</h4>
+                <span v-if="characters.memories.length">{{ characters.memories.length }}</span>
+              </div>
+              <p v-if="characters.loading" class="memory-empty">Loading memories…</p>
+              <p v-else-if="characters.error" class="memory-error">{{ characters.error }}</p>
+              <p v-else-if="characters.memories.length === 0" class="memory-empty">
+                No turn-scoped observations or beliefs have been formed yet.
+              </p>
+              <div v-else class="memory-list">
+                <article v-for="memory in characters.memories" :key="memory.memory_id" class="memory-item">
+                  <strong>{{ memoryLabel(memory) }}</strong>
+                  <span>
+                    Minute {{ memory.world_time }}
+                    <template v-if="memoryConfidence(memory)"> · {{ memoryConfidence(memory) }}</template>
+                  </span>
+                </article>
+              </div>
+            </section>
           </div>
         </section>
       </aside>
@@ -403,25 +523,6 @@ function playerTurnNumber(index: number): number {
 .scene-meta {
   margin-bottom: 0;
   color: var(--muted);
-}
-
-.turn-counter {
-  display: grid;
-  min-width: 5.5rem;
-  padding: 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: 0.8rem;
-  background: var(--paper);
-  text-align: center;
-}
-
-.turn-counter strong {
-  font-size: 1.6rem;
-}
-
-.turn-counter span {
-  color: var(--muted);
-  font-size: 0.75rem;
 }
 
 .play-layout {
@@ -471,6 +572,8 @@ function playerTurnNumber(index: number): number {
   margin: 0.85rem 0 0.4rem;
   color: var(--accent-dark);
   font-weight: 700;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .role-background,
@@ -521,7 +624,22 @@ function playerTurnNumber(index: number): number {
 }
 
 .transcript-heading {
+  flex: 0 0 auto;
   margin-bottom: 1.2rem;
+}
+
+.transcript-panel {
+  display: flex;
+  height: 38rem;
+  flex-direction: column;
+}
+
+.transcript-scroll {
+  min-height: 0;
+  padding-right: 0.45rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
 }
 
 .transcript-heading h2,
@@ -775,7 +893,15 @@ function playerTurnNumber(index: number): number {
 
 .character-item span:last-child {
   display: grid;
+  min-width: 0;
   gap: 0.15rem;
+}
+
+.character-item strong,
+.character-item small {
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .avatar {
@@ -795,18 +921,192 @@ function playerTurnNumber(index: number): number {
   border-top: 1px solid var(--line);
 }
 
-.character-detail h3 {
-  margin-bottom: 0.6rem;
+.character-detail-header {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
 }
 
-.detail-row {
-  margin-bottom: 0.35rem;
+.detail-avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  font-size: 1rem;
+}
+
+.character-kind {
+  color: var(--accent);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.character-detail-header h3 {
+  margin: 0.1rem 0 0;
+  font-size: 1.15rem;
+}
+
+.character-aliases {
+  margin: 0.15rem 0 0;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.72rem;
 }
 
-.detail-row strong {
-  color: var(--ink);
+.character-facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.character-facts div {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: #f8f4eb;
+}
+
+.character-facts span,
+.profile-section h4,
+.memory-heading h4 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.character-facts strong {
+  min-width: 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+  text-transform: capitalize;
+  word-break: normal;
+}
+
+.character-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+}
+
+.character-status span {
+  padding: 0.25rem 0.45rem;
+  border-radius: 99rem;
+  background: #edf5ef;
+  color: var(--green);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.profile-section,
+.memory-section {
+  margin-top: 1rem;
+}
+
+.profile-section p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.voice-section p {
+  padding-left: 0.65rem;
+  border-left: 2px solid #d7b19c;
+  color: var(--accent-dark);
+  font-style: italic;
+}
+
+.profile-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.profile-chip-list span {
+  padding: 0.28rem 0.48rem;
+  border-radius: 99rem;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 0.7rem;
+}
+
+.value-chips span {
+  background: #edf5ef;
+  color: var(--green);
+}
+
+.memory-section {
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.memory-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.memory-heading > span {
+  display: grid;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  border-radius: 99rem;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.memory-empty,
+.memory-error {
+  margin: 0.5rem 0 0;
+  padding: 0.65rem;
+  border-radius: 0.55rem;
+  background: #f8f4eb;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.memory-error {
+  background: #fff0f0;
+  color: #8e303b;
+}
+
+.memory-list {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+
+.memory-item {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+}
+
+.memory-item strong {
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.memory-item span {
+  color: var(--muted);
+  font-size: 0.68rem;
 }
 
 @media (max-width: 840px) {
@@ -837,11 +1137,6 @@ function playerTurnNumber(index: number): number {
     display: block;
   }
 
-  .turn-counter {
-    width: 5.5rem;
-    margin-top: 1rem;
-  }
-
   .action-footer button {
     width: 100%;
     margin-top: 0.75rem;
@@ -857,6 +1152,10 @@ function playerTurnNumber(index: number): number {
 
   .move-example-heading {
     display: grid;
+  }
+
+  .transcript-panel {
+    height: 30rem;
   }
 }
 </style>

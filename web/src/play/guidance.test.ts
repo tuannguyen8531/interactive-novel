@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { CharacterView, PlaythroughRecord, TimelineEvent, TurnRecord, WorldRecord } from '@/api/types'
-import { buildPlayGuidance, findPlayerCharacter, isOpeningTurn } from './guidance'
+import type { BranchRecord, CharacterView, PlaythroughRecord, TimelineEvent, TurnRecord, WorldRecord } from '@/api/types'
+import { branchDisplayName, branchProgressLabel, buildPlayGuidance, findPlayerCharacter, isOpeningTurn } from './guidance'
 
 describe('play guidance', () => {
   it('identifies the controlled character instead of assuming the first character', () => {
@@ -58,5 +58,19 @@ describe('play guidance', () => {
 
     expect(isOpeningTurn(opening)).toBe(true)
     expect(isOpeningTurn(action)).toBe(false)
+  })
+
+  it('turns technical branch IDs and revisions into player-facing labels', () => {
+    const main = { id: 'uuid-root', parent_branch_id: null, head_revision: 4 } as BranchRecord
+    const firstFork = { id: 'uuid-a', parent_branch_id: main.id, head_revision: 0 } as BranchRecord
+    const secondFork = { id: 'uuid-b', parent_branch_id: main.id, head_revision: 2 } as BranchRecord
+    const branches = [main, firstFork, secondFork]
+
+    expect(branchDisplayName(main, branches)).toBe('Main timeline')
+    expect(branchDisplayName(firstFork, branches)).toBe('Fork 1')
+    expect(branchDisplayName(secondFork, branches)).toBe('Fork 2')
+    expect(branchProgressLabel(main)).toBe('3 moves')
+    expect(branchProgressLabel(firstFork)).toBe('No moves yet')
+    expect(branchProgressLabel(secondFork)).toBe('2 moves')
   })
 })
