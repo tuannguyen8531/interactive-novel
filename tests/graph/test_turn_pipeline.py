@@ -233,6 +233,7 @@ async def test_fake_pipeline_commits_one_canonical_turn() -> None:
     assert result["derived_jobs_queued"] is True
     assert len(committer.bundles) == 1
     assert committer.bundles[0].claims[0].claim_id == "claim-alice-library"
+    assert [item["kind"] for item in committer.bundles[0].suggested_actions] == ["act", "speak", "observe", "think"]
     assert any(item["event_type"] == "completed" for item in result["node_events"])
 
 

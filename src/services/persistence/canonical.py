@@ -90,6 +90,7 @@ def _turn_record(model: TurnModel) -> TurnRecord:
         schema_version=model.schema_version,
         created_at=_as_utc(model.created_at),
         updated_at=_as_utc(model.updated_at),
+        suggested_actions=tuple(dict(item) for item in model.suggested_actions),
     )
 
 
@@ -352,6 +353,7 @@ class SqlAlchemyCanonicalRepository:
             status="completed",
             final_narrative=bundle.final_narrative,
             approved_patch=dict(bundle.approved_patch),
+            suggested_actions=[dict(item) for item in bundle.suggested_actions],
             world_time_start=bundle.world_time_start,
             duration_minutes=bundle.duration_minutes,
             world_time_end=bundle.world_time_end,

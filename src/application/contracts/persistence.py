@@ -227,6 +227,7 @@ class TurnRecord:
     schema_version: int
     created_at: datetime
     updated_at: datetime
+    suggested_actions: tuple[dict[str, str], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -446,6 +447,7 @@ class CanonicalTurnBundle:
     tensions: tuple[EmotionalTensionRecord, ...] = ()
     threads: tuple[NarrativeThreadRecord, ...] = ()
     hooks: tuple[NarrativeHookRecord, ...] = ()
+    suggested_actions: tuple[dict[str, str], ...] = ()
     derived_job_types: tuple[str, ...] = ("snapshot", "summary", "embedding")
     schema_version: int = 1
 

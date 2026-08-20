@@ -168,6 +168,10 @@ export interface TurnRecord {
   schema_version: number
   created_at: string
   updated_at: string
+  suggested_actions?: Array<{
+    kind: string
+    text: string
+  }>
 }
 
 export interface CharacterView {

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
+from src.application.contracts.ai import NarrativeDraft
 from src.application.contracts.persistence import (
     BeliefRecord,
     CanonFactRecord,
@@ -234,6 +235,10 @@ def build_canonical_bundle(state: TurnGraphState, game_state: GameState) -> Cano
     narrative = str(state.get("final_narrative", "")).strip()
     if not narrative:
         raise ValueError("final_narrative is required before canonical record construction")
+    draft = state.get("draft")
+    suggested_actions = (
+        tuple(item.model_dump(mode="json") for item in draft.suggested_actions) if isinstance(draft, NarrativeDraft) else ()
+    )
     return CanonicalTurnBundle(
         playthrough_id=state["playthrough_id"],
         branch_id=state["branch_id"],
@@ -248,6 +253,7 @@ def build_canonical_bundle(state: TurnGraphState, game_state: GameState) -> Cano
         turn_id=turn_id,
         final_narrative=narrative,
         approved_patch=patch_payload,
+        suggested_actions=suggested_actions,
         character_states=character_states,
         events=events,
         claims=claims,

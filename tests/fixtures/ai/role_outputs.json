@@ -202,18 +202,24 @@
     "schema_version": "narrative-draft-1",
     "role": "writer",
     "run_id": "turn-run-1",
-    "prompt_version": "1.0.0",
+    "prompt_version": "1.1.0",
     "physical_call_id": "call-write-1",
     "scene_id": "scene-1",
     "narrative_text": "Alice looked up from the festival sketches and offered you a stack of colored paper.",
     "paragraph_mappings": [{"paragraph_index": 0, "beat_id": "beat-offer-help"}],
-    "disclosed_claim_ids": ["claim-alice-library"]
+    "disclosed_claim_ids": ["claim-alice-library"],
+    "suggested_actions": [
+      {"kind": "act", "text": "I take the colored paper and start sorting it by size."},
+      {"kind": "speak", "text": "\u201cWhich decorations should we make first?\u201d I ask Alice."},
+      {"kind": "observe", "text": "I study the festival sketches for an unfinished detail."},
+      {"kind": "think", "text": "I consider how we can finish the decorations before the deadline."}
+    ]
   },
   "critic": {
     "schema_version": "critique-result-1",
     "role": "critic",
     "run_id": "turn-run-1",
-    "prompt_version": "1.0.0",
+    "prompt_version": "1.1.0",
     "physical_call_id": "call-critic-1",
     "scene_id": "scene-1",
     "decision": "accept",

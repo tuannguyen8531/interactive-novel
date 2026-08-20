@@ -83,6 +83,7 @@ class TurnModel(Base):
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="queued")
     final_narrative: Mapped[str | None] = mapped_column(Text, nullable=True)
     approved_patch: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    suggested_actions: Mapped[list[dict[str, str]]] = mapped_column(JSON, nullable=False, default=list)
     world_time_start: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     world_time_end: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

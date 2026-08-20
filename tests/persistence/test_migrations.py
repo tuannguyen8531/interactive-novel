@@ -12,6 +12,13 @@ async def _table_names(database: Database) -> set[str]:
         return await connection.run_sync(lambda sync_connection: set(inspect(sync_connection).get_table_names()))
 
 
+async def _column_names(database: Database, table_name: str) -> set[str]:
+    async with database.engine.connect() as connection:
+        return await connection.run_sync(
+            lambda sync_connection: {column["name"] for column in inspect(sync_connection).get_columns(table_name)}
+        )
+
+
 async def test_empty_database_migrates_idempotently_and_has_expected_schema(empty_database: Database) -> None:
     assert await _table_names(empty_database) == set()
     await upgrade_database(empty_database.engine)
@@ -45,6 +52,7 @@ async def test_empty_database_migrates_idempotently_and_has_expected_schema(empt
         "turns",
         "worlds",
     }
+    assert "suggested_actions" in await _column_names(empty_database, "turns")
 
     async with empty_database.engine.connect() as connection:
         assert (await connection.scalar(text("PRAGMA foreign_keys"))) == 1

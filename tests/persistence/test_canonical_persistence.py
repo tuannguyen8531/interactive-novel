@@ -353,6 +353,10 @@ def _bundle(
         world_time_end=world_time_end,
         turn_run_id=turn_run_id,
         final_narrative=f"Narrative for {turn_id}",
+        suggested_actions=(
+            {"kind": "act", "text": "I follow the sound into the hallway."},
+            {"kind": "observe", "text": "I inspect the clock more closely."},
+        ),
         approved_patch=_patch_payload(
             branch_id,
             f"patch-{turn_id}",
@@ -395,6 +399,10 @@ async def test_canonical_commit_writes_all_artifacts_and_is_idempotent(database:
     repeated = await service.commit_turn(bundle)
 
     assert committed.id == repeated.id == "turn-full"
+    assert committed.suggested_actions == (
+        {"kind": "act", "text": "I follow the sound into the hallway."},
+        {"kind": "observe", "text": "I inspect the clock more closely."},
+    )
     assert (await service.verify_invariants(root.id)).valid
     async with uow_factory() as uow:
         branch = await uow.canonical.get_branch(root.id)

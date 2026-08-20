@@ -36,6 +36,22 @@ export function branchProgressLabel(branch: BranchRecord): string {
   return `${moveCount} ${moveCount === 1 ? 'move' : 'moves'}`
 }
 
+export function turnMoveSuggestions(turn: TurnRecord): PlayerMoveSuggestion[] {
+  const allowedKinds = new Set<PlayerMoveSuggestion['kind']>(['Act', 'Speak', 'Observe', 'Think'])
+  const seenKinds = new Set<PlayerMoveSuggestion['kind']>()
+  const suggestions: PlayerMoveSuggestion[] = []
+
+  for (const candidate of turn.suggested_actions ?? []) {
+    const kind = titleCaseKind(candidate.kind)
+    const suggestionText = stringValue(candidate.text)
+    if (!kind || !suggestionText || !allowedKinds.has(kind) || seenKinds.has(kind)) continue
+    seenKinds.add(kind)
+    suggestions.push({ kind, text: suggestionText })
+  }
+
+  return suggestions.slice(0, 4)
+}
+
 export function buildPlayGuidance(
   world: WorldRecord,
   player: CharacterView | null,
@@ -94,6 +110,15 @@ function playerMoveSuggestions(locationName: string | null, otherCharacterName: 
       text: 'I pause and think about what just happened before deciding what to do.'
     }
   ]
+}
+
+function titleCaseKind(value: unknown): PlayerMoveSuggestion['kind'] | null {
+  const kind = stringValue(value)
+  if (!kind) return null
+  const normalized = `${kind[0].toUpperCase()}${kind.slice(1).toLowerCase()}`
+  return ['Act', 'Speak', 'Observe', 'Think'].includes(normalized)
+    ? (normalized as PlayerMoveSuggestion['kind'])
+    : null
 }
 
 function record(value: unknown): Record<string, unknown> | null {

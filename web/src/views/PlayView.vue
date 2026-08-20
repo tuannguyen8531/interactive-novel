@@ -6,7 +6,14 @@ import { useCharacterStore } from '@/stores/character'
 import { useDebugStore } from '@/stores/debug'
 import { usePlaythroughStore } from '@/stores/playthrough'
 import { useTurnJobStore, type TurnRequest } from '@/stores/turnJob'
-import { branchDisplayName, branchProgressLabel, buildPlayGuidance, findPlayerCharacter, isOpeningTurn } from '@/play/guidance'
+import {
+  branchDisplayName,
+  branchProgressLabel,
+  buildPlayGuidance,
+  findPlayerCharacter,
+  isOpeningTurn,
+  turnMoveSuggestions
+} from '@/play/guidance'
 import type { CharacterView, MemoryView } from '@/api/types'
 
 const route = useRoute()
@@ -36,9 +43,17 @@ const guidance = computed(() =>
     ? buildPlayGuidance(playthrough.world, playerCharacter.value, playthrough.timeline, playthrough.characters)
     : { locationName: null, sceneCues: [], suggestedActions: [] }
 )
+const latestTurnSuggestions = computed(() => {
+  const visibleTurns = playthrough.visibleTurns
+  const latestTurn = visibleTurns[visibleTurns.length - 1]
+  return latestTurn ? turnMoveSuggestions(latestTurn) : []
+})
+const suggestedActions = computed(() =>
+  latestTurnSuggestions.value.length > 0 ? latestTurnSuggestions.value : guidance.value.suggestedActions
+)
 const isFirstMove = computed(() => playerTurns.value.length === 0)
 const actionPlaceholder = computed(() =>
-  guidance.value.suggestedActions[0]?.text ??
+  suggestedActions.value[0]?.text ??
     (playerCharacter.value
       ? `Describe what ${playerCharacter.value.display_name} tries to do…`
       : 'Describe what you try to do…')
@@ -305,12 +320,18 @@ function playerTurnNumber(index: number): number {
           </p>
           <div class="move-example-heading">
             <strong>Need an idea?</strong>
-            <span>Choose an example, then edit it however you like.</span>
+            <span>
+              {{
+                latestTurnSuggestions.length > 0
+                  ? 'These ideas follow the latest scene. Choose one, then edit it however you like.'
+                  : 'Choose an example, then edit it however you like.'
+              }}
+            </span>
           </div>
           <div class="move-example-grid" aria-label="Player move examples">
             <button
-              v-for="suggestion in guidance.suggestedActions"
-              :key="suggestion.kind"
+              v-for="suggestion in suggestedActions"
+              :key="`${suggestion.kind}:${suggestion.text}`"
               class="move-example"
               type="button"
               :disabled="jobs.active"

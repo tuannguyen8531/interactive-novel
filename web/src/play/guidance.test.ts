@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { BranchRecord, CharacterView, PlaythroughRecord, TimelineEvent, TurnRecord, WorldRecord } from '@/api/types'
-import { branchDisplayName, branchProgressLabel, buildPlayGuidance, findPlayerCharacter, isOpeningTurn } from './guidance'
+import {
+  branchDisplayName,
+  branchProgressLabel,
+  buildPlayGuidance,
+  findPlayerCharacter,
+  isOpeningTurn,
+  turnMoveSuggestions
+} from './guidance'
 
 describe('play guidance', () => {
   it('identifies the controlled character instead of assuming the first character', () => {
@@ -72,5 +79,24 @@ describe('play guidance', () => {
     expect(branchProgressLabel(main)).toBe('3 moves')
     expect(branchProgressLabel(firstFork)).toBe('No moves yet')
     expect(branchProgressLabel(secondFork)).toBe('2 moves')
+  })
+})
+
+describe('turnMoveSuggestions', () => {
+  it('normalizes valid LLM suggestions and ignores duplicate or malformed entries', () => {
+    const turn = {
+      suggested_actions: [
+        { kind: 'act', text: '  I open the old cabinet.  ' },
+        { kind: 'SPEAK', text: '“Did you hear that?” I ask Hana.' },
+        { kind: 'act', text: 'Duplicate act' },
+        { kind: 'predict', text: 'I decide what Hana does.' },
+        { kind: 'think', text: '' }
+      ]
+    } as TurnRecord
+
+    expect(turnMoveSuggestions(turn)).toEqual([
+      { kind: 'Act', text: 'I open the old cabinet.' },
+      { kind: 'Speak', text: '“Did you hear that?” I ask Hana.' }
+    ])
   })
 })

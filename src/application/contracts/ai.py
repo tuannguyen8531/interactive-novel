@@ -598,8 +598,15 @@ class ParagraphMapping(AIModel):
     beat_id: str = Field(min_length=1)
 
 
+class PlayerMoveSuggestion(AIModel):
+    """A non-authoritative example of what the player could try next."""
+
+    kind: Literal["act", "speak", "observe", "think"]
+    text: str = Field(min_length=1, max_length=500)
+
+
 class NarrativeDraft(VersionedOutput):
-    """Writer output: prose only, with no authority-bearing mutation fields."""
+    """Writer prose and non-authoritative next-move examples."""
 
     expected_schema_version: ClassVar[str] = "narrative-draft-1"
     expected_role: ClassVar[AIPromptRole] = AIPromptRole.WRITER
@@ -607,6 +614,7 @@ class NarrativeDraft(VersionedOutput):
     narrative_text: str = Field(min_length=1)
     paragraph_mappings: tuple[ParagraphMapping, ...] = Field(default_factory=tuple)
     disclosed_claim_ids: tuple[str, ...] = Field(default_factory=tuple)
+    suggested_actions: tuple[PlayerMoveSuggestion, ...] = Field(default_factory=tuple, max_length=4)
 
 
 class CritiqueIssue(AIModel):
@@ -752,6 +760,7 @@ __all__ = [
     "ObservationProposal",
     "OutcomeCandidate",
     "ParagraphMapping",
+    "PlayerMoveSuggestion",
     "ParseStatus",
     "RatingValue",
     "RelationshipDimensionValue",
