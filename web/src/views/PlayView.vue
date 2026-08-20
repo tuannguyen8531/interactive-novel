@@ -6,6 +6,7 @@ import { useCharacterStore } from '@/stores/character'
 import { useDebugStore } from '@/stores/debug'
 import { usePlaythroughStore } from '@/stores/playthrough'
 import { useTurnJobStore, type TurnRequest } from '@/stores/turnJob'
+import { buildPlayGuidance, findPlayerCharacter, isOpeningTurn } from '@/play/guidance'
 
 const route = useRoute()
 const router = useRouter()
@@ -20,9 +21,22 @@ const openCharacterId = ref<string | null>(null)
 const loadingRoute = ref(false)
 
 const routePlaythroughId = computed(() => String(route.params.playthroughId ?? ''))
-const turnCount = computed(() => playthrough.visibleTurns.length)
+const playerCharacter = computed(() => findPlayerCharacter(playthrough.playthrough, playthrough.characters))
+const playerTurns = computed(() => playthrough.visibleTurns.filter((turn) => !isOpeningTurn(turn)))
+const turnCount = computed(() => playerTurns.value.length)
 const canFork = computed(() => selectedForkTurnId.value !== null && !jobs.active)
 const selectedCharacter = computed(() => characters.selected)
+const guidance = computed(() =>
+  playthrough.world
+    ? buildPlayGuidance(playthrough.world, playerCharacter.value, playthrough.timeline)
+    : { locationName: null, suggestedActions: [] }
+)
+const isFirstMove = computed(() => playerTurns.value.length === 0)
+const actionPlaceholder = computed(() =>
+  playerCharacter.value
+    ? `What does ${playerCharacter.value.display_name} do, say or notice?`
+    : 'Describe what you do, say or notice…'
+)
 
 function canForkFromTurn(turnBranchId: string): boolean {
   return !branches.activeBranch?.parent_branch_id || branches.activeBranch.id === turnBranchId
@@ -50,9 +64,10 @@ async function openRoute(): Promise<void> {
   loadingRoute.value = true
   await playthrough.open(routePlaythroughId.value)
   characters.clear()
-  if (playthrough.characters[0]) {
-    openCharacterId.value = playthrough.characters[0].id
-    await characters.select(playthrough.characters[0].id)
+  const defaultCharacter = playerCharacter.value ?? playthrough.characters[0]
+  if (defaultCharacter) {
+    openCharacterId.value = defaultCharacter.id
+    await characters.select(defaultCharacter.id)
   }
   debug.refresh()
   loadingRoute.value = false
@@ -66,6 +81,7 @@ function request(): TurnRequest | null {
     branch_id: branch.id,
     raw_input: input.value.trim(),
     base_revision: branch.head_revision,
+    actor_id: playthrough.playthrough.player_character_id ?? undefined,
     parent_turn_id: playthrough.latestTurn?.id ?? branch.fork_turn_id
   }
 }
@@ -102,6 +118,24 @@ async function chooseCharacter(characterId: string): Promise<void> {
 function narrative(turn: { final_narrative: string | null }): string {
   return turn.final_narrative ?? 'The turn finished without a final narrative.'
 }
+
+function chooseSuggestedAction(action: string): void {
+  input.value = action
+}
+
+function profileText(key: string): string | null {
+  const value = playerCharacter.value?.public_profile[key]
+  return typeof value === 'string' || typeof value === 'number' ? String(value) : null
+}
+
+function profileList(key: string): string[] {
+  const value = playerCharacter.value?.public_profile[key]
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function playerTurnNumber(index: number): number {
+  return playthrough.visibleTurns.slice(0, index + 1).filter((turn) => !isOpeningTurn(turn)).length
+}
 </script>
 
 <template>
@@ -124,17 +158,58 @@ function narrative(turn: { final_narrative: string | null }): string {
       </div>
       <div class="turn-counter" aria-label="turn count">
         <strong>{{ turnCount }}</strong>
-        <span>turns</span>
+        <span>your moves</span>
       </div>
     </section>
 
     <div class="play-layout">
       <main class="play-main">
+        <section v-if="playerCharacter" class="panel role-panel" aria-label="Player character and scene guidance">
+          <div class="role-identity">
+            <div class="role-title">
+              <span class="avatar player-avatar">{{ playerCharacter.display_name.slice(0, 1) }}</span>
+              <div>
+                <p class="eyebrow">You are playing as</p>
+                <h2>{{ playerCharacter.display_name }}</h2>
+              </div>
+            </div>
+            <p class="role-meta">
+              {{ profileText('role') || 'Protagonist' }}
+              <template v-if="profileText('age')"> · {{ profileText('age') }} years old</template>
+            </p>
+            <p v-if="profileText('background')" class="role-background">{{ profileText('background') }}</p>
+            <div v-if="profileList('traits').length" class="trait-list">
+              <span v-for="trait in profileList('traits')" :key="trait">{{ trait }}</span>
+            </div>
+          </div>
+          <div class="scene-guide">
+            <p class="eyebrow">{{ isFirstMove ? 'Start here' : 'Current scene' }}</p>
+            <h3>{{ guidance.locationName || 'The story is waiting' }}</h3>
+            <p>
+              You control {{ playerCharacter.display_name }}. Write what they do, say, ask or notice—the story will respond.
+            </p>
+            <template v-if="isFirstMove && guidance.suggestedActions.length">
+              <p class="suggestion-label">Try one of these, or write anything:</p>
+              <div class="suggestion-list">
+                <button
+                  v-for="action in guidance.suggestedActions"
+                  :key="action"
+                  class="suggestion-chip"
+                  type="button"
+                  @click="chooseSuggestedAction(action)"
+                >
+                  {{ action }}
+                </button>
+              </div>
+            </template>
+          </div>
+        </section>
+
         <section class="panel transcript-panel" aria-label="Narrative transcript">
           <div class="transcript-heading">
             <div>
               <p class="eyebrow">Transcript</p>
-              <h2>What happens next?</h2>
+              <h2>Story so far</h2>
             </div>
             <span v-if="playthrough.fixtureMode" class="fixture-badge">browser fixture</span>
           </div>
@@ -147,10 +222,12 @@ function narrative(turn: { final_narrative: string | null }): string {
           <div v-else class="transcript">
             <article v-for="(turn, index) in playthrough.visibleTurns" :key="turn.id" class="turn-entry">
               <div class="turn-label">
-                <span>Turn {{ index + 1 }}</span>
+                <span>{{ isOpeningTurn(turn) ? 'Opening scene' : `Move ${playerTurnNumber(index)}` }}</span>
                 <time :datetime="turn.created_at">{{ turn.world_time_end }} min</time>
               </div>
-              <p class="player-action">You · {{ turn.raw_input }}</p>
+              <p v-if="!isOpeningTurn(turn)" class="player-action">
+                {{ playerCharacter?.display_name || 'You' }} · {{ turn.raw_input }}
+              </p>
               <p class="narrative">{{ narrative(turn) }}</p>
               <button
                 class="fork-chip"
@@ -169,7 +246,7 @@ function narrative(turn: { final_narrative: string | null }): string {
           <div class="action-heading">
             <div>
               <p class="eyebrow">Free action</p>
-              <h2>Your move</h2>
+              <h2>{{ playerCharacter ? `${playerCharacter.display_name}’s move` : 'Your move' }}</h2>
             </div>
             <button v-if="jobs.active" class="danger" type="button" @click="jobs.cancel()">Cancel</button>
           </div>
@@ -178,7 +255,7 @@ function narrative(turn: { final_narrative: string | null }): string {
             :disabled="jobs.active"
             rows="3"
             maxlength="20000"
-            placeholder="Describe what you do, say or notice…"
+            :placeholder="actionPlaceholder"
             @keydown.ctrl.enter.prevent="submit"
           />
           <div class="action-footer">
@@ -246,7 +323,9 @@ function narrative(turn: { final_narrative: string | null }): string {
               <span class="avatar">{{ character.display_name.slice(0, 1) }}</span>
               <span>
                 <strong>{{ character.display_name }}</strong>
-                <small>{{ character.public_profile.role || 'present' }}</small>
+                <small>
+                  {{ character.id === playthrough.playthrough.player_character_id ? 'You · ' : '' }}{{ character.public_profile.role || 'present' }}
+                </small>
               </span>
             </button>
           </div>
@@ -332,6 +411,84 @@ function narrative(turn: { final_narrative: string | null }): string {
 .play-sidebar {
   display: grid;
   gap: 1rem;
+}
+
+.role-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 1.25rem;
+  background: linear-gradient(135deg, #fffdf8, #f6e9df);
+}
+
+.role-identity {
+  padding-right: 1.25rem;
+  border-right: 1px solid var(--line);
+}
+
+.role-title {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.role-title h2,
+.scene-guide h3 {
+  margin: 0;
+}
+
+.player-avatar {
+  width: 2.8rem;
+  height: 2.8rem;
+  flex: 0 0 auto;
+  font-size: 1.15rem;
+}
+
+.role-meta {
+  margin: 0.85rem 0 0.4rem;
+  color: var(--accent-dark);
+  font-weight: 700;
+}
+
+.role-background,
+.scene-guide p {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.trait-list,
+.suggestion-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.trait-list span {
+  padding: 0.25rem 0.5rem;
+  border-radius: 99rem;
+  background: #fff9;
+  color: var(--accent-dark);
+  font-size: 0.75rem;
+}
+
+.suggestion-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.suggestion-chip {
+  border: 1px solid #c99878;
+  padding: 0.45rem 0.65rem;
+  background: #fff9;
+  color: var(--accent-dark);
+  font-size: 0.78rem;
+  text-align: left;
+}
+
+.suggestion-chip:hover:not(:disabled) {
+  background: #fff;
+  color: var(--accent-dark);
 }
 
 .transcript-heading {
@@ -563,6 +720,17 @@ function narrative(turn: { final_narrative: string | null }): string {
 @media (max-width: 840px) {
   .play-layout {
     grid-template-columns: 1fr;
+  }
+
+  .role-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .role-identity {
+    padding-right: 0;
+    padding-bottom: 1rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
   }
 
   .play-sidebar {
