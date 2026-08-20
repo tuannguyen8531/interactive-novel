@@ -17,11 +17,11 @@
   },
   "simulator": {
     "template": "simulator.md",
-    "semantic_version": "1.0.0",
+    "semantic_version": "1.1.0",
     "input_contract": "role-input-1",
     "output_schema_version": "simulation-result-1",
     "required_variables": ["input_json"],
-    "changelog": "Initial typed simulation proposal contract."
+    "changelog": "Constrain canonical proposals to the exact authorized IDs and allow mutation-free turns."
   },
   "context_validator": {
     "template": "context_validator.md",

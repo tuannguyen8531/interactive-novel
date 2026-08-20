@@ -94,6 +94,22 @@ class FailedRunner:
         del turn_run_id
 
 
+class GuardOnlyFailedRunner:
+    async def run(self, request: Any) -> dict[str, Any]:
+        del request
+        return {
+            "status": "failed",
+            "errors": (),
+            "guard_error": {
+                "code": "claim_subject_owner_invalid",
+                "message": "Claim subject must reference a known character.",
+            },
+        }
+
+    def cancel(self, turn_run_id: str) -> None:
+        del turn_run_id
+
+
 def _factory(playthrough: PlaythroughRecord, branches: list[BranchRecord]):
     def factory() -> FakeUow:
         return FakeUow(playthrough, branches)
@@ -168,6 +184,23 @@ async def test_failed_job_terminal_event_carries_diagnostics() -> None:
     assert failed.error is not None
     assert history[-1].terminal is True
     assert history[-1].payload["error"] == failed.error
+
+
+@pytest.mark.asyncio
+async def test_failed_job_uses_guard_diagnostic_when_graph_errors_are_empty() -> None:
+    playthrough, branches = _fixture()
+    service = TurnApplicationService(
+        _factory(playthrough, branches),
+        GuardOnlyFailedRunner(),
+        job_store=InMemoryJobStore(),
+    )
+
+    await service.submit_turn(_command(playthrough, branch_id="root", run_id="guard-run", key="guard-key"))
+    failed = await service.wait_for_turn("guard-run")
+
+    assert failed.status == "failed"
+    assert failed.error is not None
+    assert failed.error["diagnostics"][0]["code"] == "claim_subject_owner_invalid"
 
 
 @pytest.mark.asyncio

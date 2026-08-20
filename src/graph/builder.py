@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
@@ -67,12 +68,12 @@ def build_turn_graph(runtime: TurnGraphRuntime, *, checkpointer: Any = None) -> 
     )
     builder.add_conditional_edges(
         "validate_context",
-        lambda state: _after_validate(state, nodes.runtime.max_repair_attempts),
+        partial(_after_validate, max_repairs=nodes.runtime.max_repair_attempts),
         {"guard": "guard_state", "repair": "repair", "finish": END},
     )
     builder.add_conditional_edges(
         "guard_state",
-        lambda state: _after_guard(state, nodes.runtime.max_repair_attempts),
+        partial(_after_guard, max_repairs=nodes.runtime.max_repair_attempts),
         {"write": "write", "repair": "repair", "finish": END},
     )
     builder.add_conditional_edges(
@@ -87,7 +88,7 @@ def build_turn_graph(runtime: TurnGraphRuntime, *, checkpointer: Any = None) -> 
     )
     builder.add_conditional_edges(
         "critique",
-        lambda state: _after_critique(state, nodes.runtime.max_revision_attempts),
+        partial(_after_critique, max_revisions=nodes.runtime.max_revision_attempts),
         {"records": "build_canonical_records", "revise": "revise", "finish": END},
     )
     builder.add_conditional_edges(
@@ -102,24 +103,24 @@ def build_turn_graph(runtime: TurnGraphRuntime, *, checkpointer: Any = None) -> 
     )
     builder.add_conditional_edges(
         "commit",
-        lambda state: "enqueue" if state.get("commit_done", False) else "finish",
+        _after_commit,
         {"enqueue": "enqueue_derived_jobs", "finish": END},
     )
     builder.add_edge("enqueue_derived_jobs", END)
     return builder.compile(checkpointer=checkpointer, name="turn-pipeline")
 
 
-def _running_or_finish(state: TurnGraphState) -> str:
+async def _running_or_finish(state: TurnGraphState) -> str:
     return "continue" if state.get("status", "running") == "running" else "finish"
 
 
-def _after_plan(state: TurnGraphState) -> str:
+async def _after_plan(state: TurnGraphState) -> str:
     if state.get("status", "running") != "running":
         return "finish"
     return "extract" if state.get("simulation") is not None else "simulate"
 
 
-def _after_validate(state: TurnGraphState, max_repairs: int) -> str:
+async def _after_validate(state: TurnGraphState, max_repairs: int) -> str:
     if state.get("status", "running") != "running":
         return "finish"
     report = state.get("consistency_report")
@@ -130,7 +131,7 @@ def _after_validate(state: TurnGraphState, max_repairs: int) -> str:
     return "finish"
 
 
-def _after_guard(state: TurnGraphState, max_repairs: int) -> str:
+async def _after_guard(state: TurnGraphState, max_repairs: int) -> str:
     if state.get("status", "running") != "running":
         return "finish"
     if state.get("guard_approved", False):
@@ -140,11 +141,11 @@ def _after_guard(state: TurnGraphState, max_repairs: int) -> str:
     return "finish"
 
 
-def _after_repair(state: TurnGraphState) -> str:
+async def _after_repair(state: TurnGraphState) -> str:
     return "simulate" if state.get("status", "running") == "running" else "finish"
 
 
-def _after_critique(state: TurnGraphState, max_revisions: int) -> str:
+async def _after_critique(state: TurnGraphState, max_revisions: int) -> str:
     if state.get("status", "running") != "running":
         return "finish"
     critique = state.get("critique")
@@ -155,6 +156,10 @@ def _after_critique(state: TurnGraphState, max_revisions: int) -> str:
     if critique.decision == CritiqueDecision.REVISE and state.get("revision_count", 0) < max_revisions:
         return "revise"
     return "finish"
+
+
+async def _after_commit(state: TurnGraphState) -> str:
+    return "enqueue" if state.get("commit_done", False) else "finish"
 
 
 __all__ = ["build_turn_graph"]

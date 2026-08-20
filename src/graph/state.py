@@ -28,6 +28,7 @@ class TurnGraphState(TypedDict):
     config_snapshot_id: str
     retry_counters: dict[str, int]
     errors: tuple[dict[str, Any], ...]
+    warnings: tuple[dict[str, Any], ...]
     node_events: tuple[dict[str, Any], ...]
     llm_traces: tuple[dict[str, Any], ...]
     physical_call_traces: tuple[dict[str, Any], ...]
@@ -82,6 +83,7 @@ def initial_graph_state(
         "config_snapshot_id": config_snapshot_id,
         "retry_counters": {},
         "errors": (),
+        "warnings": (),
         "node_events": (),
         "llm_traces": (),
         "physical_call_traces": (),

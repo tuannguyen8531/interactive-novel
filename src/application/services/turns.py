@@ -392,6 +392,26 @@ class TurnApplicationService:
             result = raw_result.get("committed_turn", raw_result.get("result"))
             error_value = raw_result.get("errors")
             error = None if not error_value else {"diagnostics": _json_safe(error_value)}
+            if not committed and error is None:
+                guard_error = raw_result.get("guard_error")
+                if guard_error:
+                    error = {
+                        "diagnostics": _json_safe(
+                            ({"node": "guard_state", **dict(guard_error)},)
+                            if isinstance(guard_error, Mapping)
+                            else ({"node": "guard_state", "message": str(guard_error)},)
+                        )
+                    }
+                elif graph_status == "failed":
+                    error = {
+                        "diagnostics": (
+                            {
+                                "node": "pipeline",
+                                "code": "turn_pipeline_failed",
+                                "message": "The turn pipeline stopped before committing a canonical turn.",
+                            },
+                        )
+                    }
             return replace(
                 current,
                 status=status,

@@ -53,6 +53,14 @@ def test_repair_prompt_contains_role_schema_and_diagnostics() -> None:
     assert "{bad json}" in prompt
 
 
+def test_simulator_prompt_requires_authoritative_ids_and_allows_no_op_turns() -> None:
+    prompt = PromptRegistry().get(AIPromptRole.SIMULATOR)
+
+    assert prompt.semantic_version == "1.1.0"
+    assert "context.authoritative_ids" in prompt.content
+    assert "state_patch: null" in prompt.content
+
+
 def test_missing_prompt_variable_is_a_clear_error() -> None:
     definition = PromptRegistry().get(AIPromptRole.CRITIC)
 

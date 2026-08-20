@@ -271,6 +271,55 @@ async def test_guard_rejection_repairs_once_before_commit() -> None:
 
 
 @pytest.mark.asyncio
+async def test_invalid_model_mutations_after_repair_are_dropped_without_blocking_turn() -> None:
+    invalid = copy.deepcopy(ROLE_OUTPUTS["simulator"])
+    invalid["claim_proposals"][0]["subject_id"] = "colorful-posters"
+    provider = FakeProvider(sequences={"simulator": (invalid, invalid)})
+    committer = FakeCommitter()
+
+    result = await make_pipeline(provider, committer).run(make_request(make_game_state(), "guard-fallback-run"))
+
+    assert result["status"] == "completed"
+    assert result["commit_done"] is True
+    assert result["retry_counters"]["repair"] == 1
+    assert result["warnings"][-1]["code"] == "invalid_model_mutations_dropped"
+    assert any(event["event_type"] == "guard_fallback" for event in result["node_events"])
+    assert len(committer.bundles) == 1
+    assert committer.bundles[0].approved_patch["operations"] == []
+    assert any(roles == ("writer",) for _, roles in provider.calls)
+
+
+@pytest.mark.asyncio
+async def test_simulator_can_complete_turn_without_canonical_mutations() -> None:
+    simulation = copy.deepcopy(ROLE_OUTPUTS["simulator"])
+    simulation["claim_proposals"] = []
+    simulation["state_patch"] = None
+    simulation["knowledge_requirements"] = []
+    committer = FakeCommitter()
+
+    result = await make_pipeline(
+        FakeProvider(sequences={"simulator": (simulation,)}),
+        committer,
+    ).run(make_request(make_game_state(), "mutation-free-run"))
+
+    assert result["status"] == "completed"
+    assert result["retry_counters"].get("repair", 0) == 0
+    assert committer.bundles[0].approved_patch["operations"] == []
+
+
+@pytest.mark.asyncio
+async def test_initial_context_exposes_exact_authoritative_ids() -> None:
+    result = await make_pipeline(FakeProvider(), FakeCommitter()).run(make_request(make_game_state(), "ids-run"))
+
+    context_manifest = result.get("context_manifest")
+    assert isinstance(context_manifest, dict)
+    identifiers = context_manifest["authoritative_ids"]
+    assert identifiers["character_ids"] == ["alice", "player"]
+    assert identifiers["location_ids"] == ["courtyard", "library"]
+    assert identifiers["event_ids"] == []
+
+
+@pytest.mark.asyncio
 async def test_new_claim_and_idempotent_location_do_not_require_prior_exact_claim() -> None:
     simulation = copy.deepcopy(ROLE_OUTPUTS["simulator"])
     simulation["claim_proposals"][0].update(

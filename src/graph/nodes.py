@@ -202,7 +202,9 @@ class TurnGraphNodes:
             manifest = await self.assembler.build_initial_context(request, [])
         else:
             manifest = await self.assembler.build_initial_context_from_source(request, self.runtime.candidate_source)
-        return {"context_manifest": manifest.as_context()}
+        context_manifest = manifest.as_context()
+        context_manifest["authoritative_ids"] = _authoritative_ids(game_state)
+        return {"context_manifest": context_manifest}
 
     async def _plan(self, state: TurnGraphState) -> dict[str, Any]:
         if state.get("plan") is not None and not state.get("repair_requested", False):
@@ -402,29 +404,83 @@ class TurnGraphNodes:
             patch = domain_patch_from_simulation(simulation, branch_id=state["branch_id"])
             self.runtime.guard.validate_patch(self.runtime.request.game_state, patch)
         except GuardRejected as error:
-            return {
-                "guard_approved": False,
-                "guard_error": {"code": error.code, "message": error.message, "details": dict(error.details)},
-                "approved_patch": None,
-                "status": "failed"
-                if state.get("retry_counters", {}).get("repair", 0) >= self.runtime.max_repair_attempts
-                else "running",
-            }
+            diagnostic = {"code": error.code, "message": error.message, "details": dict(error.details)}
+            return await self._handle_patch_rejection(state, simulation, diagnostic)
         except (TypeError, ValueError) as error:
-            return {
-                "guard_approved": False,
-                "guard_error": {"code": "invalid_typed_patch", "message": str(error)},
-                "approved_patch": None,
-                "status": "failed"
-                if state.get("retry_counters", {}).get("repair", 0) >= self.runtime.max_repair_attempts
-                else "running",
-            }
+            diagnostic = {"code": "invalid_typed_patch", "message": str(error), "details": {}}
+            return await self._handle_patch_rejection(state, simulation, diagnostic)
         from src.domain.codec import patch_to_payload
 
         return {
             "guard_approved": True,
             "guard_error": None,
             "approved_patch": patch_to_payload(patch),
+        }
+
+    async def _handle_patch_rejection(
+        self,
+        state: TurnGraphState,
+        simulation: SimulationResult,
+        diagnostic: dict[str, Any],
+    ) -> dict[str, Any]:
+        repair_count = state.get("retry_counters", {}).get("repair", 0)
+        final_attempt = repair_count >= self.runtime.max_repair_attempts
+        recovery = "drop_invalid_mutations" if final_attempt else "repair"
+        log_error(
+            "Turn state Guard rejected a model proposal",
+            str(diagnostic["message"]),
+            code=diagnostic["code"],
+            details=diagnostic.get("details", {}),
+            recovery=recovery,
+            repair_attempt=repair_count,
+            turn_run_id=state["turn_run_id"],
+            playthrough_id=state["playthrough_id"],
+            branch_id=state["branch_id"],
+        )
+        if not final_attempt:
+            return {
+                "guard_approved": False,
+                "guard_error": diagnostic,
+                "approved_patch": None,
+                "status": "running",
+            }
+
+        # Model-proposed mutations are optional. After the bounded repair has
+        # also failed, reject every mutation but keep the usable NPC reaction
+        # and outcome so the player is not locked out of the story.
+        from src.domain.codec import patch_to_payload
+
+        game_state = self.runtime.request.game_state
+        safe_patch = StatePatch.from_operations(
+            (),
+            branch_id=state["branch_id"],
+            base_world_time=game_state.world_time,
+            patch_id=f"guard-fallback:{state['turn_run_id']}",
+        )
+        self.runtime.guard.validate_patch(game_state, safe_patch)
+        warning = {
+            "node": "guard_state",
+            "code": "invalid_model_mutations_dropped",
+            "message": "The model proposed invalid canonical mutations; the turn continued without applying them.",
+            "guard_error": diagnostic,
+        }
+        events = await self._event(state, "guard_state", "guard_fallback", warning)
+        return {
+            "guard_approved": True,
+            "guard_error": None,
+            "approved_patch": patch_to_payload(safe_patch),
+            "simulation": simulation.model_copy(
+                update={
+                    "claim_proposals": (),
+                    "state_patch": None,
+                    "knowledge_requirements": (),
+                }
+            ),
+            "claim_extraction": None,
+            "targeted_evidence": (),
+            "warnings": (*tuple(state.get("warnings", ())), warning),
+            "node_events": events,
+            "status": "running",
         }
 
     async def _repair(self, state: TurnGraphState) -> dict[str, Any]:
@@ -695,12 +751,40 @@ def _failure(state: TurnGraphState, code: str, message: str) -> dict[str, Any]:
     return {"status": "failed", "errors": _append_error(state, "pipeline", code, message)}
 
 
+def _authoritative_ids(game_state: Any) -> dict[str, list[str]]:
+    """Expose only exact, Guard-authorized identifiers to logical AI roles."""
+
+    goal_ids: set[str] = set()
+    item_ids: set[str] = set()
+    secret_ids: set[str] = set()
+    for character in game_state.characters.values():
+        goal_ids.update(character.profile.long_term_goals)
+        goal_ids.update(character.state.short_term_goals)
+        goal_ids.update(character.state.psychology.active_goals)
+        item_ids.update(character.state.inventory_ids)
+        secret_ids.update(character.profile.initial_secrets)
+    return {
+        "character_ids": sorted(game_state.characters),
+        "location_ids": sorted(game_state.locations),
+        "event_ids": sorted(game_state.events),
+        "claim_ids": sorted(game_state.claims),
+        "goal_ids": sorted(goal_ids),
+        "item_ids": sorted(item_ids),
+        "secret_ids": sorted(secret_ids),
+        "thread_ids": sorted(game_state.threads),
+    }
+
+
 def domain_patch_from_simulation(simulation: SimulationResult, *, branch_id: str) -> StatePatch:
     """Convert only typed AI operations/claims into domain operations."""
 
     proposal = simulation.state_patch
     if proposal is None:
-        raise ValueError("simulation did not propose a state patch")
+        return StatePatch.from_operations(
+            (),
+            branch_id=branch_id,
+            patch_id=f"no-op:{simulation.run_id}",
+        )
     if proposal.branch_id != branch_id:
         raise ValueError("simulation patch branch does not match the turn branch")
     operations = [_domain_operation(operation, proposal.provenance) for operation in proposal.operations]
