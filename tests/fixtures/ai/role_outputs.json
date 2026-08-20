@@ -105,7 +105,7 @@
       "source_role": "world_builder",
       "source_run_id": "world-run-1",
       "guard_approved": false,
-      "world_time": 0,
+      "world_time": 480,
       "tags": ["romantic_affection"],
       "participants": {"player": 17, "alice": 17},
       "consent": {},
@@ -175,7 +175,10 @@
       "patch_id": "patch-1",
       "branch_id": "root",
       "base_world_time": 0,
-      "operations": [{"operation_type": "set_character_location", "character_id": "alice", "location_id": "library"}],
+      "operations": [
+        {"operation_type": "set_character_location", "character_id": "alice", "location_id": "library"},
+        {"operation_type": "advance_clock", "duration_minutes": 5}
+      ],
       "provenance": {
         "source_type": "simulation",
         "source_id": "turn-run-1",

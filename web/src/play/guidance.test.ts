@@ -5,11 +5,26 @@ import {
   branchProgressLabel,
   buildPlayGuidance,
   findPlayerCharacter,
+  formatTurnDuration,
+  formatWorldTime,
   isOpeningTurn,
   turnMoveSuggestions
 } from './guidance'
 
 describe('play guidance', () => {
+  it('formats the in-world clock as a readable day and time', () => {
+    expect(formatWorldTime(0)).toBe('Day 1 · 00:00')
+    expect(formatWorldTime(480)).toBe('Day 1 · 08:00')
+    expect(formatWorldTime(1505)).toBe('Day 2 · 01:05')
+    expect(formatWorldTime(Number.NaN)).toBe('Day 1 · 00:00')
+  })
+
+  it('formats turn duration without exposing raw accumulated minutes', () => {
+    expect(formatTurnDuration(5)).toBe('5 min')
+    expect(formatTurnDuration(75)).toBe('1 hr 15 min')
+    expect(formatTurnDuration(1500)).toBe('1 day 1 hr')
+  })
+
   it('identifies the controlled character instead of assuming the first character', () => {
     const characters = [{ id: 'npc' }, { id: 'hero' }] as CharacterView[]
     const playthrough = { player_character_id: 'hero' } as PlaythroughRecord

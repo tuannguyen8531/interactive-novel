@@ -11,6 +11,33 @@ export interface PlayerMoveSuggestion {
   text: string
 }
 
+export function formatWorldTime(totalMinutes: number): string {
+  const minutes = normalizedMinutes(totalMinutes)
+  const day = Math.floor(minutes / (24 * 60)) + 1
+  const minuteOfDay = minutes % (24 * 60)
+  const hours = Math.floor(minuteOfDay / 60)
+  const minute = minuteOfDay % 60
+  return `Day ${day} · ${String(hours).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+export function formatTurnDuration(totalMinutes: number): string {
+  const minutes = normalizedMinutes(totalMinutes)
+  if (minutes < 60) return `${minutes} min`
+
+  const days = Math.floor(minutes / (24 * 60))
+  const hours = Math.floor((minutes % (24 * 60)) / 60)
+  const remainder = minutes % 60
+  const parts: string[] = []
+  if (days > 0) parts.push(`${days} ${days === 1 ? 'day' : 'days'}`)
+  if (hours > 0) parts.push(`${hours} ${hours === 1 ? 'hr' : 'hrs'}`)
+  if (remainder > 0) parts.push(`${remainder} min`)
+  return parts.join(' ')
+}
+
+function normalizedMinutes(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0
+}
+
 export function findPlayerCharacter(
   playthrough: PlaythroughRecord | null,
   characters: CharacterView[]

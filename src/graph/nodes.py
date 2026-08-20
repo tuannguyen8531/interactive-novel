@@ -422,6 +422,11 @@ class TurnGraphNodes:
             return _failure(state, "simulation_missing", "Guard requires a simulation artifact.")
         try:
             patch = domain_patch_from_simulation(simulation, branch_id=state["branch_id"])
+            patch = _ensure_turn_clock(
+                patch,
+                current_world_time=self.runtime.request.game_state.world_time,
+                default_duration_minutes=self.runtime.guard.clock_policy.default_action_duration_minutes,
+            )
             self.runtime.guard.validate_patch(self.runtime.request.game_state, patch)
         except GuardRejected as error:
             diagnostic = {"code": error.code, "message": error.message, "details": dict(error.details)}
@@ -466,13 +471,14 @@ class TurnGraphNodes:
             }
 
         # Model-proposed mutations are optional. After the bounded repair has
-        # also failed, reject every mutation but keep the usable NPC reaction
-        # and outcome so the player is not locked out of the story.
+        # also failed, reject them but keep the deterministic clock fallback,
+        # usable NPC reaction and outcome so the player is not locked out.
         from src.domain.codec import patch_to_payload
 
         game_state = self.runtime.request.game_state
+        fallback_duration = self.runtime.guard.clock_policy.default_action_duration_minutes
         safe_patch = StatePatch.from_operations(
-            (),
+            (AdvanceClock(fallback_duration),) if fallback_duration > 0 else (),
             branch_id=state["branch_id"],
             base_world_time=game_state.world_time,
             patch_id=f"guard-fallback:{state['turn_run_id']}",
@@ -845,6 +851,34 @@ def domain_patch_from_simulation(simulation: SimulationResult, *, branch_id: str
         branch_id=branch_id,
         base_world_time=proposal.base_world_time,
         patch_id=proposal.patch_id,
+    )
+
+
+def _ensure_turn_clock(
+    patch: StatePatch,
+    *,
+    current_world_time: int,
+    default_duration_minutes: int,
+) -> StatePatch:
+    """Give completed player turns a deterministic minimum duration.
+
+    The Simulator may estimate a more suitable duration. If it omits clock
+    movement (or proposes only zero-minute movement), the application boundary
+    adds the configured fallback so an accepted action cannot freeze time.
+    """
+
+    elapsed = sum(
+        operation.duration_minutes
+        for operation in patch.operations
+        if isinstance(operation, AdvanceClock)
+    )
+    if elapsed > 0 or default_duration_minutes <= 0:
+        return patch
+    return StatePatch.from_operations(
+        (*patch.operations, AdvanceClock(default_duration_minutes)),
+        branch_id=patch.branch_id,
+        base_world_time=patch.base_world_time if patch.base_world_time is not None else current_world_time,
+        patch_id=patch.patch_id,
     )
 
 

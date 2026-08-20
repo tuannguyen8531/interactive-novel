@@ -118,6 +118,16 @@ class DomainGuard:
                             details={"maximum": self.clock_policy.max_turn_duration_minutes},
                         )
                     current_time += operation.duration_minutes
+                    elapsed_minutes = current_time - state.world_time
+                    if elapsed_minutes > self.clock_policy.max_turn_duration_minutes:
+                        _fail(
+                            "duration_over_limit",
+                            "Total clock movement exceeds the deterministic Guard limit.",
+                            details={
+                                "maximum": self.clock_policy.max_turn_duration_minutes,
+                                "received": elapsed_minutes,
+                            },
+                        )
                 elif isinstance(operation, (SetCharacterLocation, SetCharacterCondition, UpdatePsychology)):
                     if operation.character_id not in known_characters:
                         _fail("unknown_character", f"Unknown character: {operation.character_id}.")

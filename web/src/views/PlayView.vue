@@ -11,6 +11,8 @@ import {
   branchProgressLabel,
   buildPlayGuidance,
   findPlayerCharacter,
+  formatTurnDuration,
+  formatWorldTime,
   isOpeningTurn,
   turnMoveSuggestions
 } from '@/play/guidance'
@@ -224,7 +226,7 @@ function playerTurnNumber(index: number): number {
         <p class="eyebrow">{{ playthrough.world.genre || 'Story' }}</p>
         <h1>{{ playthrough.world.name }}</h1>
         <p class="scene-meta">
-          {{ playthrough.world.tone || 'A new scene' }} · {{ playthrough.worldTime }} minutes ·
+          {{ playthrough.world.tone || 'A new scene' }} · {{ formatWorldTime(playthrough.worldTime) }} ·
           {{ activeBranchName }}
         </p>
       </div>
@@ -284,7 +286,10 @@ function playerTurnNumber(index: number): number {
               <article v-for="(turn, index) in playthrough.visibleTurns" :key="turn.id" class="turn-entry">
                 <div class="turn-label">
                   <span>{{ isOpeningTurn(turn) ? 'Opening scene' : `Move ${playerTurnNumber(index)}` }}</span>
-                  <time :datetime="turn.created_at">{{ turn.world_time_end }} min</time>
+                  <span class="turn-clock" :title="`World minute ${turn.world_time_end}`">
+                    <span>{{ formatWorldTime(turn.world_time_end) }}</span>
+                    <small v-if="turn.duration_minutes > 0">+{{ formatTurnDuration(turn.duration_minutes) }}</small>
+                  </span>
                 </div>
                 <p v-if="!isOpeningTurn(turn)" class="player-action">
                   {{ playerCharacter?.display_name || 'You' }} · {{ turn.raw_input }}
@@ -702,9 +707,27 @@ function playerTurnNumber(index: number): number {
 
 .turn-label {
   display: flex;
+  gap: 0.75rem;
   justify-content: space-between;
   color: var(--muted);
   font-size: 0.75rem;
+}
+
+.turn-clock {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.turn-clock small {
+  padding: 0.08rem 0.35rem;
+  border-radius: 99rem;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 0.68rem;
+  font-weight: 700;
 }
 
 .player-action {

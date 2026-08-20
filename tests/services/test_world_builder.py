@@ -45,5 +45,5 @@ async def test_provider_world_builder_renders_versioned_school_romance_prompt() 
     assert '"player_character"' in provider.request.user_prompt
     assert '"opening_scene"' in provider.request.user_prompt
     assert provider.request.metadata["output_schema_version"] == "world-seed-1"
-    assert result.prompt_version == "1.1.0"
+    assert result.prompt_version == "1.2.0"
     assert result.run_id != payload["run_id"]

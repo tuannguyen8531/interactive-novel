@@ -5,6 +5,7 @@ import random
 import pytest
 
 from src.domain.characters import Character, CharacterProfile
+from src.domain.clock import ClockPolicy
 from src.domain.engine import DomainEngine
 from src.domain.errors import GuardRejected
 from src.domain.events import Event
@@ -102,3 +103,18 @@ def test_invalid_transition_and_branch_are_rejected_before_mutation() -> None:
     with pytest.raises(GuardRejected) as branch_error:
         DomainGuard().validate_patch(state, wrong_branch)
     assert branch_error.value.code == "branch_scope_mismatch"
+
+
+def test_guard_limits_total_clock_movement_across_operations() -> None:
+    state = _state()
+    patch = StatePatch(
+        (AdvanceClock(6), AdvanceClock(5)),
+        branch_id="root",
+        base_world_time=0,
+    )
+
+    with pytest.raises(GuardRejected) as duration_error:
+        DomainGuard(clock_policy=ClockPolicy(max_turn_duration_minutes=10)).validate_patch(state, patch)
+
+    assert duration_error.value.code == "duration_over_limit"
+    assert duration_error.value.details == {"maximum": 10, "received": 11}

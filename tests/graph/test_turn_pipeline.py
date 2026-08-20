@@ -246,6 +246,8 @@ async def test_fake_pipeline_commits_one_canonical_turn() -> None:
     assert result["derived_jobs_queued"] is True
     assert len(committer.bundles) == 1
     assert committer.bundles[0].claims[0].claim_id == "claim-alice-library"
+    assert committer.bundles[0].duration_minutes == 5
+    assert committer.bundles[0].world_time_end == 5
     assert [item["kind"] for item in committer.bundles[0].suggested_actions] == ["act", "speak", "observe", "think"]
     assert any(item["event_type"] == "completed" for item in result["node_events"])
 
@@ -339,12 +341,15 @@ async def test_invalid_model_mutations_after_repair_are_dropped_without_blocking
     assert result["warnings"][-1]["code"] == "invalid_model_mutations_dropped"
     assert any(event["event_type"] == "guard_fallback" for event in result["node_events"])
     assert len(committer.bundles) == 1
-    assert committer.bundles[0].approved_patch["operations"] == []
+    assert committer.bundles[0].approved_patch["operations"] == [
+        {"operation_type": "advance_clock", "payload": {"duration_minutes": 1}}
+    ]
+    assert committer.bundles[0].duration_minutes == 1
     assert any(roles == ("writer",) for _, roles in provider.calls)
 
 
 @pytest.mark.asyncio
-async def test_simulator_can_complete_turn_without_canonical_mutations() -> None:
+async def test_simulator_without_canonical_mutations_gets_default_clock_progress() -> None:
     simulation = copy.deepcopy(ROLE_OUTPUTS["simulator"])
     simulation["claim_proposals"] = []
     simulation["state_patch"] = None
@@ -358,7 +363,10 @@ async def test_simulator_can_complete_turn_without_canonical_mutations() -> None
 
     assert result["status"] == "completed"
     assert result["retry_counters"].get("repair", 0) == 0
-    assert committer.bundles[0].approved_patch["operations"] == []
+    assert committer.bundles[0].approved_patch["operations"] == [
+        {"operation_type": "advance_clock", "payload": {"duration_minutes": 1}}
+    ]
+    assert committer.bundles[0].world_time_end == 1
 
 
 @pytest.mark.asyncio

@@ -13,6 +13,9 @@ versioned run and prompt metadata. The top-level object itself must be the
 WorldSeed: do not wrap it in `world_seed`, `metadata`, `result` or another
 envelope. Do not emit authority-bearing claims in this initial editable draft.
 Keep the opening scene `guard_approved` false. Use two to four NPC profiles.
+Treat `opening_scene.world_time` as minutes since midnight on Day 1. Choose a
+time that fits the opening scene (for example, 480 means 08:00); do not default
+to midnight unless the requested premise actually begins there.
 
 Follow this exact shape. Replace example prose and IDs with values appropriate
 to the input and keep participant ages equal to their character ages. For this
@@ -25,7 +28,7 @@ these authority-bearing records are added only by later validated workflows:
   "schema_version": "world-seed-1",
   "role": "world_builder",
   "run_id": "copy the input run_id",
-  "prompt_version": "1.1.0",
+  "prompt_version": "1.2.0",
   "title": "World title",
   "premise": "World premise",
   "genre": "school romance",
@@ -84,7 +87,7 @@ these authority-bearing records are added only by later validated workflows:
     "source_role": "world_builder",
     "source_run_id": "copy the input run_id",
     "guard_approved": false,
-    "world_time": 0,
+    "world_time": 480,
     "tags": ["opening"],
     "participants": {"player": 16, "npc_one": 16},
     "consent": {},
