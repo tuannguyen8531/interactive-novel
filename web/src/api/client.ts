@@ -110,6 +110,8 @@ export const api = {
   getWorld: (worldId: string): Promise<WorldRecord> => request<WorldRecord>(`/api/worlds/${encodeURIComponent(worldId)}`),
   createWorld: (payload: Record<string, unknown>): Promise<WorldRecord> =>
     request<WorldRecord>('/api/worlds', jsonBody(payload)),
+  deleteWorld: (worldId: string): Promise<void> =>
+    request<void>(`/api/worlds/${encodeURIComponent(worldId)}`, { method: 'DELETE' }),
   generateWorldDraft: (prompt: string): Promise<WorldSeed> =>
     request<WorldSeed>('/api/world-drafts', jsonBody({ prompt })),
   validateWorldDraft: (draft: WorldSeed): Promise<WorldSeed> =>

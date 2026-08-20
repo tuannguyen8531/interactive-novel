@@ -9,6 +9,7 @@ export const useLibraryStore = defineStore('library', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const loaded = ref(false)
+  const deletingWorldId = ref<string | null>(null)
 
   async function load(): Promise<void> {
     loading.value = true
@@ -25,5 +26,21 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
-  return { worlds, playthroughs, loading, error, loaded, load }
+  async function deleteWorld(worldId: string): Promise<boolean> {
+    deletingWorldId.value = worldId
+    error.value = null
+    try {
+      await api.deleteWorld(worldId)
+      worlds.value = worlds.value.filter((world) => world.id !== worldId)
+      playthroughs.value = playthroughs.value.filter((playthrough) => playthrough.world_id !== worldId)
+      return true
+    } catch (cause) {
+      error.value = cause instanceof Error ? cause.message : String(cause)
+      return false
+    } finally {
+      deletingWorldId.value = null
+    }
+  }
+
+  return { worlds, playthroughs, loading, error, loaded, deletingWorldId, load, deleteWorld }
 })

@@ -30,6 +30,16 @@ describe('API client', () => {
     expect((fetchMock.mock.calls[0][1] as RequestInit).method).toBe('POST')
   })
 
+  it('deletes a world with the encoded resource path', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await api.deleteWorld('world/one')
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/worlds/world%2Fone')
+    expect((fetchMock.mock.calls[0][1] as RequestInit).method).toBe('DELETE')
+  })
+
   it('requests models using secret-safe target metadata', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ provider: 'ollama', models: ['llama3.2:3b'] }), {

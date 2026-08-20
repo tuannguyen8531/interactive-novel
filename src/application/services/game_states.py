@@ -177,8 +177,7 @@ def _apply_world_seed(state: GameState, seed: WorldSeed) -> None:
         )
         state.canon_facts[fact.fact_id] = fact
     opening_location_claims = {
-        (claim.subject_id, claim.predicate, claim.object_id, claim.polarity)
-        for claim in state.claims.values()
+        (claim.subject_id, claim.predicate, claim.object_id, claim.polarity) for claim in state.claims.values()
     }
     for character_id in seed.opening_scene.participants:
         signature = (character_id, "located_at", opening_location_id, "positive")

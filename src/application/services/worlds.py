@@ -54,5 +54,12 @@ class WorldApplicationService:
         async with self._uow_factory() as uow:
             return tuple(await uow.worlds.list())
 
+    async def delete_world(self, world_id: str) -> None:
+        """Delete a world and every playthrough-scoped resource it owns."""
+        async with self._uow_factory() as uow:
+            if not await uow.worlds.delete(world_id):
+                raise ResourceNotFoundError(f"World {world_id} does not exist.")
+            await uow.commit()
+
 
 __all__ = ["WorldApplicationService"]

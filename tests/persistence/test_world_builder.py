@@ -3,23 +3,28 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from sqlalchemy import func, select
 
 from src.application.contracts.ai import WorldSeed
 from src.application.contracts.persistence import CanonicalTurnBundle
+from src.application.errors import ResourceNotFoundError
 from src.application.services.canonical_turns import CanonicalTurnApplicationService
 from src.application.services.derived import DerivedJobApplicationService
 from src.application.services.game_states import GameStateApplicationService
 from src.application.services.world_drafts import WorldDraftApplicationService
+from src.application.services.worlds import WorldApplicationService
 from src.domain.codec import patch_to_payload
 from src.domain.patch import AdvanceClock, StatePatch
 from src.services.persistence.models import (
+    Base,
     BeliefModel,
     CanonFactModel,
     CharacterStateModel,
     KnowledgeClaimModel,
     NarrativeHookModel,
     RelationshipModel,
+    RetrievalTraceModel,
 )
 from src.services.persistence.uow import make_uow_factory
 
@@ -85,9 +90,7 @@ async def test_confirmed_world_builder_seed_round_trips_all_opening_artifacts(da
             .where(KnowledgeClaimModel.playthrough_id == confirmation.playthrough.id)
         )
         canon_facts = await session.scalar(
-            select(func.count())
-            .select_from(CanonFactModel)
-            .where(CanonFactModel.playthrough_id == confirmation.playthrough.id)
+            select(func.count()).select_from(CanonFactModel).where(CanonFactModel.playthrough_id == confirmation.playthrough.id)
         )
 
     assert beliefs == 1
@@ -118,10 +121,7 @@ async def test_game_state_hydrates_seed_replays_turn_and_builds_snapshot(databas
         (claim.subject_id, claim.predicate, claim.object_id)
         for claim in opening.claims.values()
         if claim.predicate == "located_at"
-    } == {
-        (character_id, "located_at", seed.locations[0].location_id)
-        for character_id in seed.opening_scene.participants
-    }
+    } == {(character_id, "located_at", seed.locations[0].location_id) for character_id in seed.opening_scene.participants}
     assert len(opening.relationships) == len(seed.initial_relationships)
     assert opening.policy is not None
     assert {event.event_type for event in opening.events.values()} == {"opening_scene"}
@@ -174,3 +174,36 @@ async def test_game_state_hydrates_seed_replays_turn_and_builds_snapshot(databas
     assert snapshot.source_turn_id == turn.id
     assert snapshot.world_clock_minutes == rebuilt.world_time
     assert len(jobs) == 3
+
+
+async def test_delete_world_removes_the_complete_confirmed_aggregate(database) -> None:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]
+    uow_factory = make_uow_factory(database)
+    confirmation = await WorldDraftApplicationService(uow_factory).confirm_world_bundle(WorldSeed.model_validate(payload))
+
+    async with database.session_factory() as session, session.begin():
+        session.add(
+            RetrievalTraceModel(
+                id="trace-delete-world",
+                query_id="query-delete-world",
+                phase="planning",
+                playthrough_id=confirmation.playthrough.id,
+                branch_id=confirmation.branch.id,
+                owner_id=None,
+                world_time=0,
+                payload={"safe": True},
+                created_at=confirmation.world.created_at,
+            )
+        )
+
+    worlds = WorldApplicationService(uow_factory)
+    await worlds.delete_world(confirmation.world.id)
+
+    async with database.session_factory() as session:
+        remaining = {
+            table.name: await session.scalar(select(func.count()).select_from(table)) for table in Base.metadata.tables.values()
+        }
+
+    assert all(count == 0 for count in remaining.values()), remaining
+    with pytest.raises(ResourceNotFoundError):
+        await worlds.delete_world(confirmation.world.id)

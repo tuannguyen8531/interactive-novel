@@ -77,6 +77,9 @@ class FakeWorlds:
     async def list(self) -> list[WorldRecord]:
         return list(self.store.worlds.values())
 
+    async def delete(self, world_id: str) -> bool:
+        return self.store.worlds.pop(world_id, None) is not None
+
 
 class FakeCharacters:
     def __init__(self, store: Store) -> None:

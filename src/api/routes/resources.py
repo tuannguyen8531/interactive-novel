@@ -67,6 +67,12 @@ async def get_world(world_id: str, services: ApplicationContainer = _services_de
     return public_json(await services.worlds.get_world(world_id))
 
 
+@router.delete("/worlds/{world_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_world(world_id: str, services: ApplicationContainer = _services_dependency) -> Response:
+    await services.worlds.delete_world(world_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/playthroughs")
 async def list_playthroughs(
     world_id: str | None = None,

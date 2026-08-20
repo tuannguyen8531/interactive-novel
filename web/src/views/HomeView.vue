@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useLibraryStore } from '@/stores/library'
 import { FIXTURE_PLAYTHROUGH_ID } from '@/fixtures/fixture'
+import type { PlaythroughRecord, WorldRecord } from '@/api/types'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -15,6 +16,17 @@ onMounted(() => {
 
 function openFixture(): void {
   void router.push({ name: 'play', params: { playthroughId: FIXTURE_PLAYTHROUGH_ID } })
+}
+
+function worldPlaythroughs(worldId: string): PlaythroughRecord[] {
+  return library.playthroughs.filter((playthrough) => playthrough.world_id === worldId)
+}
+
+async function deleteWorld(world: WorldRecord): Promise<void> {
+  const confirmed = window.confirm(
+    `Delete “${world.name}” and all of its playthroughs? This cannot be undone.`
+  )
+  if (confirmed) await library.deleteWorld(world.id)
 }
 </script>
 
@@ -64,17 +76,40 @@ function openFixture(): void {
 
     <div v-if="library.loading" class="empty-state">Loading saved worlds…</div>
     <div v-else-if="library.error" class="error-box" role="alert">{{ library.error }}</div>
-    <div v-else-if="library.playthroughs.length === 0" class="empty-state">
-      No server playthroughs yet. The fixture above is ready for a browser test.
+    <div v-else-if="library.worlds.length === 0" class="empty-state">
+      No saved worlds yet. Create one above, or open the fixture for a browser test.
     </div>
     <div v-else class="library-grid">
-      <article v-for="playthrough in library.playthroughs" :key="playthrough.id" class="card story-card">
-        <p class="eyebrow">Playthrough</p>
-        <h3>{{ library.worlds.find((world) => world.id === playthrough.world_id)?.name ?? playthrough.world_id }}</h3>
-        <p class="muted">Clock {{ playthrough.world_clock_minutes }} minutes · {{ playthrough.lifecycle }}</p>
-        <button type="button" @click="router.push({ name: 'play', params: { playthroughId: playthrough.id } })">
-          Continue
-        </button>
+      <article v-for="world in library.worlds" :key="world.id" class="card story-card">
+        <div class="story-heading">
+          <div>
+            <p class="eyebrow">World</p>
+            <h3>{{ world.name }}</h3>
+          </div>
+          <button
+            class="danger delete-world-button"
+            type="button"
+            :aria-label="`Delete ${world.name}`"
+            :disabled="library.deletingWorldId !== null"
+            @click="deleteWorld(world)"
+          >
+            {{ library.deletingWorldId === world.id ? 'Deleting…' : 'Delete world' }}
+          </button>
+        </div>
+        <p v-if="world.premise" class="world-premise">{{ world.premise }}</p>
+        <p v-if="worldPlaythroughs(world.id).length === 0" class="muted no-playthroughs">No playthroughs in this world.</p>
+        <div v-else class="playthrough-list">
+          <div v-for="playthrough in worldPlaythroughs(world.id)" :key="playthrough.id" class="playthrough-row">
+            <span class="muted">Clock {{ playthrough.world_clock_minutes }} minutes · {{ playthrough.lifecycle }}</span>
+            <button
+              class="secondary"
+              type="button"
+              @click="router.push({ name: 'play', params: { playthroughId: playthrough.id } })"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
       </article>
     </div>
   </section>
@@ -161,11 +196,46 @@ function openFixture(): void {
 }
 
 .story-card h3 {
-  margin-bottom: 0.45rem;
+  margin: 0;
 }
 
-.story-card p {
-  min-height: 2.5rem;
+.story-heading,
+.playthrough-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.delete-world-button {
+  flex: 0 0 auto;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.world-premise {
+  margin: 1rem 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.no-playthroughs {
+  margin: 1rem 0 0;
+}
+
+.playthrough-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.playthrough-row {
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+}
+
+.playthrough-row button {
+  flex: 0 0 auto;
 }
 
 @media (max-width: 700px) {
@@ -180,6 +250,12 @@ function openFixture(): void {
 
   .backend-card {
     margin-top: 1rem;
+  }
+
+  .story-heading,
+  .playthrough-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 </style>

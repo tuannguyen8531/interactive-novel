@@ -4,12 +4,38 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.contracts.persistence import CharacterRecord, PlaythroughRecord, WorldRecord
 
-from .models import CharacterModel, PlaythroughModel, WorldModel
+from .models import (
+    BeliefEvidenceModel,
+    BeliefModel,
+    BranchModel,
+    CanonFactModel,
+    CharacterModel,
+    CharacterStateModel,
+    ClaimLinkModel,
+    DerivedArtifactModel,
+    DerivedJobModel,
+    EmotionalTensionModel,
+    EventModel,
+    JobModel,
+    KnowledgeClaimModel,
+    MemoryEmbeddingModel,
+    NarrativeHookModel,
+    NarrativeThreadModel,
+    ObservationModel,
+    OutboxEventModel,
+    PlaythroughModel,
+    RelationshipChangeModel,
+    RelationshipModel,
+    RetrievalTraceModel,
+    SnapshotModel,
+    TurnModel,
+    WorldModel,
+)
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -80,6 +106,71 @@ class SqlAlchemyWorldRepository:
     async def list(self) -> list[WorldRecord]:
         result = await self._session.scalars(select(WorldModel).order_by(WorldModel.created_at, WorldModel.id))
         return [_world_record(model) for model in result.all()]
+
+    async def delete(self, world_id: str) -> bool:
+        """Delete one complete world aggregate without leaving audit rows behind."""
+        exists = await self._session.scalar(select(WorldModel.id).where(WorldModel.id == world_id))
+        if exists is None:
+            return False
+
+        playthrough_ids = tuple(
+            (await self._session.scalars(select(PlaythroughModel.id).where(PlaythroughModel.world_id == world_id))).all()
+        )
+        if playthrough_ids:
+            # Break the canonical history's intentional cycles, then delete
+            # children before parents. A direct SQLite cascade can recurse around
+            # playthrough -> branch -> turn -> branch indefinitely.
+            await self._session.execute(
+                update(PlaythroughModel)
+                .where(PlaythroughModel.id.in_(playthrough_ids))
+                .values(player_character_id=None, root_branch_id=None, active_branch_id=None)
+            )
+            await self._session.execute(
+                update(BranchModel)
+                .where(BranchModel.playthrough_id.in_(playthrough_ids))
+                .values(parent_branch_id=None, fork_turn_id=None, head_turn_id=None)
+            )
+            await self._session.execute(
+                update(TurnModel).where(TurnModel.playthrough_id.in_(playthrough_ids)).values(parent_turn_id=None)
+            )
+
+            leaf_models = (
+                BeliefEvidenceModel,
+                RelationshipChangeModel,
+                ClaimLinkModel,
+                ObservationModel,
+                CanonFactModel,
+                BeliefModel,
+                CharacterStateModel,
+                EmotionalTensionModel,
+                NarrativeHookModel,
+                NarrativeThreadModel,
+                SnapshotModel,
+                DerivedArtifactModel,
+                MemoryEmbeddingModel,
+                DerivedJobModel,
+                OutboxEventModel,
+                JobModel,
+                RetrievalTraceModel,
+            )
+            for model in leaf_models:
+                await self._session.execute(delete(model).where(model.playthrough_id.in_(playthrough_ids)))
+
+            await self._session.execute(delete(RelationshipModel).where(RelationshipModel.playthrough_id.in_(playthrough_ids)))
+            await self._session.execute(
+                delete(KnowledgeClaimModel).where(KnowledgeClaimModel.playthrough_id.in_(playthrough_ids))
+            )
+            await self._session.execute(delete(EventModel).where(EventModel.playthrough_id.in_(playthrough_ids)))
+            await self._session.execute(delete(TurnModel).where(TurnModel.playthrough_id.in_(playthrough_ids)))
+            await self._session.execute(delete(BranchModel).where(BranchModel.playthrough_id.in_(playthrough_ids)))
+            await self._session.execute(delete(PlaythroughModel).where(PlaythroughModel.id.in_(playthrough_ids)))
+
+        # Characters created during world review are world-scoped rather than
+        # playthrough-scoped, so they need an explicit aggregate cleanup.
+        await self._session.execute(delete(CharacterModel).where(CharacterModel.world_id == world_id))
+        result = await self._session.execute(delete(WorldModel).where(WorldModel.id == world_id))
+        await self._session.flush()
+        return getattr(result, "rowcount", None) == 1
 
 
 class SqlAlchemyPlaythroughRepository:
