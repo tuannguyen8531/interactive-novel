@@ -2,14 +2,14 @@ import type { CharacterView, PlaythroughRecord, TimelineEvent, TurnRecord, World
 
 export interface PlayGuidance {
   locationName: string | null
-  suggestedActions: string[]
+  sceneCues: string[]
+  suggestedActions: PlayerMoveSuggestion[]
 }
 
-const DEFAULT_ACTIONS = [
-  'Look around and take in the scene.',
-  'Introduce yourself to someone nearby.',
-  'Ask what is happening.'
-]
+export interface PlayerMoveSuggestion {
+  kind: 'Act' | 'Speak' | 'Observe' | 'Think'
+  text: string
+}
 
 export function findPlayerCharacter(
   playthrough: PlaythroughRecord | null,
@@ -26,22 +26,61 @@ export function isOpeningTurn(turn: TurnRecord): boolean {
 export function buildPlayGuidance(
   world: WorldRecord,
   player: CharacterView | null,
-  timeline: TimelineEvent[]
+  timeline: TimelineEvent[],
+  characters: CharacterView[] = []
 ): PlayGuidance {
   const openingEvent = timeline.find((event) => event.event_type === 'opening_scene')
   const seed = record(world.canon_rules.world_seed)
   const openingScene = record(openingEvent?.payload.scene_spec) ?? record(seed?.opening_scene)
-  const actions = stringList(openingScene?.visible_actions)
+  const sceneCues = stringList(openingScene?.visible_actions)
   const locationId = stringValue(player?.state?.location_id) ?? openingEvent?.location_id ?? null
   const eventLocation = record(openingEvent?.payload.location)
   const seedLocations = Array.isArray(seed?.locations) ? seed.locations.map(record).filter(isRecord) : []
   const seedLocation = seedLocations.find((location) => stringValue(location.location_id) === locationId)
   const locationName = stringValue(eventLocation?.name) ?? stringValue(seedLocation?.name) ?? locationId
+  const sceneParticipantIds = new Set([
+    ...(openingEvent?.actor_ids ?? []),
+    ...(openingEvent?.target_ids ?? []),
+    ...(openingEvent?.witness_ids ?? []),
+    ...Object.keys(record(openingScene?.participants) ?? {})
+  ])
+  const otherCharacter =
+    characters.find((character) => character.id !== player?.id && sceneParticipantIds.has(character.id)) ??
+    characters.find((character) => character.id !== player?.id) ??
+    null
 
   return {
     locationName,
-    suggestedActions: [...new Set(actions.length ? actions : DEFAULT_ACTIONS)].slice(0, 4)
+    sceneCues: [...new Set(sceneCues)].slice(0, 4),
+    suggestedActions: playerMoveSuggestions(locationName, otherCharacter?.display_name ?? null)
   }
+}
+
+function playerMoveSuggestions(locationName: string | null, otherCharacterName: string | null): PlayerMoveSuggestion[] {
+  return [
+    {
+      kind: 'Act',
+      text: otherCharacterName
+        ? `I walk over to ${otherCharacterName} and offer to help.`
+        : 'I step forward and investigate what is happening.'
+    },
+    {
+      kind: 'Speak',
+      text: otherCharacterName
+        ? `“What should we do next?” I ask ${otherCharacterName}.`
+        : '“Is anyone here?” I call out.'
+    },
+    {
+      kind: 'Observe',
+      text: locationName
+        ? `I take a moment to look around ${locationName} for anything important.`
+        : 'I take a moment to look around for anything important.'
+    },
+    {
+      kind: 'Think',
+      text: 'I pause and think about what just happened before deciding what to do.'
+    }
+  ]
 }
 
 function record(value: unknown): Record<string, unknown> | null {

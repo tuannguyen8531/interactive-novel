@@ -12,7 +12,7 @@ describe('play guidance', () => {
 
   it('extracts the opening location and suggested actions from canonical event data', () => {
     const world = { canon_rules: {} } as WorldRecord
-    const player = { state: { location_id: 'library' } } as unknown as CharacterView
+    const player = { id: 'hero', state: { location_id: 'library' } } as unknown as CharacterView
     const timeline = [
       {
         event_type: 'opening_scene',
@@ -24,10 +24,32 @@ describe('play guidance', () => {
       } as unknown as TimelineEvent
     ]
 
-    expect(buildPlayGuidance(world, player, timeline)).toEqual({
+    const characters = [
+      { id: 'hero', display_name: 'Mina' },
+      { id: 'alice', display_name: 'Alice' }
+    ] as CharacterView[]
+    timeline[0].actor_ids = ['hero', 'alice']
+
+    expect(buildPlayGuidance(world, player, timeline, characters)).toEqual({
       locationName: 'Moonlit Library',
-      suggestedActions: ['Enter the library', 'Greet Alice']
+      sceneCues: ['Enter the library', 'Greet Alice'],
+      suggestedActions: [
+        { kind: 'Act', text: 'I walk over to Alice and offer to help.' },
+        { kind: 'Speak', text: '“What should we do next?” I ask Alice.' },
+        { kind: 'Observe', text: 'I take a moment to look around Moonlit Library for anything important.' },
+        { kind: 'Think', text: 'I pause and think about what just happened before deciding what to do.' }
+      ]
     })
+  })
+
+  it('returns editable move examples even when the scene has no NPC or location', () => {
+    const world = { canon_rules: {} } as WorldRecord
+
+    const result = buildPlayGuidance(world, null, [])
+
+    expect(result.sceneCues).toEqual([])
+    expect(result.suggestedActions.map((suggestion) => suggestion.kind)).toEqual(['Act', 'Speak', 'Observe', 'Think'])
+    expect(result.suggestedActions[0].text).toContain('investigate')
   })
 
   it('recognizes builder setup as an opening scene rather than a player move', () => {

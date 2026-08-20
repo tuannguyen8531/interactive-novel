@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBranchStore } from '@/stores/branch'
 import { useCharacterStore } from '@/stores/character'
@@ -16,6 +16,7 @@ const characters = useCharacterStore()
 const jobs = useTurnJobStore()
 const debug = useDebugStore()
 const input = ref('')
+const actionInput = ref<HTMLTextAreaElement | null>(null)
 const selectedForkTurnId = ref<string | null>(null)
 const openCharacterId = ref<string | null>(null)
 const loadingRoute = ref(false)
@@ -28,14 +29,15 @@ const canFork = computed(() => selectedForkTurnId.value !== null && !jobs.active
 const selectedCharacter = computed(() => characters.selected)
 const guidance = computed(() =>
   playthrough.world
-    ? buildPlayGuidance(playthrough.world, playerCharacter.value, playthrough.timeline)
-    : { locationName: null, suggestedActions: [] }
+    ? buildPlayGuidance(playthrough.world, playerCharacter.value, playthrough.timeline, playthrough.characters)
+    : { locationName: null, sceneCues: [], suggestedActions: [] }
 )
 const isFirstMove = computed(() => playerTurns.value.length === 0)
 const actionPlaceholder = computed(() =>
-  playerCharacter.value
-    ? `What does ${playerCharacter.value.display_name} do, say or notice?`
-    : 'Describe what you do, say or notice…'
+  guidance.value.suggestedActions[0]?.text ??
+    (playerCharacter.value
+      ? `Describe what ${playerCharacter.value.display_name} tries to do…`
+      : 'Describe what you try to do…')
 )
 
 function canForkFromTurn(turnBranchId: string): boolean {
@@ -119,8 +121,11 @@ function narrative(turn: { final_narrative: string | null }): string {
   return turn.final_narrative ?? 'The turn finished without a final narrative.'
 }
 
-function chooseSuggestedAction(action: string): void {
+async function chooseSuggestedAction(action: string): Promise<void> {
   input.value = action
+  await nextTick()
+  actionInput.value?.focus()
+  actionInput.value?.setSelectionRange(action.length, action.length)
 }
 
 function profileText(key: string): string | null {
@@ -188,18 +193,10 @@ function playerTurnNumber(index: number): number {
             <p>
               You control {{ playerCharacter.display_name }}. Write what they do, say, ask or notice—the story will respond.
             </p>
-            <template v-if="isFirstMove && guidance.suggestedActions.length">
-              <p class="suggestion-label">Try one of these, or write anything:</p>
-              <div class="suggestion-list">
-                <button
-                  v-for="action in guidance.suggestedActions"
-                  :key="action"
-                  class="suggestion-chip"
-                  type="button"
-                  @click="chooseSuggestedAction(action)"
-                >
-                  {{ action }}
-                </button>
+            <template v-if="isFirstMove && guidance.sceneCues.length">
+              <p class="suggestion-label">What is happening in the opening scene:</p>
+              <div class="scene-cue-list">
+                <span v-for="cue in guidance.sceneCues" :key="cue">{{ cue }}</span>
               </div>
             </template>
           </div>
@@ -245,22 +242,49 @@ function playerTurnNumber(index: number): number {
         <section class="panel action-panel">
           <div class="action-heading">
             <div>
-              <p class="eyebrow">Free action</p>
-              <h2>{{ playerCharacter ? `${playerCharacter.display_name}’s move` : 'Your move' }}</h2>
+              <p class="eyebrow">Your move</p>
+              <h2>
+                {{ playerCharacter ? `What does ${playerCharacter.display_name} do next?` : 'What do you do next?' }}
+              </h2>
             </div>
             <button v-if="jobs.active" class="danger" type="button" @click="jobs.cancel()">Cancel</button>
           </div>
+          <p id="player-move-help" class="move-help">
+            Write naturally—no command syntax is required. Describe what your character tries to do, say, ask, notice or
+            think. The story decides how the world and other characters respond.
+          </p>
+          <div class="move-example-heading">
+            <strong>Need an idea?</strong>
+            <span>Choose an example, then edit it however you like.</span>
+          </div>
+          <div class="move-example-grid" aria-label="Player move examples">
+            <button
+              v-for="suggestion in guidance.suggestedActions"
+              :key="suggestion.kind"
+              class="move-example"
+              type="button"
+              :disabled="jobs.active"
+              @click="chooseSuggestedAction(suggestion.text)"
+            >
+              <span>{{ suggestion.kind }}</span>
+              <small>{{ suggestion.text }}</small>
+            </button>
+          </div>
+          <label class="move-label" for="player-move">Write your move</label>
           <textarea
+            id="player-move"
+            ref="actionInput"
             v-model="input"
             :disabled="jobs.active"
-            rows="3"
+            rows="4"
             maxlength="20000"
             :placeholder="actionPlaceholder"
+            aria-describedby="player-move-help"
             @keydown.ctrl.enter.prevent="submit"
           />
           <div class="action-footer">
             <span class="muted">Ctrl + Enter to send · {{ input.length }}/20,000</span>
-            <button type="button" :disabled="jobs.active || !input.trim()" @click="submit">Send action</button>
+            <button type="button" :disabled="jobs.active || !input.trim()" @click="submit">Continue story</button>
           </div>
           <div v-if="jobs.loading || jobs.current" class="job-status" aria-live="polite">
             <div class="job-status-line">
@@ -456,8 +480,7 @@ function playerTurnNumber(index: number): number {
   line-height: 1.55;
 }
 
-.trait-list,
-.suggestion-list {
+.trait-list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
@@ -477,18 +500,24 @@ function playerTurnNumber(index: number): number {
   font-weight: 700;
 }
 
-.suggestion-chip {
-  border: 1px solid #c99878;
-  padding: 0.45rem 0.65rem;
-  background: #fff9;
-  color: var(--accent-dark);
-  font-size: 0.78rem;
-  text-align: left;
+.scene-cue-list {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
 }
 
-.suggestion-chip:hover:not(:disabled) {
-  background: #fff;
+.scene-cue-list span {
+  position: relative;
+  padding-left: 1rem;
   color: var(--accent-dark);
+  font-size: 0.82rem;
+}
+
+.scene-cue-list span::before {
+  position: absolute;
+  left: 0;
+  content: '•';
+  color: var(--accent);
 }
 
 .transcript-heading {
@@ -567,10 +596,73 @@ function playerTurnNumber(index: number): number {
   transform: none;
 }
 
+.move-help {
+  max-width: 52rem;
+  margin: 0.65rem 0 1rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.move-example-heading {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin-bottom: 0.55rem;
+  font-size: 0.82rem;
+}
+
+.move-example-heading span {
+  color: var(--muted);
+}
+
+.move-example-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.move-example {
+  display: grid;
+  grid-template-columns: 3.8rem minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: start;
+  border: 1px solid var(--line);
+  background: #fffaf4;
+  color: var(--ink);
+  text-align: left;
+}
+
+.move-example:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  transform: none;
+}
+
+.move-example span {
+  color: var(--accent-dark);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.move-example small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.move-label {
+  display: block;
+  margin-top: 1rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
 .action-panel textarea {
   width: 100%;
   resize: vertical;
-  margin: 1rem 0 0.65rem;
+  margin: 0.4rem 0 0.65rem;
   padding: 0.85rem;
   border: 1px solid var(--line);
   border-radius: 0.65rem;
@@ -757,6 +849,14 @@ function playerTurnNumber(index: number): number {
 
   .character-panel {
     margin-top: 1rem;
+  }
+
+  .move-example-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .move-example-heading {
+    display: grid;
   }
 }
 </style>
