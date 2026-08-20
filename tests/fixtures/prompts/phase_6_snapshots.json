@@ -1,9 +1,9 @@
 {
   "world_builder": {
-    "semantic_version": "1.0.1",
+    "semantic_version": "1.1.0",
     "input_contract": "role-input-1",
     "output_schema_version": "world-seed-1",
-    "template_hash": "a23f1bfe21db3e59b71cb486a72f25060712bbfe4f109c57fd2226e3571febcd"
+    "template_hash": "a4ec49ac90ca65e48ac8b5d1af9035d966471062dfea13d527f74ac38df33880"
   },
   "planner": {
     "semantic_version": "1.0.0",

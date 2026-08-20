@@ -359,7 +359,11 @@ class BaseProvider(ABC):
                 system_prompt=(
                     "Return only valid JSON matching the requested schema. Do not include Markdown fences or commentary."
                 ),
-                user_prompt=(f"Repair this invalid structured response for schema {schema.name}:\n{response.text}"),
+                user_prompt=(
+                    f"Repair this invalid structured response for schema {schema.name}.\n\n"
+                    f"Validation failure:\n{self._repair_diagnostic(first_error)}\n\n"
+                    f"Invalid output:\n{response.text}"
+                ),
                 repair_attempt=1,
             )
             repaired_response = await self.generate_text(repair_request)
@@ -554,6 +558,13 @@ class BaseProvider(ABC):
                 }
             )
         return metadata
+
+    @staticmethod
+    def _repair_diagnostic(error: StructuredOutputError) -> str:
+        cause: BaseException = error
+        while cause.__cause__ is not None:
+            cause = cause.__cause__
+        return redact_secret(str(cause), max_length=4_000) or str(error)
 
     @staticmethod
     def _inferred_call_type(url: str) -> str:

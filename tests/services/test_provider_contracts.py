@@ -117,6 +117,65 @@ async def test_provider_call_writes_full_correlated_request_and_response_logs(tm
     assert response_entry["response"]["message"]["content"] == "hello"
 
 
+async def test_ollama_cloud_inlines_schema_and_uses_prompt_driven_json_mode() -> None:
+    captured: dict[str, Any] = {}
+    schema = StructuredSchema(
+        name="fixture_output",
+        json_schema={
+            "type": "object",
+            "properties": {"ok": {"type": "boolean"}},
+            "required": ["ok"],
+            "additionalProperties": False,
+        },
+        validator=lambda payload: payload,
+    )
+    target = ProviderTarget(
+        name="cloud",
+        provider="ollama",
+        model="gemma4:31b-cloud",
+        base_url="http://provider.test/api",
+        max_retries=0,
+    )
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(200, json=_text_payload("ollama", '{"ok": true}'))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await OllamaProvider(target, client=client).generate_structured(
+            _request(structured=schema),
+            schema,
+        )
+
+    assert result.data == {"ok": True}
+    assert captured["format"] == "json"
+    assert captured["think"] is False
+    assert captured["options"]["temperature"] == 0.0
+    cloud_prompt = captured["messages"][1]["content"]
+    assert "Required response JSON Schema" in cloud_prompt
+    assert '"required":["ok"]' in cloud_prompt
+
+
+async def test_ollama_local_keeps_native_json_schema_constraint() -> None:
+    captured: dict[str, Any] = {}
+    schema = StructuredSchema(
+        name="fixture_output",
+        json_schema={"type": "object", "properties": {"ok": {"type": "boolean"}}},
+        validator=lambda payload: payload,
+    )
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(200, json=_text_payload("ollama", '{"ok": true}'))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        await _provider("ollama", client).generate_structured(_request(structured=schema), schema)
+
+    assert captured["format"] == schema.json_schema
+    assert captured["messages"][1]["content"] == "Return a small answer."
+    assert captured["options"]["temperature"] == 0.0
+
+
 @pytest.mark.parametrize("provider", [name for name, _ in PROVIDERS])
 async def test_all_adapters_parse_and_repair_structured_output(provider: str) -> None:
     calls = 0

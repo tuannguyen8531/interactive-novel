@@ -51,11 +51,15 @@ class OllamaProvider(BaseProvider):
         )
 
     def _chat_payload(self, request: ProviderRequest, *, stream: bool) -> dict[str, Any]:
+        model = request.model or self.model
+        user_prompt = request.user_prompt
+        if request.structured_schema is not None and _is_cloud_model(model):
+            user_prompt = _with_inline_json_schema(user_prompt, request.structured_schema.json_schema)
         payload: dict[str, Any] = {
-            "model": request.model or self.model,
+            "model": model,
             "messages": [
                 {"role": "system", "content": request.system_prompt},
-                {"role": "user", "content": request.user_prompt},
+                {"role": "user", "content": user_prompt},
             ],
             "stream": stream,
         }
@@ -64,10 +68,12 @@ class OllamaProvider(BaseProvider):
             options["temperature"] = request.temperature
         if request.max_output_tokens is not None:
             options["num_predict"] = request.max_output_tokens
+        if request.structured_schema is not None:
+            options["temperature"] = 0.0
         if options:
             payload["options"] = options
         if request.structured_schema is not None:
-            payload["format"] = dict(request.structured_schema.json_schema) or "json"
+            payload["format"] = "json" if _is_cloud_model(model) else dict(request.structured_schema.json_schema) or "json"
             payload["think"] = False
         return payload
 
@@ -205,6 +211,23 @@ class OllamaProvider(BaseProvider):
 
 def _int(value: Any) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _is_cloud_model(model: str) -> bool:
+    normalized = model.strip().lower()
+    return normalized.endswith(":cloud") or normalized.endswith("-cloud")
+
+
+def _with_inline_json_schema(prompt: str, schema: Mapping[str, Any]) -> str:
+    """Ground cloud models with the schema that Ollama Cloud cannot enforce."""
+
+    serialized = json.dumps(dict(schema), ensure_ascii=False, separators=(",", ":"))
+    return (
+        f"{prompt.rstrip()}\n\n"
+        "Required response JSON Schema (follow every required field and nested definition):\n"
+        f"{serialized}\n\n"
+        "Return one JSON object only. Do not add fields absent from the schema."
+    )
 
 
 __all__ = ["OllamaProvider"]

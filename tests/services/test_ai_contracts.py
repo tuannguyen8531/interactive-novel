@@ -109,6 +109,25 @@ def test_structured_schema_returns_typed_model() -> None:
     assert result.role == AIPromptRole.PLANNER
 
 
+def test_registered_claim_predicates_are_exposed_in_provider_json_schema() -> None:
+    schema = AIContractRegistry().structured_schema(AIPromptRole.WORLD_BUILDER).json_schema
+
+    predicate = schema["$defs"]["KnowledgeClaimProposal"]["properties"]["predicate"]
+
+    assert predicate["enum"] == [
+        "located_at",
+        "age_is",
+        "romantic_interest",
+        "commitment_status",
+        "goal_active",
+        "secret_exists",
+        "item_held",
+        "physical_condition",
+        "public_fact",
+        "event_participation",
+    ]
+
+
 def test_world_seed_schema_normalizes_one_provider_envelope_with_authoritative_trace_metadata() -> None:
     payload = copy.deepcopy(_fixtures()["world_builder"])
     world_seed = {

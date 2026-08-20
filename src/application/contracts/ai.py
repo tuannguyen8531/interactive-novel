@@ -112,6 +112,18 @@ REGISTERED_PREDICATES = frozenset(
         "event_participation",
     }
 )
+RegisteredPredicate = Literal[
+    "located_at",
+    "age_is",
+    "romantic_interest",
+    "commitment_status",
+    "goal_active",
+    "secret_exists",
+    "item_held",
+    "physical_condition",
+    "public_fact",
+    "event_participation",
+]
 
 
 class AIModel(BaseModel):
@@ -264,7 +276,7 @@ class KnowledgeClaimProposal(AIModel):
     source_run_id: str = Field(min_length=1)
     claim_type: Literal["knowledge_claim"] = "knowledge_claim"
     subject_id: str = Field(min_length=1)
-    predicate: str = Field(min_length=1)
+    predicate: RegisteredPredicate
     object_id: str | None = Field(default=None, min_length=1)
     typed_value: Any = None
     polarity: ClaimPolarity = ClaimPolarity.POSITIVE
@@ -317,7 +329,7 @@ class KnowledgeRequirement(AIModel):
     requirement_id: str = Field(min_length=1)
     actor_id: str = Field(min_length=1)
     subject_id: str = Field(min_length=1)
-    predicate: str = Field(min_length=1)
+    predicate: RegisteredPredicate
     object_id: str | None = Field(default=None, min_length=1)
     typed_value: Any = None
     purpose: str = Field(min_length=1)

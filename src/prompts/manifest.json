@@ -1,11 +1,11 @@
 {
   "world_builder": {
     "template": "world_builder.md",
-    "semantic_version": "1.0.1",
+    "semantic_version": "1.1.0",
     "input_contract": "role-input-1",
     "output_schema_version": "world-seed-1",
     "required_variables": ["input_json"],
-    "changelog": "Require a flat WorldSeed object and reject provider-added envelopes beyond one normalized wrapper."
+    "changelog": "Add a complete minimal WorldSeed example for providers without enforced JSON Schema support."
   },
   "planner": {
     "template": "planner.md",
