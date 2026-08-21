@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, or_, select, update
@@ -66,7 +67,7 @@ def _playthrough_record(model: PlaythroughModel) -> PlaythroughRecord:
         provider_config_snapshot=dict(model.provider_config_snapshot),
         world_clock_minutes=model.world_clock_minutes,
         rng_seed=model.rng_seed,
-        rng_state=dict(model.rng_state),
+        rng_state=deepcopy(model.rng_state),
         active_branch_id=model.active_branch_id,
         lifecycle=model.lifecycle,
         schema_version=model.schema_version,
@@ -189,7 +190,7 @@ class SqlAlchemyPlaythroughRepository:
                 provider_config_snapshot=dict(playthrough.provider_config_snapshot),
                 world_clock_minutes=playthrough.world_clock_minutes,
                 rng_seed=playthrough.rng_seed,
-                rng_state=dict(playthrough.rng_state),
+                rng_state=deepcopy(playthrough.rng_state),
                 active_branch_id=playthrough.active_branch_id,
                 lifecycle=playthrough.lifecycle,
                 schema_version=playthrough.schema_version,

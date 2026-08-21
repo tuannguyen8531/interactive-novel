@@ -9,10 +9,13 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
+
+type JSONValue = None | bool | int | float | str | list[JSONValue] | dict[str, JSONValue]
 
 
 class PersistenceError(RuntimeError):
@@ -136,7 +139,7 @@ class PlaythroughRecord:
     provider_config_snapshot: dict[str, Any]
     world_clock_minutes: int
     rng_seed: str
-    rng_state: dict[str, Any]
+    rng_state: JSONValue
     active_branch_id: str | None = None
     lifecycle: str = "active"
     schema_version: int = 1
@@ -153,7 +156,7 @@ class PlaythroughRecord:
         provider_config_snapshot: dict[str, Any] | None = None,
         world_clock_minutes: int = 0,
         rng_seed: str | None = None,
-        rng_state: dict[str, Any] | None = None,
+        rng_state: JSONValue | None = None,
         active_branch_id: str | None = None,
         playthrough_id: str | None = None,
     ) -> PlaythroughRecord:
@@ -168,7 +171,7 @@ class PlaythroughRecord:
             provider_config_snapshot=dict(provider_config_snapshot or {}),
             world_clock_minutes=world_clock_minutes,
             rng_seed=rng_seed or str(uuid4()),
-            rng_state=dict(rng_state or {}),
+            rng_state=deepcopy(rng_state) if rng_state is not None else {},
             active_branch_id=active_branch_id,
             created_at=now,
             updated_at=now,
@@ -431,7 +434,7 @@ class CanonicalTurnBundle:
     turn_run_id: str
     final_narrative: str
     approved_patch: dict[str, Any]
-    rng_state: dict[str, Any] | None = None
+    rng_state: JSONValue | None = None
     turn_id: str = field(default_factory=lambda: str(uuid4()))
     parent_turn_id: str | None = None
     normalized_input: str | None = None
@@ -466,7 +469,7 @@ class SnapshotRecord:
     source_turn_id: str | None
     source_revision: int
     world_clock_minutes: int
-    rng_state: dict[str, Any]
+    rng_state: JSONValue
     state_payload: dict[str, Any]
     checksum: str
     builder_version: str = "canonical-builder"
@@ -483,7 +486,7 @@ class SnapshotRecord:
         source_turn_id: str | None,
         source_revision: int,
         world_clock_minutes: int,
-        rng_state: dict[str, Any],
+        rng_state: JSONValue,
         state_payload: dict[str, Any],
         builder_version: str = "canonical-builder",
     ) -> SnapshotRecord:
@@ -493,7 +496,7 @@ class SnapshotRecord:
             source_turn_id=source_turn_id,
             source_revision=source_revision,
             world_clock_minutes=world_clock_minutes,
-            rng_state=dict(rng_state),
+            rng_state=deepcopy(rng_state),
             state_payload=dict(state_payload),
             checksum=snapshot_checksum(state_payload),
             builder_version=builder_version,
@@ -598,6 +601,7 @@ class OutboxEventRecord:
 
 
 __all__ = [
+    "JSONValue",
     "BeliefEvidenceRecord",
     "BeliefRecord",
     "BranchRecord",

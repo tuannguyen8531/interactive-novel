@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from copy import deepcopy
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -124,7 +125,7 @@ def _snapshot_record(model: SnapshotModel) -> SnapshotRecord:
         source_turn_id=model.source_turn_id,
         source_revision=model.source_revision,
         world_clock_minutes=model.world_clock_minutes,
-        rng_state=dict(model.rng_state),
+        rng_state=deepcopy(model.rng_state),
         state_payload=dict(model.state_payload),
         checksum=model.checksum,
         builder_version=model.builder_version,
@@ -391,7 +392,7 @@ class SqlAlchemyCanonicalRepository:
             .where(PlaythroughModel.id == bundle.playthrough_id)
             .values(
                 world_clock_minutes=bundle.world_time_end,
-                **({"rng_state": dict(bundle.rng_state)} if bundle.rng_state is not None else {}),
+                **({"rng_state": deepcopy(bundle.rng_state)} if bundle.rng_state is not None else {}),
                 updated_at=utc_now(),
             )
         )
@@ -800,7 +801,7 @@ class SqlAlchemyCanonicalRepository:
                 source_turn_id=snapshot.source_turn_id,
                 source_revision=snapshot.source_revision,
                 world_clock_minutes=snapshot.world_clock_minutes,
-                rng_state=dict(snapshot.rng_state),
+                rng_state=deepcopy(snapshot.rng_state),
                 state_payload=dict(snapshot.state_payload),
                 checksum=snapshot.checksum,
                 builder_version=snapshot.builder_version,

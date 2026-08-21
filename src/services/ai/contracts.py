@@ -152,9 +152,20 @@ class AIContractRegistry:
                     fallback_eligible=True,
                 ) from error
 
+        json_schema = model.model_json_schema()
+        schema_version_schema = json_schema.get("properties", {}).get("schema_version")
+        if isinstance(schema_version_schema, dict):
+            # Keep the provider-facing schema explicit. Pydantic may emit a
+            # single-value Literal as `const`, while provider JSON Schema
+            # support is more portable when the constraint is represented as
+            # a one-item enum.
+            schema_version_schema.pop("const", None)
+            schema_version_schema.pop("default", None)
+            schema_version_schema["enum"] = [model.expected_schema_version]
+
         return StructuredSchema(
             name=f"{normalized.value}_output",
-            json_schema=model.model_json_schema(),
+            json_schema=json_schema,
             validator=validate,
         )
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import asdict
 from typing import Any
 
@@ -251,6 +252,7 @@ def build_canonical_bundle(state: TurnGraphState, game_state: GameState) -> Cano
     if not narrative:
         raise ValueError("final_narrative is required before canonical record construction")
     draft = state.get("draft")
+    rng_state = after.metadata.get("rng_state")
     suggested_actions = (
         tuple(item.model_dump(mode="json") for item in draft.suggested_actions) if isinstance(draft, NarrativeDraft) else ()
     )
@@ -268,7 +270,7 @@ def build_canonical_bundle(state: TurnGraphState, game_state: GameState) -> Cano
         turn_id=turn_id,
         final_narrative=narrative,
         approved_patch=patch_payload,
-        rng_state=dict(after.metadata.get("rng_state", {})) if after.metadata.get("rng_state") else None,
+        rng_state=deepcopy(rng_state) if rng_state is not None else None,
         suggested_actions=suggested_actions,
         character_states=character_states,
         events=events,

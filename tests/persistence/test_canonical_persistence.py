@@ -16,6 +16,7 @@ from src.application.contracts.persistence import (
     ClaimLinkRecord,
     EmotionalTensionRecord,
     EventRecord,
+    JSONValue,
     KnowledgeClaimRecord,
     NarrativeHookRecord,
     NarrativeThreadRecord,
@@ -134,6 +135,7 @@ def _bundle(
     parent_turn_id: str | None = None,
     event_ids: Iterable[str] = (),
     full_artifacts: bool = False,
+    rng_state: JSONValue | None = None,
 ) -> CanonicalTurnBundle:
     world_time_end = world_time_start + duration
     event_records = tuple(
@@ -363,6 +365,7 @@ def _bundle(
             base_world_time=world_time_start,
             duration=duration,
         ),
+        rng_state=rng_state,
         turn_id=turn_id,
         parent_turn_id=parent_turn_id,
         character_states=character_states,
@@ -393,6 +396,7 @@ async def test_canonical_commit_writes_all_artifacts_and_is_idempotent(database:
         world_time_start=0,
         event_ids=("event-full",),
         full_artifacts=True,
+        rng_state=[3, [1, 2, 3], None],
     )
 
     committed = await service.commit_turn(bundle)
@@ -413,6 +417,9 @@ async def test_canonical_commit_writes_all_artifacts_and_is_idempotent(database:
         jobs = await uow.canonical.list_derived_jobs()
         assert {job.job_type for job in jobs} == {"snapshot", "summary", "embedding"}
         assert await uow.canonical.reconcile_derived_jobs() == 0
+        playthrough = await uow.playthroughs.get(playthrough_id)
+        assert playthrough is not None
+        assert playthrough.rng_state == [3, [1, 2, 3], None]
 
     async with database.session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(TurnModel)) == 1
@@ -714,10 +721,14 @@ async def test_replay_snapshot_fallback_and_derived_failure_leave_canon_intact(d
         source_turn_id=turn.id,
         source_revision=1,
         world_clock_minutes=rebuilt.world_time,
-        rng_state={"position": 1},
+        rng_state=[3, [1, 2, 3], None],
         state_payload=state_to_payload(rebuilt),
     )
     await turns.save_snapshot(snapshot)
+    async with uow_factory() as uow:
+        loaded_snapshot = await uow.canonical.load_latest_snapshot(root.id)
+    assert loaded_snapshot is not None
+    assert loaded_snapshot.rng_state == [3, [1, 2, 3], None]
     from_snapshot = await replay.replay_branch(branch_id=root.id, initial_state=initial)
     assert from_snapshot.world_time == 1
 

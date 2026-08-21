@@ -29,7 +29,7 @@ async def test_world_and_playthrough_application_services_round_trip(database: D
         provider_config_snapshot={"mode": "fake"},
         world_clock_minutes=12,
         rng_seed="fixture-seed",
-        rng_state={"position": 0},
+        rng_state=[3, [1, 2, 3], None],
     )
 
     assert await worlds.load_world(world.id) == world

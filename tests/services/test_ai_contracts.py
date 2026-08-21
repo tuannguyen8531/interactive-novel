@@ -109,6 +109,25 @@ def test_structured_schema_returns_typed_model() -> None:
     assert result.role == AIPromptRole.PLANNER
 
 
+@pytest.mark.parametrize("role", tuple(AIPromptRole))
+def test_provider_schema_pins_each_role_schema_version(role: AIPromptRole) -> None:
+    registry = AIContractRegistry()
+    schema = registry.structured_schema(role).json_schema
+
+    schema_version = schema["properties"]["schema_version"]
+    assert schema_version["enum"] == [registry.model_for(role).expected_schema_version]
+    assert "const" not in schema_version
+
+
+@pytest.mark.parametrize("role", tuple(AIPromptRole))
+def test_role_model_rejects_wrong_schema_version(role: AIPromptRole) -> None:
+    payload = copy.deepcopy(_fixtures()[role.value])
+    payload["schema_version"] = f"{payload['schema_version']}-v1"
+
+    with pytest.raises(ValidationError, match="expected schema version"):
+        AIContractRegistry().model_for(role).model_validate(payload)
+
+
 def test_registered_claim_predicates_are_exposed_in_provider_json_schema() -> None:
     schema = AIContractRegistry().structured_schema(AIPromptRole.WORLD_BUILDER).json_schema
 

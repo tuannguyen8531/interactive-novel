@@ -176,6 +176,34 @@ async def test_ollama_local_keeps_native_json_schema_constraint() -> None:
     assert captured["options"]["temperature"] == 0.0
 
 
+async def test_gemini_structured_output_uses_json_schema_field() -> None:
+    captured: dict[str, Any] = {}
+    schema = StructuredSchema(
+        name="fixture_output",
+        json_schema={
+            "$defs": {"item": {"type": "object", "properties": {"name": {"type": "string"}}}},
+            "type": "object",
+            "properties": {"item": {"$ref": "#/$defs/item"}},
+            "required": ["item"],
+            "additionalProperties": False,
+        },
+        validator=lambda payload: payload,
+    )
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(200, json=_text_payload("gemini", '{"item": {"name": "fixture"}}'))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await _provider("gemini", client).generate_structured(_request(structured=schema), schema)
+
+    generation_config = captured["generationConfig"]
+    assert result.data == {"item": {"name": "fixture"}}
+    assert generation_config["responseMimeType"] == "application/json"
+    assert generation_config["responseJsonSchema"] == schema.json_schema
+    assert "responseSchema" not in generation_config
+
+
 @pytest.mark.parametrize("provider", [name for name, _ in PROVIDERS])
 async def test_all_adapters_parse_and_repair_structured_output(provider: str) -> None:
     calls = 0

@@ -29,7 +29,7 @@ from .memory import (
     RetrievalEvaluationDashboard,
     ThreadHealth,
 )
-from .persistence import CharacterRecord, PlaythroughRecord, WorldRecord
+from .persistence import CharacterRecord, JSONValue, PlaythroughRecord, WorldRecord
 from .providers import ProviderRequest, ProviderRoutingConfig, ProviderTarget
 from .retrieval import (
     PUBLIC_OWNER,
@@ -73,6 +73,7 @@ __all__ = [
     "InitialContextRequest",
     "HookPriority",
     "IntegrityReport",
+    "JSONValue",
     "KnowledgeClaimProposal",
     "KnowledgeRequirement",
     "LLMRunTrace",

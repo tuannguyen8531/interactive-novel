@@ -7,6 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.application.contracts.ai import WorldSeed
+from src.application.contracts.persistence import JSONValue
 
 
 class HealthResponse(BaseModel):
@@ -65,7 +66,7 @@ class PlaythroughCreateRequest(BaseModel):
     provider_config_snapshot: dict[str, Any] = Field(default_factory=dict)
     world_clock_minutes: int = Field(default=0, ge=0)
     rng_seed: str | None = Field(default=None, max_length=160)
-    rng_state: dict[str, Any] = Field(default_factory=dict)
+    rng_state: JSONValue = Field(default_factory=dict)
 
 
 class RootBranchRequest(BaseModel):

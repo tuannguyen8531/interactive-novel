@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.application.contracts.persistence import PlaythroughRecord
+from src.application.contracts.persistence import JSONValue, PlaythroughRecord
 from src.application.errors import ResourceNotFoundError
 from src.application.ports.persistence import UowFactory
 
@@ -24,7 +24,7 @@ class PlaythroughApplicationService:
         provider_config_snapshot: dict[str, Any] | None = None,
         world_clock_minutes: int = 0,
         rng_seed: str | None = None,
-        rng_state: dict[str, Any] | None = None,
+        rng_state: JSONValue | None = None,
     ) -> PlaythroughRecord:
         playthrough = PlaythroughRecord.new(
             world_id=world_id,

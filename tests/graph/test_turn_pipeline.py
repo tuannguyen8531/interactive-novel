@@ -253,6 +253,22 @@ async def test_fake_pipeline_commits_one_canonical_turn() -> None:
 
 
 @pytest.mark.asyncio
+async def test_pipeline_commits_json_rng_state_without_treating_it_as_a_mapping() -> None:
+    state = make_game_state()
+    state.metadata["rng_seed"] = "stable-seed"
+    state.metadata["rng_state"] = {}
+    committer = FakeCommitter()
+
+    result = await make_pipeline(FakeProvider(), committer).run(make_request(state, "rng-state-run"))
+
+    assert result["status"] == "completed"
+    assert len(committer.bundles) == 1
+    rng_state = committer.bundles[0].rng_state
+    assert isinstance(rng_state, list)
+    assert isinstance(rng_state[0], int)
+
+
+@pytest.mark.asyncio
 async def test_pipeline_uses_stored_embeddings_and_records_retrieval_trace() -> None:
     provider = FakeProvider()
     candidate_source = CandidateSource()

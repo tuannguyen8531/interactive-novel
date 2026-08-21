@@ -336,6 +336,11 @@ function cancel(): void {
   align-items: start;
 }
 
+.review-main {
+  display: grid;
+  gap: 1rem;
+}
+
 .builder-card,
 .guidance-card,
 .review-main > .card {

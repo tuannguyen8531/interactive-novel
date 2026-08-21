@@ -10,7 +10,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Any, ClassVar, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class AIPromptRole(StrEnum):
@@ -145,8 +145,15 @@ class VersionedOutput(AIModel):
     prompt_version: str = Field(min_length=1)
     physical_call_id: str | None = Field(default=None, min_length=1)
     config_snapshot_id: str | None = Field(default=None, min_length=1)
-    expected_schema_version: ClassVar[str]
+    expected_schema_version: ClassVar[str] = ""
     expected_role: ClassVar[AIPromptRole]
+
+    @field_validator("schema_version")
+    @classmethod
+    def schema_version_matches_contract(cls, value: str) -> str:
+        if value != cls.expected_schema_version:
+            raise ValueError(f"expected schema version {cls.expected_schema_version!r}, received {value!r}")
+        return value
 
 
 class TokenUsageSnapshot(AIModel):

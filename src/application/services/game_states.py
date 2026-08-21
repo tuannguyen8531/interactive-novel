@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from copy import deepcopy
 from typing import Any
 
 from src.application.contracts.ai import WorldSeed
@@ -62,7 +63,7 @@ class GameStateApplicationService:
             "branch_head_revision": branch.head_revision,
             "branch_head_turn_id": branch.head_turn_id,
             "rng_seed": playthrough.rng_seed,
-            "rng_state": dict(playthrough.rng_state),
+            "rng_state": deepcopy(playthrough.rng_state),
         }
         if seed is not None:
             _apply_world_seed(state, seed)

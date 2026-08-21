@@ -68,7 +68,7 @@ class GeminiProvider(BaseProvider):
         if request.structured_schema is not None:
             generation_config["responseMimeType"] = "application/json"
             if request.structured_schema.json_schema:
-                generation_config["responseSchema"] = dict(request.structured_schema.json_schema)
+                generation_config["responseJsonSchema"] = dict(request.structured_schema.json_schema)
         return payload
 
     def _model_url(self, model: str, action: str) -> str:
