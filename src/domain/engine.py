@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 
 from .clock import InWorldClock
@@ -40,6 +40,20 @@ from .state import GameState
 
 def _fact_id(patch: StatePatch, operation_index: int, operation: AssertCanonFact) -> str:
     return operation.fact_id or f"{patch.patch_id}:fact:{operation_index}"
+
+
+def _json_state(value: object) -> object:
+    if isinstance(value, tuple):
+        return [_json_state(item) for item in value]
+    if isinstance(value, list):
+        return [_json_state(item) for item in value]
+    return value
+
+
+def _tuple_state(value: object) -> object:
+    if isinstance(value, list):
+        return tuple(_tuple_state(item) for item in value)
+    return value
 
 
 @dataclass(slots=True)
@@ -95,13 +109,39 @@ class DomainEngine:
 
     def apply(self, state: GameState, patch: StatePatch) -> AppliedPatch:
         """Validate then apply a patch to a copy, leaving the input untouched."""
+        self._restore_rng(state)
         self.guard.validate_patch(state, patch)
         before = state.copy()
         working = state.copy()
         for operation_index, operation in enumerate(patch.operations):
             self._apply_operation(working, patch, operation_index, operation)
         self._refresh_familiarity(working)
+        self._store_rng(working)
         return AppliedPatch(patch=patch, before=before, after=working)
+
+    def random_int(self, state: GameState, lower: int, upper: int) -> int:
+        """Consume a seeded random rule and persist its state on the domain snapshot."""
+        if lower > upper:
+            raise ValueError("Random lower bound cannot exceed upper bound.")
+        self._restore_rng(state)
+        value = self.runtime.rng.randint(lower, upper)
+        self._store_rng(state)
+        return value
+
+    def _restore_rng(self, state: GameState) -> None:
+        metadata: Mapping[str, object] = state.metadata
+        saved = metadata.get("rng_state")
+        if saved:
+            restored = _tuple_state(saved)
+            if not isinstance(restored, tuple):
+                raise ValueError("Serialized RNG state must be a tuple-shaped value.")
+            self.runtime.rng.setstate(restored)
+        elif metadata.get("rng_seed") is not None:
+            self.runtime.rng.seed(str(metadata["rng_seed"]))
+
+    def _store_rng(self, state: GameState) -> None:
+        if "rng_seed" in state.metadata or "rng_state" in state.metadata:
+            state.metadata["rng_state"] = _json_state(self.runtime.rng.getstate())
 
     @staticmethod
     def _refresh_familiarity(state: GameState) -> None:

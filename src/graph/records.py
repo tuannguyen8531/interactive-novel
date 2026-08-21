@@ -268,6 +268,7 @@ def build_canonical_bundle(state: TurnGraphState, game_state: GameState) -> Cano
         turn_id=turn_id,
         final_narrative=narrative,
         approved_patch=patch_payload,
+        rng_state=dict(after.metadata.get("rng_state", {})) if after.metadata.get("rng_state") else None,
         suggested_actions=suggested_actions,
         character_states=character_states,
         events=events,

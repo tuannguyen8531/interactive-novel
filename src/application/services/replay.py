@@ -24,6 +24,9 @@ class ReplayApplicationService:
             if snapshot is not None:
                 state = state_from_payload(snapshot.state_payload)
                 after_revision = snapshot.source_revision
+            else:
+                # Replay from the opening seed, not from the latest cursor.
+                state.metadata["rng_state"] = {}
             payloads = await uow.canonical.list_approved_patches(branch_id, after_revision=after_revision)
         for _, payload in payloads:
             # Bootstrap/import records can be canonical without using the typed

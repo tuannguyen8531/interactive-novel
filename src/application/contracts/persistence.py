@@ -431,6 +431,7 @@ class CanonicalTurnBundle:
     turn_run_id: str
     final_narrative: str
     approved_patch: dict[str, Any]
+    rng_state: dict[str, Any] | None = None
     turn_id: str = field(default_factory=lambda: str(uuid4()))
     parent_turn_id: str | None = None
     normalized_input: str | None = None

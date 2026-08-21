@@ -389,7 +389,11 @@ class SqlAlchemyCanonicalRepository:
         await self._session.execute(
             update(PlaythroughModel)
             .where(PlaythroughModel.id == bundle.playthrough_id)
-            .values(world_clock_minutes=bundle.world_time_end, updated_at=utc_now())
+            .values(
+                world_clock_minutes=bundle.world_time_end,
+                **({"rng_state": dict(bundle.rng_state)} if bundle.rng_state is not None else {}),
+                updated_at=utc_now(),
+            )
         )
         self._maybe_fail(fail_after_step, "head_update")
         await self._session.flush()

@@ -118,3 +118,17 @@ def test_guard_limits_total_clock_movement_across_operations() -> None:
 
     assert duration_error.value.code == "duration_over_limit"
     assert duration_error.value.details == {"maximum": 10, "received": 11}
+
+
+def test_seeded_random_rule_is_reproducible_and_advances_serialized_state() -> None:
+    first = _state()
+    second = _state()
+    for state in (first, second):
+        state.metadata["rng_seed"] = "stable-seed"
+        state.metadata["rng_state"] = {}
+    first_engine = DomainEngine()
+    second_engine = DomainEngine()
+    first_rolls = [first_engine.random_int(first, 1, 100) for _ in range(3)]
+    second_rolls = [second_engine.random_int(second, 1, 100) for _ in range(3)]
+    assert first_rolls == second_rolls
+    assert first.metadata["rng_state"] == second.metadata["rng_state"]
