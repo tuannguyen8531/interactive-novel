@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "fixture_version": "phase-0-2026-08-13",
+  "fixture_version": "2026-08-13",
   "scenarios": [
     {
       "id": "world-draft-review-confirm",
@@ -16,7 +16,7 @@
         "cancel leaves no World, Character, Relationship or Hook rows"
       ],
       "hard_failures": ["database_mutation_before_confirm"],
-      "implementation_phase": 12
+      "implementation_area": "acceptance"
     },
     {
       "id": "free-action-impossible-outcome",
@@ -36,7 +36,7 @@
         "no authoritative mutation comes from the prose alone"
       ],
       "hard_failures": ["unjustified_victory", "untyped_outcome_mutation"],
-      "implementation_phase": 3
+      "implementation_area": "domain"
     },
     {
       "id": "coffee-memory-recall",
@@ -60,7 +60,7 @@
         "canonical preference is not invented by the writer"
       ],
       "hard_failures": ["critical_memory_recall_miss", "summary_becomes_canon"],
-      "implementation_phase": 7
+      "implementation_area": "content_policy"
     },
     {
       "id": "secret-letter-perspective-isolation",
@@ -86,7 +86,7 @@
         "canon secret remains unchanged regardless of bob belief"
       ],
       "hard_failures": ["secret_leak", "belief_promoted_to_canon"],
-      "implementation_phase": 3
+      "implementation_area": "domain"
     },
     {
       "id": "one-sided-romance",
@@ -106,7 +106,7 @@
         "Bob retains his own goal and agency"
       ],
       "hard_failures": ["relationship_direction_collapsed", "implicit_commitment"],
-      "implementation_phase": 3
+      "implementation_area": "domain"
     },
     {
       "id": "false-rumor-belief-chain",
@@ -123,7 +123,7 @@
         "reaction can follow a false belief without changing CanonFact"
       ],
       "hard_failures": ["rumor_changes_canon", "shared_memory_without_owner"],
-      "implementation_phase": 3
+      "implementation_area": "domain"
     },
     {
       "id": "branch-fork-isolation",
@@ -145,7 +145,7 @@
         "root history is unchanged and replay is deterministic"
       ],
       "hard_failures": ["sibling_memory_leak", "parent_history_overwrite"],
-      "implementation_phase": 4
+      "implementation_area": "persistence"
     },
     {
       "id": "triangular-jealousy",
@@ -165,7 +165,7 @@
         "tension decay and visibility are explicit"
       ],
       "hard_failures": ["jealousy_scalar_only", "belief_as_fact"],
-      "implementation_phase": 3
+      "implementation_area": "domain"
     },
     {
       "id": "targeted-consistency-retrieval",
@@ -192,7 +192,7 @@
         "Guard authorizes or rejects using typed evidence and scope"
       ],
       "hard_failures": ["initial_context_false_pass", "evidence_scope_bypass"],
-      "implementation_phase": 7
+      "implementation_area": "content_policy"
     },
     {
       "id": "offscreen-boundary",
@@ -210,7 +210,7 @@
         "new event cannot retroactively contradict canon/observations"
       ],
       "hard_failures": ["autonomous_world_tick", "causeless_offscreen_event"],
-      "implementation_phase": 3
+      "implementation_area": "domain"
     },
     {
       "id": "narrative-degeneracy-30-turn",
@@ -234,7 +234,7 @@
       "rubric_dimensions": [
         "agency", "independence", "resistance", "pacing", "romantic_escalation", "thread_progression"
       ],
-      "implementation_phase": 8
+      "implementation_area": "turn_pipeline"
     }
   ]
 }

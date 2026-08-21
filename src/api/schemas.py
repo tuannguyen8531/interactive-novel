@@ -1,4 +1,4 @@
-"""Pydantic contracts exposed by the Phase 1 API."""
+"""Pydantic contracts exposed by the API."""
 
 from __future__ import annotations
 

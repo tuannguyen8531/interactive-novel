@@ -68,7 +68,7 @@ def initial_graph_state(
     raw_input: str,
     actor_id: str,
     parent_turn_id: str | None = None,
-    config_snapshot_id: str = "phase-8-default",
+    config_snapshot_id: str = "default",
 ) -> TurnGraphState:
     """Create the small initial state passed to LangGraph."""
 

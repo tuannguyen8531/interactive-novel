@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "fixture_version": "phase-0-2026-08-13",
+  "fixture_version": "2026-08-13",
   "cases": [
     {
       "id": "valid-romantic-interest",

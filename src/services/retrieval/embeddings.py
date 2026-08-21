@@ -15,7 +15,7 @@ from src.application.contracts.retrieval import (
 from src.application.ports.providers import ProviderPort
 from src.application.ports.retrieval import EmbeddingStore
 
-DEFAULT_EMBEDDING_VERSION = "phase-13-embedding-1"
+DEFAULT_EMBEDDING_VERSION = "embedding"
 
 
 class InMemoryEmbeddingStore:

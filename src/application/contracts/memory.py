@@ -1,4 +1,4 @@
-"""Persistence-neutral records produced by Phase 13 derived memory jobs.
+"""Persistence-neutral records produced by derived memory jobs.
 
 These records are intentionally non-authoritative.  They point back to
 canonical source IDs and may be discarded and rebuilt without changing a

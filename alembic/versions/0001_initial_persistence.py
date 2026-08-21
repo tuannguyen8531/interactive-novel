@@ -1,4 +1,4 @@
-"""Create the Phase 2 persistence foundation tables."""
+"""Create the initial persistence tables."""
 
 from collections.abc import Sequence
 

@@ -75,7 +75,7 @@ class WorldDraftApplicationService:
         return validated
 
     async def confirm_world(self, seed: WorldSeed, *, world_id: str | None = None) -> WorldRecord:
-        """Legacy world-only confirmation kept for callers from the earlier phase."""
+        """Legacy world-only confirmation kept for older callers."""
         validated = self.validate_world_draft(seed)
         world, characters = _build_world_records(validated, world_id=world_id)
         async with self._uow_factory() as uow:

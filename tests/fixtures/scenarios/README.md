@@ -1,19 +1,20 @@
 # Scenario fixture contract
 
-Các file trong thư mục này là design data của Phase 0, không gọi LLM và không
-ghi database. Mỗi scenario phải có:
+The files in this directory are design data: they do not call an LLM or write
+to the database. Each scenario must include:
 
-- `id`, `category`, `setup`, `actions` hoặc `stimulus`;
-- `expected_invariants` mô tả assertion bắt buộc;
-- `hard_failures` là lỗi không được phép xuất hiện;
-- `implementation_phase` cho biết Phase nào parameterize fixture thành test.
+- `id`, `category`, `setup`, and `actions` or `stimulus`;
+- `expected_invariants` for required assertions;
+- `hard_failures` for outcomes that must never occur;
+- `implementation_area` to identify the implementation area that parameterizes
+  the fixture into a test.
 
-`core_acceptance.json` dùng cho deterministic engine, repository/branch và
-scenario eval. `claim_contracts.json` khóa mapping từ AI proposal sang typed
-claim/operation. `content_policy.json` là vector deterministic cho
-`ContentPolicy`. `reference_matrix.json` khóa metadata cần ghi khi đo quality,
-latency và cost; các số đo thật bắt đầu ở Phase 3 và phải giữ dataset/prompt/
-model/config version.
+`core_acceptance.json` covers the deterministic engine, repository/branch
+behavior, and scenario evaluation. `claim_contracts.json` fixes the mapping
+from AI proposals to typed claims and operations. `content_policy.json` holds
+deterministic vectors for `ContentPolicy`. `reference_matrix.json` defines the
+metadata required for quality, latency, and cost measurements; real
+measurements must retain the dataset, prompt, model, and configuration version.
 
-Fixture không phải canon của một world cụ thể. ID trong fixture là stable test
-IDs và mỗi test phải tạo namespace playthrough/branch riêng.
+Fixtures are not canon for any particular world. Their IDs are stable test IDs,
+and each test must create its own playthrough/branch namespace.

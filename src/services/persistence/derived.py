@@ -1,4 +1,4 @@
-"""SQLAlchemy adapter for rebuildable Phase 13 derived artifacts."""
+"""SQLAlchemy adapter for rebuildable derived artifacts."""
 
 from __future__ import annotations
 

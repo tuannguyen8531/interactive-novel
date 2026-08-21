@@ -68,14 +68,14 @@ from src.services.persistence.uow import make_uow_factory
 async def _setup(database: Database) -> tuple[UowFactory, str, str, BranchRecord]:
     uow_factory = make_uow_factory(database)
     world = await WorldApplicationService(uow_factory).create_world(
-        name="Phase 4 Test World",
+        name="Canonical Test World",
         premise="A deterministic persistence fixture.",
         genre="test",
         tone="calm",
     )
     playthrough = await PlaythroughApplicationService(uow_factory).create_playthrough(
         world_id=world.id,
-        rng_seed="phase-4-seed",
+        rng_seed="canonical-test-seed",
     )
     root = await BranchApplicationService(uow_factory).create_root_branch(
         playthrough_id=playthrough.id,

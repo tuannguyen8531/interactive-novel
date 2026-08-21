@@ -1,7 +1,7 @@
 """Provider-neutral contracts for text generation and embeddings.
 
-Phase 5 owns transport and provider capability boundaries only. AI role schemas
-and authoritative proposal models are intentionally left for Phase 6.
+This module owns transport and provider capability boundaries only. AI role schemas
+and authoritative proposal models live in their dedicated contracts.
 """
 
 from __future__ import annotations
@@ -149,7 +149,7 @@ StructuredValidator = Callable[[Any], Any]
 
 @dataclass(frozen=True, slots=True)
 class StructuredSchema:
-    """Provider-facing JSON schema plus an optional Phase 6 validator hook."""
+    """Provider-facing JSON schema plus an optional validator hook."""
 
     name: str
     json_schema: Mapping[str, Any] = field(default_factory=dict)

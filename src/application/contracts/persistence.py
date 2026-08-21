@@ -1,7 +1,7 @@
 """Persistence-neutral records for the application persistence boundary.
 
 These records deliberately describe only the stable persistence contract. The
-full domain entities and invariant-rich value objects belong to Phase 3.
+full domain entities and invariant-rich value objects belong to the domain layer.
 """
 
 from __future__ import annotations
@@ -468,7 +468,7 @@ class SnapshotRecord:
     rng_state: dict[str, Any]
     state_payload: dict[str, Any]
     checksum: str
-    builder_version: str = "phase-4"
+    builder_version: str = "canonical-builder"
     schema_version: int = 1
     snapshot_id: str = field(default_factory=lambda: str(uuid4()))
     created_at: datetime = field(default_factory=utc_now)
@@ -484,7 +484,7 @@ class SnapshotRecord:
         world_clock_minutes: int,
         rng_state: dict[str, Any],
         state_payload: dict[str, Any],
-        builder_version: str = "phase-4",
+        builder_version: str = "canonical-builder",
     ) -> SnapshotRecord:
         return cls(
             playthrough_id=playthrough_id,

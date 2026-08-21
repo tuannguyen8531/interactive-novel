@@ -41,7 +41,7 @@ class TurnPipelineDependencies:
     failure_hook: Callable[[str], None] | None = None
     telemetry: TelemetryRecorderPort | None = None
     input_max_chars: int = 20_000
-    embedding_version: str = "phase-13-embedding-1"
+    embedding_version: str = "embedding"
 
 
 class TurnPipeline:

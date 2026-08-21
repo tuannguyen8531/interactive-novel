@@ -169,7 +169,7 @@ class DerivedJobApplicationService:
                 world_clock_minutes=state.world_time,
                 rng_state=playthrough.rng_state,
                 state_payload=state_to_payload(state),
-                builder_version="phase-13-state-loader-1",
+                builder_version="state-loader",
             )
         )
 

@@ -314,7 +314,7 @@ async def test_embedding_rebuild_only_writes_derived_vectors() -> None:
             source_id="event-1",
             content_hash=content_hash("A canonical event."),
             model="fake-embedding",
-            embedding_version="phase-13-embedding-1",
+            embedding_version="embedding",
         )
         is not None
     )

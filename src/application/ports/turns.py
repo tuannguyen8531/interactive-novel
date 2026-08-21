@@ -9,7 +9,7 @@ from src.application.contracts.turns import TurnRunRequest
 
 
 class TurnRunner(Protocol):
-    """Injected turn executor; Phase 8's graph is one implementation."""
+    """Injected turn executor; the graph is one implementation."""
 
     async def run(self, request: TurnRunRequest) -> Mapping[str, Any] | Any: ...
 

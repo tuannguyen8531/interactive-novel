@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "fixture_version": "phase-0-2026-08-13",
-  "purpose": "Khóa metadata và target trước khi đo baseline; không giả định số đo trước Phase 3.",
+  "fixture_version": "2026-08-13",
+  "purpose": "Khóa metadata và target trước khi đo baseline; không giả định số đo trước khi có dữ liệu thật.",
   "dataset": {
     "id": "interactive-novel-reference-v1",
     "scenarios": [
@@ -22,7 +22,7 @@
       "hardware_profile": "to_be_filled",
       "network_region": "none",
       "privacy_mode": "local_only",
-      "status": "baseline_pending_phase_3"
+      "status": "baseline_pending"
     },
     {
       "id": "gemini-cloud-default",
@@ -32,7 +32,7 @@
       "hardware_profile": "client_cpu_only",
       "network_region": "to_be_filled",
       "privacy_mode": "explicit_cloud_opt_in",
-      "status": "baseline_pending_phase_3"
+      "status": "baseline_pending"
     },
     {
       "id": "openrouter-cloud-default",
@@ -42,7 +42,7 @@
       "hardware_profile": "client_cpu_only",
       "network_region": "to_be_filled",
       "privacy_mode": "explicit_cloud_opt_in",
-      "status": "baseline_pending_phase_3"
+      "status": "baseline_pending"
     }
   ],
   "record_for_each_run": [

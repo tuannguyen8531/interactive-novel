@@ -1,4 +1,4 @@
-"""Application settings for the Phase 1 runtime shell."""
+"""Application settings for the runtime shell."""
 
 from __future__ import annotations
 

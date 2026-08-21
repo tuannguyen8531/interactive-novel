@@ -25,7 +25,7 @@ class TurnRunRequest:
     actor_id: str
     game_state: GameState
     parent_turn_id: str | None = None
-    config_snapshot_id: str = "phase-9-default"
+    config_snapshot_id: str = "default"
 
     def __post_init__(self) -> None:
         for name in ("turn_run_id", "playthrough_id", "branch_id", "raw_input", "actor_id"):
@@ -50,7 +50,7 @@ class SubmitTurnCommand:
     actor_id: str
     game_state: GameState
     parent_turn_id: str | None = None
-    config_snapshot_id: str = "phase-9-default"
+    config_snapshot_id: str = "default"
 
     def __post_init__(self) -> None:
         for name in ("idempotency_key", "turn_run_id", "playthrough_id", "branch_id", "raw_input", "actor_id"):

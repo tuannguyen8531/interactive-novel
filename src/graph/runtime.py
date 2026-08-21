@@ -38,7 +38,7 @@ class TurnPipelineRequest:
     actor_id: str
     game_state: GameState
     parent_turn_id: str | None = None
-    config_snapshot_id: str = "phase-8-default"
+    config_snapshot_id: str = "default"
 
     def __post_init__(self) -> None:
         for name in ("turn_run_id", "playthrough_id", "branch_id", "raw_input", "actor_id"):
@@ -71,7 +71,7 @@ class TurnGraphRuntime:
     failure_hook: Callable[[str], None] | None = None
     telemetry: TelemetryRecorderPort | None = None
     input_max_chars: int = 20_000
-    embedding_version: str = "phase-13-embedding-1"
+    embedding_version: str = "embedding"
 
 
 __all__ = [

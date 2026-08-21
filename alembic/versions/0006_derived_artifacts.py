@@ -1,4 +1,4 @@
-"""Add versioned, discardable Phase 13 derived artifacts."""
+"""Add versioned, discardable derived artifacts."""
 
 from collections.abc import Sequence
 
@@ -6,7 +6,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision: str = "0006_phase_13_derived_artifacts"
+revision: str = "0006_derived_artifacts"
 down_revision: str | None = "0005_background_jobs"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

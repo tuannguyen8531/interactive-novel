@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0007_turn_suggested_actions"
-down_revision: str | None = "0006_phase_13_derived_artifacts"
+down_revision: str | None = "0006_derived_artifacts"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

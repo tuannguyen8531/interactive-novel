@@ -1,4 +1,4 @@
-"""SQLAlchemy mappings for the Phase 2 persistence foundation."""
+"""SQLAlchemy mappings for persistence."""
 
 from __future__ import annotations
 

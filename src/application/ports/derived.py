@@ -1,4 +1,4 @@
-"""Application port for discardable Phase 13 derived artifacts."""
+"""Application port for discardable derived artifacts."""
 
 from __future__ import annotations
 

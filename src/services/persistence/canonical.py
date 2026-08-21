@@ -1,4 +1,4 @@
-"""SQLAlchemy adapter for Phase 4 canonical commits and derived artifacts."""
+"""SQLAlchemy adapter for canonical commits and derived artifacts."""
 
 from __future__ import annotations
 
