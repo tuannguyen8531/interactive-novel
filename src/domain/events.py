@@ -60,6 +60,22 @@ class Event:
 
 
 @dataclass(frozen=True, slots=True)
+class ScheduledEvent:
+    """A causal event waiting for a deterministic in-world due time."""
+
+    scheduled_event_id: str
+    due_world_time: int
+    event: Event
+    cause_thread_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.scheduled_event_id.strip() or self.due_world_time < 0:
+            raise DomainValidationError("invalid_scheduled_event", "Scheduled event ID and due time are required.")
+        if self.cause_thread_id is not None and not self.cause_thread_id.strip():
+            raise DomainValidationError("invalid_scheduled_event", "Scheduled event thread cause cannot be empty.")
+
+
+@dataclass(frozen=True, slots=True)
 class Evidence:
     evidence_id: str
     owner_id: str
@@ -142,4 +158,4 @@ class Belief:
         object.__setattr__(self, "counter_evidence_ids", tuple(self.counter_evidence_ids))
 
 
-__all__ = ["Belief", "Event", "Evidence", "Observation"]
+__all__ = ["Belief", "Event", "Evidence", "Observation", "ScheduledEvent"]

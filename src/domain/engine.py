@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from .clock import InWorldClock
 from .content import ConsentRecord
+from .events import Event
 from .guard import DomainGuard
 from .knowledge import CanonFact
 from .patch import (
@@ -22,6 +23,8 @@ from .patch import (
     ApplyRelationshipDelta,
     AssertCanonFact,
     ConsentTransition,
+    MaterializeScheduledEvent,
+    ScheduleEvent,
     SetCharacterCondition,
     SetCharacterLocation,
     StateOperation,
@@ -135,6 +138,15 @@ class DomainEngine:
             current = self.apply(current, patch).after
         return current
 
+    @staticmethod
+    def due_scheduled_operations(state: GameState) -> tuple[MaterializeScheduledEvent, ...]:
+        """Return due schedules in stable order; no autonomous world tick is performed."""
+        return tuple(
+            MaterializeScheduledEvent(item.scheduled_event_id)
+            for item in sorted(state.scheduled_events.values(), key=lambda item: (item.due_world_time, item.scheduled_event_id))
+            if item.due_world_time <= state.world_time
+        )
+
     def _apply_operation(self, state: GameState, patch: StatePatch, operation_index: int, operation: object) -> None:
         if isinstance(operation, AdvanceClock):
             state.clock = self.runtime.clock_factory(state.world_time + operation.duration_minutes)
@@ -182,6 +194,27 @@ class DomainEngine:
             )
         elif isinstance(operation, AddEvent):
             state.events[operation.event.event_id] = operation.event
+        elif isinstance(operation, ScheduleEvent):
+            state.scheduled_events[operation.scheduled_event.scheduled_event_id] = operation.scheduled_event
+        elif isinstance(operation, MaterializeScheduledEvent):
+            scheduled = state.scheduled_events.pop(operation.scheduled_event_id)
+            event = scheduled.event
+            state.events[event.event_id] = Event(
+                event_id=event.event_id,
+                event_type=event.event_type,
+                world_time=state.world_time,
+                branch_scope=event.branch_scope,
+                location_id=event.location_id,
+                actor_ids=event.actor_ids,
+                target_ids=event.target_ids,
+                witness_ids=event.witness_ids,
+                payload=dict(event.payload),
+                salience=event.salience,
+                emotional_intensity=event.emotional_intensity,
+                cause_event_ids=(*event.cause_event_ids, f"scheduled:{scheduled.scheduled_event_id}"),
+                turn_id=event.turn_id,
+                provenance=event.provenance,
+            )
         elif isinstance(operation, AddEvidence):
             state.evidence[operation.evidence.evidence_id] = operation.evidence
         elif isinstance(operation, AddObservation):

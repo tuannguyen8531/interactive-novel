@@ -17,7 +17,7 @@ from src.application.contracts.persistence import (
     ObservationRecord,
     RelationshipRecord,
 )
-from src.domain.codec import patch_from_payload
+from src.domain.codec import patch_from_payload, patch_to_payload
 from src.domain.engine import DomainEngine
 from src.domain.patch import (
     AddClaimLink,
@@ -29,6 +29,7 @@ from src.domain.patch import (
     AssertCanonFact,
     SetCharacterCondition,
     SetCharacterLocation,
+    StatePatch,
     UpdateBelief,
     UpdatePsychology,
 )
@@ -68,7 +69,18 @@ def build_canonical_bundle(state: TurnGraphState, game_state: GameState) -> Cano
     if not isinstance(patch_payload, dict):
         raise ValueError("approved_patch is required before canonical record construction")
     patch = patch_from_payload(patch_payload)
-    applied = DomainEngine().apply(game_state, patch)
+    engine = DomainEngine()
+    applied = engine.apply(game_state, patch)
+    due_operations = engine.due_scheduled_operations(applied.after)
+    if due_operations:
+        patch = StatePatch(
+            operations=(*patch.operations, *due_operations),
+            branch_id=patch.branch_id,
+            base_world_time=patch.base_world_time,
+            patch_id=patch.patch_id,
+        )
+        patch_payload = patch_to_payload(patch)
+        applied = engine.apply(game_state, patch)
     before = applied.before
     after = applied.after
     turn_id = f"turn-{state['turn_run_id']}"
@@ -92,26 +104,28 @@ def build_canonical_bundle(state: TurnGraphState, game_state: GameState) -> Cano
         if character_id in after.characters
     )
 
+    event_ids = {operation.event.event_id for operation in operation_list if isinstance(operation, AddEvent)}
+    event_ids.update(set(after.events).difference(before.events))
     events = tuple(
         EventRecord(
-            event_id=operation.event.event_id,
+            event_id=event.event_id,
             playthrough_id=state["playthrough_id"],
             branch_id=state["branch_id"],
             turn_id=turn_id,
-            event_type=operation.event.event_type,
-            world_time=operation.event.world_time,
-            location_id=operation.event.location_id,
-            actor_ids=operation.event.actor_ids,
-            target_ids=operation.event.target_ids,
-            witness_ids=operation.event.witness_ids,
-            payload=dict(operation.event.payload),
-            salience=operation.event.salience,
-            emotional_intensity=operation.event.emotional_intensity,
-            cause_event_ids=operation.event.cause_event_ids,
-            provenance=_provenance(operation.event.provenance),
+            event_type=event.event_type,
+            world_time=event.world_time,
+            location_id=event.location_id,
+            actor_ids=event.actor_ids,
+            target_ids=event.target_ids,
+            witness_ids=event.witness_ids,
+            payload=dict(event.payload),
+            salience=event.salience,
+            emotional_intensity=event.emotional_intensity,
+            cause_event_ids=event.cause_event_ids,
+            provenance=_provenance(event.provenance),
         )
-        for operation in operation_list
-        if isinstance(operation, AddEvent)
+        for event_id, event in after.events.items()
+        if event_id in event_ids
     )
 
     claim_ids = {operation.claim.claim_id for operation in operation_list if isinstance(operation, AddKnowledgeClaim)}

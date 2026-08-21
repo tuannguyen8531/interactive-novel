@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
 from .content import ConsentState
-from .events import Belief, Event, Evidence, Observation
+from .events import Belief, Event, Evidence, Observation, ScheduledEvent
 from .knowledge import ClaimLink, KnowledgeClaim
 from .narrative import HookStatus, NarrativeHook, NarrativeThread, ThreadStatus
 from .values import Provenance
@@ -92,7 +92,14 @@ class AddEvent(StateOperation):
 
 
 @dataclass(frozen=True, slots=True)
-class MaterializeScheduledEvent(AddEvent):
+class ScheduleEvent(StateOperation):
+    scheduled_event: ScheduledEvent
+    operation_type: ClassVar[str] = "schedule_event"
+
+
+@dataclass(frozen=True, slots=True)
+class MaterializeScheduledEvent(StateOperation):
+    scheduled_event_id: str
     operation_type: ClassVar[str] = "materialize_scheduled_event"
 
 
@@ -198,6 +205,7 @@ __all__ = [
     "AssertCanonFact",
     "ConsentTransition",
     "MaterializeScheduledEvent",
+    "ScheduleEvent",
     "RelationshipDelta",
     "SetCharacterCondition",
     "SetCharacterLocation",

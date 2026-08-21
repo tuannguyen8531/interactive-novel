@@ -9,7 +9,7 @@ from typing import Any
 from .characters import Character
 from .clock import InWorldClock
 from .content import ConsentRecord, ContentPolicy
-from .events import Belief, Event, Evidence, Observation
+from .events import Belief, Event, Evidence, Observation, ScheduledEvent
 from .knowledge import CanonFact, ClaimLink, KnowledgeClaim
 from .narrative import NarrativeHook, NarrativeThread
 from .relationships import RelationshipChange, RelationshipVector
@@ -32,6 +32,7 @@ class GameState:
     claim_links: dict[str, ClaimLink] = field(default_factory=dict)
     canon_facts: dict[str, CanonFact] = field(default_factory=dict)
     events: dict[str, Event] = field(default_factory=dict)
+    scheduled_events: dict[str, ScheduledEvent] = field(default_factory=dict)
     evidence: dict[str, Evidence] = field(default_factory=dict)
     observations: dict[str, Observation] = field(default_factory=dict)
     beliefs: dict[str, Belief] = field(default_factory=dict)

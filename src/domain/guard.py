@@ -24,6 +24,7 @@ from .patch import (
     AssertCanonFact,
     ConsentTransition,
     MaterializeScheduledEvent,
+    ScheduleEvent,
     SetCharacterCondition,
     SetCharacterLocation,
     StateOperation,
@@ -94,6 +95,7 @@ class DomainGuard:
         known_beliefs = dict(state.beliefs)
         known_threads = dict(state.threads)
         known_hooks = dict(state.hooks)
+        known_scheduled_events = dict(state.scheduled_events)
         known_consents = dict(state.consents)
 
         for operation_index, operation in enumerate(patch.operations):
@@ -176,11 +178,28 @@ class DomainGuard:
                         asserted_world_time=current_time,
                         asserted_turn=operation.asserted_turn,
                     )
-                elif isinstance(operation, (AddEvent, MaterializeScheduledEvent)):
+                elif isinstance(operation, AddEvent):
                     self._validate_event(state, operation.event, known_characters, known_events, current_time)
                     if operation.event.event_id in known_events:
                         _fail("duplicate_event", f"Event already exists: {operation.event.event_id}.")
                     known_events[operation.event.event_id] = operation.event
+                elif isinstance(operation, ScheduleEvent):
+                    scheduled = operation.scheduled_event
+                    if scheduled.scheduled_event_id in known_scheduled_events:
+                        _fail("duplicate_scheduled_event", "Scheduled event ID already exists.")
+                    if scheduled.due_world_time < current_time:
+                        _fail("scheduled_event_in_past", "Scheduled event due time cannot be in the past.")
+                    if scheduled.cause_thread_id is not None and scheduled.cause_thread_id not in known_threads:
+                        _fail("unknown_thread", "Scheduled event thread cause does not exist.")
+                    self._validate_event(state, scheduled.event, known_characters, known_events, scheduled.due_world_time)
+                    known_scheduled_events[scheduled.scheduled_event_id] = scheduled
+                elif isinstance(operation, MaterializeScheduledEvent):
+                    scheduled = known_scheduled_events.get(operation.scheduled_event_id)
+                    if scheduled is None:
+                        _fail("unknown_scheduled_event", "Scheduled event does not exist.")
+                    if scheduled.due_world_time > current_time:
+                        _fail("scheduled_event_not_due", "Scheduled event is not due yet.")
+                    known_scheduled_events.pop(operation.scheduled_event_id)
                 elif isinstance(operation, AddEvidence):
                     self._validate_evidence(state, operation.evidence, known_characters, known_events, known_claims, current_time)
                     if operation.evidence.evidence_id in known_evidence:

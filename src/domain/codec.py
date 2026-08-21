@@ -13,7 +13,7 @@ from typing import Any
 
 from .characters import Character, CharacterProfile, CharacterState
 from .content import ConsentRecord, ConsentState, ContentPolicy
-from .events import Belief, Event, Evidence, Observation
+from .events import Belief, Event, Evidence, Observation, ScheduledEvent
 from .knowledge import CanonFact, ClaimLink, KnowledgeClaim
 from .narrative import NarrativeHook, NarrativeThread
 from .patch import (
@@ -29,6 +29,7 @@ from .patch import (
     AssertCanonFact,
     ConsentTransition,
     MaterializeScheduledEvent,
+    ScheduleEvent,
     SetCharacterCondition,
     SetCharacterLocation,
     StateOperation,
@@ -76,6 +77,12 @@ def _event(value: Mapping[str, Any]) -> Event:
     data = dict(value)
     data["provenance"] = _provenance(data.get("provenance"))
     return Event(**data)
+
+
+def _scheduled_event(value: Mapping[str, Any]) -> ScheduledEvent:
+    data = dict(value)
+    data["event"] = _event(data["event"])
+    return ScheduledEvent(**data)
 
 
 def _evidence(value: Mapping[str, Any]) -> Evidence:
@@ -142,7 +149,8 @@ def patch_from_payload(payload: Mapping[str, Any]) -> StatePatch:
         "add_claim_link": lambda data: AddClaimLink(_claim_link(data["link"])),
         "assert_canon_fact": lambda data: AssertCanonFact(**data),
         "add_event": lambda data: AddEvent(_event(data["event"])),
-        "materialize_scheduled_event": lambda data: MaterializeScheduledEvent(_event(data["event"])),
+        "schedule_event": lambda data: ScheduleEvent(_scheduled_event(data["scheduled_event"])),
+        "materialize_scheduled_event": lambda data: MaterializeScheduledEvent(**data),
         "add_evidence": lambda data: AddEvidence(_evidence(data["evidence"])),
         "add_observation": lambda data: AddObservation(_observation(data["observation"])),
         "update_belief": lambda data: UpdateBelief(_belief(data["belief"])),
@@ -185,6 +193,7 @@ def state_to_payload(state: GameState) -> dict[str, Any]:
         "claim_links": [_jsonable(link) for link in state.claim_links.values()],
         "canon_facts": [_jsonable(fact) for fact in state.canon_facts.values()],
         "events": [_jsonable(event) for event in state.events.values()],
+        "scheduled_events": [_jsonable(event) for event in state.scheduled_events.values()],
         "evidence": [_jsonable(item) for item in state.evidence.values()],
         "observations": [_jsonable(item) for item in state.observations.values()],
         "beliefs": [_jsonable(item) for item in state.beliefs.values()],
@@ -226,6 +235,9 @@ def state_from_payload(payload: Mapping[str, Any]) -> GameState:
     state.claim_links = {link.link_id: link for link in (_claim_link(item) for item in payload.get("claim_links", []))}
     state.canon_facts = {fact.fact_id: fact for fact in (_fact(item) for item in payload.get("canon_facts", []))}
     state.events = {event.event_id: event for event in (_event(item) for item in payload.get("events", []))}
+    state.scheduled_events = {
+        item.scheduled_event_id: item for item in (_scheduled_event(value) for value in payload.get("scheduled_events", []))
+    }
     state.evidence = {item.evidence_id: item for item in (_evidence(item) for item in payload.get("evidence", []))}
     state.observations = {item.observation_id: item for item in (_observation(item) for item in payload.get("observations", []))}
     state.beliefs = {item.belief_id: item for item in (_belief(item) for item in payload.get("beliefs", []))}

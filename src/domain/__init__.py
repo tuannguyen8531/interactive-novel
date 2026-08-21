@@ -18,7 +18,7 @@ from .content import (
 )
 from .engine import AppliedPatch, DomainEngine, DomainRuntime, apply_patch, replay_patches, revert_patch
 from .errors import DomainError, DomainValidationError, GuardRejected
-from .events import Belief, Event, Evidence, Observation
+from .events import Belief, Event, Evidence, Observation, ScheduledEvent
 from .guard import DomainGuard, GuardResult
 from .knowledge import (
     CanonFact,
@@ -44,6 +44,7 @@ from .patch import (
     ConsentTransition,
     MaterializeScheduledEvent,
     RelationshipDelta,
+    ScheduleEvent,
     SetCharacterCondition,
     SetCharacterLocation,
     StateOperation,
@@ -110,11 +111,13 @@ __all__ = [
     "InWorldClock",
     "KnowledgeClaim",
     "MaterializeScheduledEvent",
+    "ScheduleEvent",
     "MINUTES_PER_DAY",
     "MINUTES_PER_YEAR",
     "NarrativeHook",
     "NarrativeThread",
     "Observation",
+    "ScheduledEvent",
     "PolicyDecision",
     "PredicateDefinition",
     "PredicateRegistry",
