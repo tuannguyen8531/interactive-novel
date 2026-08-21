@@ -77,6 +77,7 @@ function cancel(): void {
           <select v-model="store.ratingPreset">
             <option value="teen_14_plus">Teen 14+</option>
             <option value="mature_16_plus">Mature 16+</option>
+            <option value="adult_18_plus">Adult 18+</option>
           </select>
         </label>
         <label>
@@ -232,7 +233,11 @@ function cancel(): void {
             <option value="graphic">Graphic</option>
           </select>
         </label>
-        <p class="muted small-copy">Explicit adult content remains disabled in this MVP template.</p>
+        <label class="checkbox-row">
+          <input v-model="store.draft.content_boundaries.adult_explicit_opt_in" type="checkbox" />
+          Allow explicit adult content (18+ participants only)
+        </label>
+        <p class="muted small-copy">Adult explicit scenes still require every participant to be 18+, player opt-in and valid consent.</p>
       </section>
 
       <section class="card">
@@ -306,6 +311,17 @@ label {
   color: var(--muted);
   font-size: 0.85rem;
   font-weight: 700;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.checkbox-row input {
+  width: auto;
+  padding: 0;
 }
 
 input,

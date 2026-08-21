@@ -40,7 +40,7 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     if (draft.value.opening_scene.guard_approved) {
       warnings.push('Opening scene must remain unapproved until confirmation.')
     }
-    if (draft.value.content_boundaries.adult_explicit_opt_in && draft.value.npc_profiles.some((item) => item.age < 18)) {
+    if (draft.value.content_boundaries.adult_explicit_opt_in && [draft.value.player_character, ...draft.value.npc_profiles].some((item) => item.age < 18)) {
       warnings.push('Adult explicit content cannot be enabled with a minor character.')
     }
     if (draft.value.locations.length === 0) warnings.push('At least one starting location is required.')
@@ -52,7 +52,7 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
       prompt.value.trim(),
       'Template: school_romance.',
       'Tone preset: ' + tonePreset.value + '.',
-      'Content preset: rating=' + ratingPreset.value + ', violence=' + violencePreset.value + ', adult_explicit_opt_in=false.'
+      'Content preset: rating=' + ratingPreset.value + ', violence=' + violencePreset.value + ', adult_explicit_opt_in=' + (ratingPreset.value === 'adult_18_plus') + '.'
     ].join('\n')
   }
 

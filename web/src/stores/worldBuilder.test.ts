@@ -137,4 +137,14 @@ describe('world builder store', () => {
     expect(store.stage).toBe('prompt')
     expect(confirmSpy).not.toHaveBeenCalled()
   })
+
+  it('requests adult explicit opt-in for an adult rating', async () => {
+    vi.spyOn(api, 'generateWorldDraft').mockResolvedValue(seed())
+    const store = useWorldBuilderStore()
+    store.ratingPreset = 'adult_18_plus'
+
+    await store.generate()
+
+    expect(vi.mocked(api.generateWorldDraft).mock.calls[0][0]).toContain('adult_explicit_opt_in=true')
+  })
 })
