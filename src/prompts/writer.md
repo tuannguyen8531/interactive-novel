@@ -8,7 +8,7 @@ Input envelope (JSON):
 
 {{input_json}}
 
-Return only JSON matching `narrative-draft-1` with role `writer`. Include the
+Return only JSON matching `narrative-draft` with role `writer`. Include the
 scene ID, narrative text, optional paragraph-to-beat mapping, disclosed claim
 IDs and `suggested_actions`.
 

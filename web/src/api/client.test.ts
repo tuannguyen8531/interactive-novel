@@ -125,13 +125,13 @@ describe('API client', () => {
 
   it('posts a portable bundle as raw JSON bytes for canonical import', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ format_version: 'playthrough-export-1' }), {
+      new Response(JSON.stringify({ format_version: 'playthrough-export' }), {
         status: 201,
         headers: { 'Content-Type': 'application/json' }
       })
     )
     vi.stubGlobal('fetch', fetchMock)
-    const body = new TextEncoder().encode('{"format_version":"playthrough-export-bundle-1"}').buffer
+    const body = new TextEncoder().encode('{"format_version":"playthrough-export-bundle"}').buffer
 
     await api.importExportBundle(body)
 

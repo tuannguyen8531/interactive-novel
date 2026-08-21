@@ -333,7 +333,7 @@ def test_claim_extractor_emits_typed_requirement_and_validation_query() -> None:
         ),
     )
     simulation = SimulationResult(
-        schema_version="simulation-result-1",
+        schema_version="simulation-result",
         role=AIPromptRole.SIMULATOR,
         run_id="sim-run",
         prompt_version="simulator@1.0.0",
@@ -375,7 +375,7 @@ def test_claim_extractor_skips_new_claim_checks_and_idempotent_locations_for_liv
         ),
     )
     simulation = SimulationResult(
-        schema_version="simulation-result-1",
+        schema_version="simulation-result",
         role=AIPromptRole.SIMULATOR,
         run_id="sim-run",
         prompt_version="simulator@1.0.0",

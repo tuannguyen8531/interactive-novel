@@ -336,7 +336,7 @@ class TurnGraphNodes:
             )
             prompt = self._executor().prompts.get(AIPromptRole.CONTEXT_VALIDATOR)
             report = ConsistencyReport(
-                schema_version="consistency-report-1",
+                schema_version="consistency-report",
                 role=AIPromptRole.CONTEXT_VALIDATOR,
                 run_id=state["turn_run_id"],
                 prompt_version=prompt.semantic_version,

@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useWorldBuilderStore } from '@/stores/worldBuilder'
 
 const router = useRouter()
 const store = useWorldBuilderStore()
 
+onMounted(() => {
+  void store.loadTemplates()
+})
+
 const characters = computed(() =>
   store.draft ? [store.draft.player_character, ...store.draft.npc_profiles] : []
 )
+const selectedTemplate = computed(() => store.templates.find((item) => item.id === store.templateId))
 
 function characterName(characterId: string): string {
   return characters.value.find((character) => character.character_id === characterId)?.name ?? characterId
@@ -50,7 +55,7 @@ function cancel(): void {
     <div>
       <p class="eyebrow">World Builder</p>
       <h1>Make a world worth remembering</h1>
-      <p class="lede">Describe a school-romance setting. The builder creates a draft first, then lets you edit every important seed before anything is saved.</p>
+      <p class="lede">Describe a setting for the selected story template. The builder creates a draft first, then lets you edit every important seed before anything is saved.</p>
     </div>
     <span class="stage-pill">{{ store.stage === 'prompt' ? 'Draft prompt' : store.stage === 'review' ? 'Review draft' : 'Confirmed' }}</span>
   </section>
@@ -61,9 +66,16 @@ function cancel(): void {
       <h2>What kind of story should begin?</h2>
       <label>
         World description
-        <textarea v-model="store.prompt" rows="7" maxlength="20000" placeholder="A quiet school club prepares for a festival while two students learn to trust each other…" />
+        <textarea v-model="store.prompt" rows="7" maxlength="20000" placeholder="Describe the setting, characters, conflict, or mystery you want to explore…" />
       </label>
       <div class="preset-grid">
+        <label>
+          Story template
+          <select v-model="store.templateId">
+            <option v-for="template in store.templates" :key="template.id" :value="template.id">{{ template.name }}</option>
+          </select>
+          <span class="muted small-copy">{{ selectedTemplate?.description }}</span>
+        </label>
         <label>
           Tone preset
           <select v-model="store.tonePreset">
@@ -89,8 +101,8 @@ function cancel(): void {
         </label>
       </div>
       <div class="notice-box">
-        <strong>School romance template</strong>
-        <p>Generates a school, class or club locations, one player character, two to four NPCs and a few starting narrative threads. Archetypes seed agency; they do not lock future behavior.</p>
+        <strong>{{ selectedTemplate?.name ?? 'Story template' }}</strong>
+        <p>{{ selectedTemplate?.description ?? 'Choose a story template to shape the generated world.' }}</p>
       </div>
       <button type="submit" :disabled="store.loading || !store.prompt.trim()">
         {{ store.generating ? 'Creating draft…' : 'Create world draft' }}

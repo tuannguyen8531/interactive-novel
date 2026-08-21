@@ -25,7 +25,7 @@ class FeedbackRecord:
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "schema_version": "feedback-1",
+            "schema_version": "feedback",
             "rating": self.rating,
             "comment": self.comment,
             "category": self.category,

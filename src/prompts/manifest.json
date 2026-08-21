@@ -2,48 +2,48 @@
   "world_builder": {
     "template": "world_builder.md",
     "semantic_version": "1.2.0",
-    "input_contract": "role-input-1",
-    "output_schema_version": "world-seed-1",
+    "input_contract": "role-input",
+    "output_schema_version": "world-seed",
     "required_variables": ["input_json"],
     "changelog": "Choose a scene-appropriate Day 1 opening time instead of defaulting to midnight."
   },
   "planner": {
     "template": "planner.md",
     "semantic_version": "1.0.0",
-    "input_contract": "role-input-1",
-    "output_schema_version": "turn-plan-1",
+    "input_contract": "role-input",
+    "output_schema_version": "turn-plan",
     "required_variables": ["input_json"],
     "changelog": "Initial turn planning contract."
   },
   "simulator": {
     "template": "simulator.md",
     "semantic_version": "1.2.0",
-    "input_contract": "role-input-1",
-    "output_schema_version": "simulation-result-1",
+    "input_contract": "role-input",
+    "output_schema_version": "simulation-result",
     "required_variables": ["input_json"],
     "changelog": "Require one bounded, scene-appropriate clock advance for every completed player action."
   },
   "context_validator": {
     "template": "context_validator.md",
     "semantic_version": "1.1.0",
-    "input_contract": "role-input-1",
-    "output_schema_version": "consistency-report-1",
+    "input_contract": "role-input",
+    "output_schema_version": "consistency-report",
     "required_variables": ["input_json"],
     "changelog": "Treat an empty targeted-evidence list as no declared dependency while preserving blocking insufficient manifests."
   },
   "writer": {
     "template": "writer.md",
     "semantic_version": "1.1.0",
-    "input_contract": "role-input-1",
-    "output_schema_version": "narrative-draft-1",
+    "input_contract": "role-input",
+    "output_schema_version": "narrative-draft",
     "required_variables": ["input_json"],
     "changelog": "Generate bounded, progress-aware player move suggestions alongside each narrative draft."
   },
   "critic": {
     "template": "critic.md",
     "semantic_version": "1.1.0",
-    "input_contract": "role-input-1",
-    "output_schema_version": "critique-result-1",
+    "input_contract": "role-input",
+    "output_schema_version": "critique-result",
     "required_variables": ["input_json"],
     "changelog": "Review suggested player moves for continuity and player-only authority."
   }

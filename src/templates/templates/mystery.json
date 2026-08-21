@@ -1,0 +1,19 @@
+{
+  "id": "mystery",
+  "name": "Mystery",
+  "description": "A clue-driven story built around secrets, investigation, and competing interpretations.",
+  "genre": "mystery",
+  "default_tone": "tense, observant",
+  "prompt_instructions": "Build a clue-driven setting with a clear initial question, suspects or competing explanations, and evidence that can be discovered without making the answer canonical in the opening scene. Give central characters distinct motives and knowledge boundaries.",
+  "default_presets": {
+    "tone": "tense, observant",
+    "rating": "teen_14_plus",
+    "violence_ceiling": "non_graphic",
+    "adult_explicit_opt_in": false
+  },
+  "opening_guidance": [
+    "Present an unexplained incident or unanswered question.",
+    "Seed at least two plausible lines of inquiry without resolving the mystery."
+  ],
+  "version": "1"
+}

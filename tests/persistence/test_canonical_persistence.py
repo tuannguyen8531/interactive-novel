@@ -182,7 +182,7 @@ def _bundle(
                 valid_time_end=None,
                 branch_scope="public",
                 normalized_fingerprint="a" * 64,
-                schema_version="claim-1",
+                schema_version="claim",
                 provenance={"source": "test"},
             ),
             KnowledgeClaimRecord(
@@ -201,7 +201,7 @@ def _bundle(
                 valid_time_end=None,
                 branch_scope=branch_id,
                 normalized_fingerprint="b" * 64,
-                schema_version="claim-1",
+                schema_version="claim",
             ),
         )
         canon_facts = (
@@ -761,7 +761,7 @@ async def test_replay_snapshot_fallback_and_derived_failure_leave_canon_intact(d
 def test_snapshot_codec_round_trips_consent_and_player_policy() -> None:
     policy = ContentPolicy.from_mapping(
         {
-            "schema_version": "content-1",
+            "schema_version": "content",
             "rating": "teen_14_plus",
             "topic_boundaries": {"dating": TopicBoundary.OPT_IN},
         },

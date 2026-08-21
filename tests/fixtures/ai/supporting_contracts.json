@@ -1,6 +1,6 @@
 {
   "validation_query": {
-    "schema_version": "validation-query-1",
+    "schema_version": "validation-query",
     "query_id": "query-1",
     "requirement_id": "req-alice-location",
     "actor_id": "player",
@@ -11,7 +11,7 @@
     "target_claim_ids": ["claim-alice-library"]
   },
   "targeted_evidence_manifest": {
-    "schema_version": "targeted-evidence-manifest-1",
+    "schema_version": "targeted-evidence-manifest",
     "query_id": "query-1",
     "branch_scope": "root",
     "world_time": 0,

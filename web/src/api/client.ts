@@ -19,7 +19,8 @@ import type {
   TurnJobView,
   WorldConfirmation,
   WorldRecord,
-  WorldSeed
+  WorldSeed,
+  StoryTemplate
 } from './types'
 import type { HealthResponse } from './types'
 
@@ -119,10 +120,11 @@ export const api = {
   getWorld: (worldId: string): Promise<WorldRecord> => request<WorldRecord>(`/api/worlds/${encodeURIComponent(worldId)}`),
   createWorld: (payload: Record<string, unknown>): Promise<WorldRecord> =>
     request<WorldRecord>('/api/worlds', jsonBody(payload)),
+  listStoryTemplates: (): Promise<StoryTemplate[]> => request<StoryTemplate[]>('/api/story-templates'),
   deleteWorld: (worldId: string): Promise<void> =>
     request<void>(`/api/worlds/${encodeURIComponent(worldId)}`, { method: 'DELETE' }),
-  generateWorldDraft: (prompt: string): Promise<WorldSeed> =>
-    request<WorldSeed>('/api/world-drafts', jsonBody({ prompt })),
+  generateWorldDraft: (prompt: string, templateId = 'school_romance'): Promise<WorldSeed> =>
+    request<WorldSeed>('/api/world-drafts', jsonBody({ prompt, template_id: templateId })),
   validateWorldDraft: (draft: WorldSeed): Promise<WorldSeed> =>
     request<WorldSeed>('/api/world-drafts/validate', jsonBody({ draft })),
   confirmWorldDraft: (draft: WorldSeed, worldId?: string): Promise<WorldConfirmation> =>

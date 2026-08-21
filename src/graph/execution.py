@@ -292,7 +292,7 @@ class RoleExecutor:
         role_context = dict(context)
         manifest_id = str(role_context.get("manifest_id", f"manifest:{run_id}"))
         role_input = RoleInput(
-            input_schema_version="role-input-1",
+            input_schema_version="role-input",
             role=role,
             run_id=run_id,
             context_manifest_id=manifest_id,

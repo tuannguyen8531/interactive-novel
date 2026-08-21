@@ -26,7 +26,7 @@ class EpisodicSummary:
     source_ids: tuple[str, ...]
     salient_source_ids: tuple[str, ...]
     text: str
-    summary_version: str = "episodic-summary-1"
+    summary_version: str = "episodic-summary"
     derived: bool = True
 
     def __post_init__(self) -> None:

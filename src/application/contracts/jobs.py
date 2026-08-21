@@ -83,7 +83,7 @@ class JobEvent:
     event_type: str
     phase: str
     payload: dict[str, Any] = field(default_factory=dict)
-    payload_version: str = "job-event-1"
+    payload_version: str = "job-event"
     created_at: datetime = field(default_factory=utc_now)
     terminal: bool = False
 

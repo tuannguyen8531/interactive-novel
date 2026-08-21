@@ -1,6 +1,6 @@
 {
   "world_builder": {
-    "schema_version": "world-seed-1",
+    "schema_version": "world-seed",
     "role": "world_builder",
     "run_id": "world-run-1",
     "prompt_version": "1.0.0",
@@ -62,7 +62,7 @@
     ],
     "initial_claims": [
       {
-        "schema_version": "knowledge-claim-proposal-1",
+        "schema_version": "knowledge-claim-proposal",
         "proposal_id": "claim-alice-tea",
         "source_role": "world_builder",
         "source_run_id": "world-run-1",
@@ -100,7 +100,7 @@
       }
     ],
     "opening_scene": {
-      "schema_version": "scene-spec-1",
+      "schema_version": "scene-spec",
       "scene_id": "opening-scene",
       "source_role": "world_builder",
       "source_run_id": "world-run-1",
@@ -121,7 +121,7 @@
     }
   },
   "planner": {
-    "schema_version": "turn-plan-1",
+    "schema_version": "turn-plan",
     "role": "planner",
     "run_id": "turn-run-1",
     "prompt_version": "1.0.0",
@@ -140,7 +140,7 @@
     "safety_constraints": ["Keep the scene teen-safe."]
   },
   "simulator": {
-    "schema_version": "simulation-result-1",
+    "schema_version": "simulation-result",
     "role": "simulator",
     "run_id": "turn-run-1",
     "prompt_version": "1.0.0",
@@ -149,7 +149,7 @@
     "proposed_outcome": "Alice assigns the player a manageable preparation task.",
     "claim_proposals": [
       {
-        "schema_version": "knowledge-claim-proposal-1",
+        "schema_version": "knowledge-claim-proposal",
         "proposal_id": "claim-alice-library",
         "source_role": "simulator",
         "source_run_id": "turn-run-1",
@@ -171,7 +171,7 @@
       }
     ],
     "state_patch": {
-      "schema_version": "state-patch-proposal-1",
+      "schema_version": "state-patch-proposal",
       "patch_id": "patch-1",
       "branch_id": "root",
       "base_world_time": 0,
@@ -187,11 +187,11 @@
         "model_metadata": {}
       }
     },
-    "knowledge_requirements": [{"schema_version": "knowledge-requirement-1", "requirement_id": "req-alice-location", "actor_id": "player", "subject_id": "alice", "predicate": "located_at", "object_id": "library", "purpose": "authorize the meeting", "branch_scope": "root", "world_time": 0, "minimum_confidence": 0.5}],
+    "knowledge_requirements": [{"schema_version": "knowledge-requirement", "requirement_id": "req-alice-location", "actor_id": "player", "subject_id": "alice", "predicate": "located_at", "object_id": "library", "purpose": "authorize the meeting", "branch_scope": "root", "world_time": 0, "minimum_confidence": 0.5}],
     "uncertainties": [{"subject_id": "alice", "statement": "Alice may be distracted by the deadline.", "confidence": 0.6}]
   },
   "context_validator": {
-    "schema_version": "consistency-report-1",
+    "schema_version": "consistency-report",
     "role": "context_validator",
     "run_id": "turn-run-1",
     "prompt_version": "1.0.0",
@@ -202,7 +202,7 @@
     "recommended_corrections": []
   },
   "writer": {
-    "schema_version": "narrative-draft-1",
+    "schema_version": "narrative-draft",
     "role": "writer",
     "run_id": "turn-run-1",
     "prompt_version": "1.1.0",
@@ -219,7 +219,7 @@
     ]
   },
   "critic": {
-    "schema_version": "critique-result-1",
+    "schema_version": "critique-result",
     "role": "critic",
     "run_id": "turn-run-1",
     "prompt_version": "1.1.0",
@@ -228,6 +228,6 @@
     "decision": "accept",
     "issues": [],
     "revision_instructions": [],
-    "checked_scene_spec_version": "scene-spec-1"
+    "checked_scene_spec_version": "scene-spec"
   }
 }

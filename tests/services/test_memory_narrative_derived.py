@@ -93,7 +93,7 @@ def _claim(claim_id: str, *, polarity: str) -> KnowledgeClaimRecord:
         valid_time_end=None,
         branch_scope="public",
         normalized_fingerprint=claim_id,
-        schema_version="knowledge-1",
+        schema_version="knowledge",
     )
 
 
@@ -327,7 +327,7 @@ def test_missing_or_stale_artifact_falls_back_to_canonical_payload() -> None:
         branch_id="root",
         source_turn_id="turn-2",
         source_revision=2,
-        artifact_version="episodic-summary-1",
+        artifact_version="episodic-summary",
         payload={"text": "derived"},
     )
     resolver = DerivedArtifactResolver()

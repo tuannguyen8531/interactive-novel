@@ -17,7 +17,7 @@ def test_prompt_render_replaces_required_input_without_unresolved_placeholders()
 
 def test_render_input_requires_matching_versioned_role() -> None:
     role_input = RoleInput(
-        input_schema_version="role-input-1",
+        input_schema_version="role-input",
         role=AIPromptRole.WRITER,
         run_id="turn-run-1",
         context_manifest_id="manifest-1",
@@ -27,7 +27,7 @@ def test_render_input_requires_matching_versioned_role() -> None:
 
     rendered = PromptRegistry().render_input(AIPromptRole.WRITER, role_input)
 
-    assert "role-input-1" in rendered
+    assert "role-input" in rendered
     with pytest.raises(PromptRegistryError, match="Role input is for writer"):
         PromptRegistry().render_input(AIPromptRole.CRITIC, role_input)
 
@@ -48,7 +48,7 @@ def test_repair_prompt_contains_role_schema_and_diagnostics() -> None:
     )
 
     assert "simulator" in prompt
-    assert "simulation-result-1" in prompt
+    assert "simulation-result" in prompt
     assert "state_patch.operations" in prompt
     assert "{bad json}" in prompt
 

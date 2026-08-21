@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ApiError, api } from '@/api/client'
-import type { WorldConfirmation, WorldRecord, WorldSeed } from '@/api/types'
+import type { StoryTemplate, WorldConfirmation, WorldRecord, WorldSeed } from '@/api/types'
 
 export type WorldBuilderStage = 'prompt' | 'review' | 'confirmed'
 
@@ -22,6 +22,19 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
   const prompt = ref('A gentle school romance around a culture club preparing for its first festival.')
   const tonePreset = ref('warm, reflective')
   const ratingPreset = ref('teen_14_plus')
+  const templateId = ref('school_romance')
+  const templates = ref<StoryTemplate[]>([
+    {
+      id: 'school_romance',
+      name: 'School romance',
+      description: 'A character-driven romance around school, class, or club life.',
+      genre: 'school_romance',
+      default_tone: 'warm, reflective',
+      default_presets: {},
+      opening_guidance: [],
+      version: '1'
+    }
+  ])
   const violencePreset = ref('none')
   const stage = ref<WorldBuilderStage>('prompt')
   const draft = ref<WorldSeed | null>(null)
@@ -34,6 +47,14 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
 
   const loading = computed(() => generating.value || validating.value || confirming.value)
   const createdWorld = computed<WorldRecord | null>(() => confirmation.value?.world ?? null)
+
+  async function loadTemplates(): Promise<void> {
+    try {
+      templates.value = await api.listStoryTemplates()
+    } catch {
+      // Keep the built-in school-romance fallback when the catalog is unavailable.
+    }
+  }
   const contentWarnings = computed(() => {
     if (!draft.value) return []
     const warnings: string[] = []
@@ -50,7 +71,7 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
   function requestPrompt(): string {
     return [
       prompt.value.trim(),
-      'Template: school_romance.',
+      'Template: ' + templateId.value + '.',
       'Tone preset: ' + tonePreset.value + '.',
       'Content preset: rating=' + ratingPreset.value + ', violence=' + violencePreset.value + ', adult_explicit_opt_in=' + (ratingPreset.value === 'adult_18_plus') + '.'
     ].join('\n')
@@ -61,7 +82,7 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     error.value = null
     validationMessages.value = []
     try {
-      const generated = await api.generateWorldDraft(requestPrompt())
+      const generated = await api.generateWorldDraft(requestPrompt(), templateId.value)
       draft.value = generated
       confirmation.value = null
       stage.value = 'review'
@@ -123,6 +144,8 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     prompt,
     tonePreset,
     ratingPreset,
+    templateId,
+    templates,
     violencePreset,
     stage,
     draft,
@@ -135,6 +158,7 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     error,
     validationMessages,
     contentWarnings,
+    loadTemplates,
     generate,
     validate,
     confirm,

@@ -1,0 +1,19 @@
+{
+  "id": "fantasy_adventure",
+  "name": "Fantasy adventure",
+  "description": "A character-led journey through a fantastical world with danger, discovery, and consequential choices.",
+  "genre": "fantasy_adventure",
+  "default_tone": "wondrous, adventurous",
+  "prompt_instructions": "Build a coherent fantasy setting with distinct locations, understandable stakes, and a small party of characters with conflicting goals. Establish the world's unusual rule or threat through observable details rather than an encyclopedia dump.",
+  "default_presets": {
+    "tone": "wondrous, adventurous",
+    "rating": "mature_16_plus",
+    "violence_ceiling": "non_graphic",
+    "adult_explicit_opt_in": false
+  },
+  "opening_guidance": [
+    "Open at the edge of a journey, discovery, or dangerous obligation.",
+    "Show one concrete consequence of the world's unusual rule or threat."
+  ],
+  "version": "1"
+}

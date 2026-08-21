@@ -43,9 +43,10 @@ class WorldCreateRequest(BaseModel):
 
 
 class WorldDraftGenerateRequest(BaseModel):
-    """Natural-language request for a transient school-romance WorldSeed."""
+    """Natural-language request for a transient templated WorldSeed."""
 
     prompt: str = Field(min_length=1, max_length=20_000)
+    template_id: str = Field(default="school_romance", min_length=1, max_length=80)
 
 
 class WorldDraftRequest(BaseModel):

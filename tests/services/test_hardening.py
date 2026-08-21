@@ -27,7 +27,7 @@ def _trace(*, run_id: str = "run-1", latency_ms: float = 12.0) -> LLMRunTrace:
         provider="fixture",
         model="fixture-model",
         prompt_version="1.0.0",
-        output_schema_version="narrative-draft-1",
+        output_schema_version="narrative-draft",
         latency_ms=latency_ms,
         token_usage=TokenUsageSnapshot(prompt_tokens=100, completion_tokens=50, total_tokens=150),
     )
@@ -154,7 +154,7 @@ def test_export_bundle_detects_tampering() -> None:
     payload = {"playthrough": {"id": "playthrough-1"}, "turns": []}
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     bundle = ExportBundle(
-        format_version="playthrough-export-bundle-1",
+        format_version="playthrough-export-bundle",
         exported_at="2026-01-01T00:00:00+00:00",
         payload=payload,
         sha256=hashlib.sha256(canonical).hexdigest(),

@@ -56,7 +56,7 @@ class TelemetryEvent:
     def as_dict(self) -> dict[str, Any]:
         """Return JSON-safe metadata; raw prompts and provider output are absent."""
         return {
-            "schema_version": "telemetry-event-1",
+            "schema_version": "telemetry-event",
             "recorded_at": self.recorded_at.astimezone(UTC).isoformat(),
             "run_id": self.run_id,
             "logical_role": self.logical_role,

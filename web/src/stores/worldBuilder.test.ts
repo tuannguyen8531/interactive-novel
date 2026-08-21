@@ -6,7 +6,7 @@ import { useWorldBuilderStore } from './worldBuilder'
 
 function seed(): WorldSeed {
   return {
-    schema_version: 'world-seed-1',
+    schema_version: 'world-seed',
     role: 'world_builder',
     run_id: 'world-run-1',
     prompt_version: '1.0.0',

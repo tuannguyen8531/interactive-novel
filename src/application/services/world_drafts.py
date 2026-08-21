@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, replace
+from inspect import signature
 from typing import Any
 from uuid import uuid4
 
@@ -34,6 +35,7 @@ from src.domain.knowledge import KnowledgeClaim
 from src.domain.values import TimeRange
 from src.services.ai.contracts import AIContractValidationError
 from src.services.ai.validators import validate_semantics
+from src.templates import StoryTemplate, StoryTemplateRegistry, StoryTemplateRegistryError
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,16 +52,31 @@ class WorldConfirmation:
 class WorldDraftApplicationService:
     """Keep a WorldSeed transient until explicit user confirmation."""
 
-    def __init__(self, uow_factory: UowFactory, *, generator: WorldDraftGenerator | None = None) -> None:
+    def __init__(
+        self,
+        uow_factory: UowFactory,
+        *,
+        generator: WorldDraftGenerator | None = None,
+        templates: StoryTemplateRegistry | None = None,
+    ) -> None:
         self._uow_factory = uow_factory
         self._generator = generator
+        self._templates = templates or StoryTemplateRegistry()
 
-    async def generate_world_draft(self, prompt: str) -> WorldSeed:
+    async def generate_world_draft(self, prompt: str, *, template_id: str = "school_romance") -> WorldSeed:
         if not prompt.strip():
             raise ApplicationValidationError("World draft prompt must not be empty.")
         if self._generator is None:
             raise ApplicationValidationError("World draft generator is not configured.")
-        return self.validate_world_draft(await self._generator.generate_world_draft(prompt.strip()))
+        template = self._require_template(template_id)
+        generator_method: Any = self._generator.generate_world_draft
+        if "template_id" in signature(generator_method).parameters:
+            generated = await generator_method(prompt.strip(), template_id=template_id)
+        else:
+            # Keep older injected test/adaptor implementations source-compatible.
+            generated = await generator_method(prompt.strip())
+            generated = generated.model_copy(update={"template_id": template.id})
+        return self.validate_world_draft(generated)
 
     def validate_world_draft(self, seed: WorldSeed) -> WorldSeed:
         """Re-validate shape and semantic references before review or confirm."""
@@ -71,6 +88,8 @@ class WorldDraftApplicationService:
                 str(error),
                 details={"role": error.role, "diagnostics": [item.as_dict() for item in error.diagnostics]},
             ) from error
+        template = self._require_template(validated.template_id)
+        validated = validated.model_copy(update={"template_id": template.id})
         self._validate_scene_fingerprint_references(validated)
         return validated
 
@@ -141,6 +160,12 @@ class WorldDraftApplicationService:
             if reference.fingerprint is not None and reference.fingerprint not in fingerprints:
                 raise ApplicationValidationError("Opening scene references an unknown claim fingerprint.")
 
+    def _require_template(self, template_id: str) -> StoryTemplate:
+        try:
+            return self._templates.get(template_id)
+        except StoryTemplateRegistryError as error:
+            raise ApplicationValidationError(str(error), details={"template_id": template_id}) from error
+
 
 def _build_world_records(seed: WorldSeed, *, world_id: str | None) -> tuple[WorldRecord, tuple[CharacterRecord, ...]]:
     world = WorldRecord.new(
@@ -151,7 +176,7 @@ def _build_world_records(seed: WorldSeed, *, world_id: str | None) -> tuple[Worl
         tone=seed.tone,
         canon_rules={
             "world_seed": seed.model_dump(mode="json"),
-            "world_builder": {"confirmed": True, "template": "school_romance"},
+            "world_builder": {"confirmed": True, "template": seed.template_id},
         },
         content_policy=seed.content_boundaries.model_dump(mode="json"),
     )

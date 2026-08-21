@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from inspect import signature
+
 from fastapi import APIRouter, Depends, Request, Response, status
 
 from src.api.container import ApplicationContainer
@@ -20,6 +22,7 @@ from src.api.schemas import (
     WorldDraftRequest,
 )
 from src.api.serialization import public_json
+from src.templates import StoryTemplateRegistry
 
 router = APIRouter(tags=["resources"])
 _services_dependency = Depends(get_services)
@@ -30,8 +33,18 @@ async def generate_world_draft(
     payload: WorldDraftGenerateRequest,
     services: ApplicationContainer = _services_dependency,
 ):
-    draft = await services.world_drafts.generate_world_draft(payload.prompt)
+    generator = services.world_drafts.generate_world_draft
+    if "template_id" in signature(generator).parameters:
+        draft = await generator(payload.prompt, template_id=payload.template_id)
+    else:
+        # Keep older injected test/adaptor services source-compatible.
+        draft = await generator(payload.prompt)
     return public_json(draft)
+
+
+@router.get("/story-templates")
+async def list_story_templates():
+    return public_json(tuple(item.as_public_dict() for item in StoryTemplateRegistry().list()))
 
 
 @router.post("/world-drafts/validate")

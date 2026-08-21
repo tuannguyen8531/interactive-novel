@@ -4,6 +4,17 @@ export interface HealthResponse {
   version: string
 }
 
+export interface StoryTemplate {
+  id: string
+  name: string
+  description: string
+  genre: string
+  default_tone: string
+  default_presets: Record<string, unknown>
+  opening_guidance: string[]
+  version: string
+}
+
 export interface WorldRecord {
   id: string
   name: string
@@ -84,12 +95,13 @@ export interface WorldSceneSpec {
 }
 
 export interface WorldSeed {
-  schema_version: 'world-seed-1' | string
+  schema_version: 'world-seed' | string
   role: 'world_builder' | string
   run_id: string
   prompt_version: string
   physical_call_id: string | null
   config_snapshot_id?: string | null
+  template_id?: string
   title: string
   premise: string
   genre: string

@@ -106,7 +106,7 @@ class ContentPolicyOverride:
 
 @dataclass(frozen=True, slots=True)
 class ContentPolicy:
-    schema_version: str = "content-1"
+    schema_version: str = "content"
     rating: Rating = Rating.TEEN_14_PLUS
     topic_boundaries: Mapping[str, TopicBoundary] = field(default_factory=dict)
     violence_ceiling: ViolenceCeiling = ViolenceCeiling.NON_GRAPHIC
@@ -139,7 +139,7 @@ class ContentPolicy:
         )
         consent = mapping.get("consent", {})
         return cls(
-            schema_version=str(mapping.get("schema_version", "content-1")),
+            schema_version=str(mapping.get("schema_version", "content")),
             rating=Rating(mapping.get("rating", Rating.TEEN_14_PLUS)),
             topic_boundaries={str(tag): TopicBoundary(value) for tag, value in mapping.get("topic_boundaries", {}).items()},
             violence_ceiling=ViolenceCeiling(mapping.get("violence_ceiling", ViolenceCeiling.NON_GRAPHIC)),

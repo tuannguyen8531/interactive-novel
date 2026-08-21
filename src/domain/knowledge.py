@@ -53,9 +53,7 @@ DEFAULT_PREDICATES = (
 class PredicateRegistry:
     """Versioned finite registry; prose is never a predicate."""
 
-    def __init__(
-        self, predicates: Mapping[str, PredicateDefinition] | None = None, *, schema_version: str = "predicate-1"
-    ) -> None:
+    def __init__(self, predicates: Mapping[str, PredicateDefinition] | None = None, *, schema_version: str = "predicate") -> None:
         self.schema_version = schema_version
         self._predicates = dict(predicates or {predicate.name: predicate for predicate in DEFAULT_PREDICATES})
 
@@ -103,7 +101,7 @@ class KnowledgeClaim:
     qualifiers: Mapping[str, Any] = field(default_factory=dict)
     valid_time: TimeRange = field(default_factory=lambda: TimeRange(0, None))
     branch_scope: str = "public"
-    schema_version: str = "claim-1"
+    schema_version: str = "claim"
     claim_type: str = "knowledge_claim"
     claim_id: str = field(default_factory=_new_id)
     provenance: Provenance | None = None

@@ -44,7 +44,7 @@ def test_fake_provider_fixture_parses_into_versioned_role_contract(role: AIPromp
 
 def test_schema_error_has_field_diagnostic() -> None:
     payload = {
-        "schema_version": "turn-plan-1",
+        "schema_version": "turn-plan",
         "role": "planner",
         "run_id": "turn-run-1",
         "prompt_version": "1.0.0",
@@ -136,7 +136,7 @@ def test_world_seed_schema_normalizes_one_provider_envelope_with_authoritative_t
         if key not in {"schema_version", "role", "run_id", "prompt_version", "physical_call_id"}
     }
     wrapped = {
-        "schema_version": "world-seed-1",
+        "schema_version": "world-seed",
         "role": "world_builder",
         "run_id": "provider-invented-run",
         "metadata": {"prompt": "not contract metadata"},
@@ -145,7 +145,7 @@ def test_world_seed_schema_normalizes_one_provider_envelope_with_authoritative_t
     schema = AIContractRegistry().structured_schema(
         AIPromptRole.WORLD_BUILDER,
         authoritative_metadata={
-            "schema_version": "world-seed-1",
+            "schema_version": "world-seed",
             "role": "world_builder",
             "run_id": "authoritative-run",
             "prompt_version": "1.0.1",
@@ -189,7 +189,7 @@ def test_empty_evidence_manifest_must_report_insufficient_evidence() -> None:
 
 def test_role_input_is_versioned_and_strict() -> None:
     role_input = RoleInput(
-        input_schema_version="role-input-1",
+        input_schema_version="role-input",
         role=AIPromptRole.WRITER,
         run_id="turn-run-1",
         context_manifest_id="manifest-1",
@@ -198,7 +198,7 @@ def test_role_input_is_versioned_and_strict() -> None:
         context={"scene": "approved"},
     )
 
-    assert role_input.input_schema_version == "role-input-1"
+    assert role_input.input_schema_version == "role-input"
     with pytest.raises(ValidationError):
         RoleInput.model_validate({**role_input.model_dump(), "unexpected": True})
 
@@ -227,7 +227,7 @@ def test_llm_run_trace_records_prompt_and_schema_versions_without_raw_output() -
     )
 
     assert trace.prompt_version == "1.1.0"
-    assert trace.output_schema_version == "narrative-draft-1"
+    assert trace.output_schema_version == "narrative-draft"
     assert trace.token_usage is not None
     assert trace.token_usage.total_tokens == 12
     assert trace.raw_output_stored is False

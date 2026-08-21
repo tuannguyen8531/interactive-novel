@@ -295,7 +295,7 @@ class InitialContextManifest:
     token_budget: int
     estimated_tokens: int
     retrieval_trace_ids: tuple[str, ...] = ()
-    schema_version: str = "initial-context-manifest-1"
+    schema_version: str = "initial-context-manifest"
     embedding_model: str | None = None
     embedding_version: str | None = None
 

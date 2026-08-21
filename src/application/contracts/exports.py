@@ -55,7 +55,7 @@ class ExportBundle:
     def from_export(cls, exported: PlaythroughExport) -> ExportBundle:
         payload = exported.as_dict()
         return cls(
-            format_version="playthrough-export-bundle-1",
+            format_version="playthrough-export-bundle",
             exported_at=exported.exported_at.isoformat(),
             payload=payload,
             sha256=_payload_hash(payload),
@@ -75,7 +75,7 @@ class ExportBundle:
         sha256 = value.get("sha256")
         if not isinstance(format_version, str) or not isinstance(exported_at, str) or not isinstance(sha256, str):
             raise ValueError("export bundle metadata is invalid")
-        if format_version != "playthrough-export-bundle-1" or not isinstance(payload, dict):
+        if format_version != "playthrough-export-bundle" or not isinstance(payload, dict):
             raise ValueError("unsupported export bundle format")
         playthrough = payload.get("playthrough")
         if not isinstance(playthrough, dict) or not isinstance(playthrough.get("id"), str):

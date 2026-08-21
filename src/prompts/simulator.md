@@ -7,7 +7,7 @@ Input envelope (JSON):
 
 {{input_json}}
 
-Return only JSON matching `simulation-result-1` with role `simulator`. Every
+Return only JSON matching `simulation-result` with role `simulator`. Every
 authoritative proposal must be a registered `KnowledgeClaimProposal` or a
 typed `StatePatchProposal` operation. Include uncertainty when evidence is
 missing. Never promote a belief or narrative sentence into canon implicitly.

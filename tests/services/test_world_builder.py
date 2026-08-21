@@ -44,6 +44,19 @@ async def test_provider_world_builder_renders_versioned_school_romance_prompt() 
     assert '"template": "school_romance"' in provider.request.user_prompt
     assert '"player_character"' in provider.request.user_prompt
     assert '"opening_scene"' in provider.request.user_prompt
-    assert provider.request.metadata["output_schema_version"] == "world-seed-1"
+    assert provider.request.metadata["output_schema_version"] == "world-seed"
     assert result.prompt_version == "1.2.0"
     assert result.run_id != payload["run_id"]
+
+
+@pytest.mark.asyncio
+async def test_provider_world_builder_applies_selected_story_template() -> None:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]
+    provider = _Provider(payload)
+    generator = ProviderWorldDraftGenerator(provider)  # type: ignore[arg-type]
+
+    result = await generator.generate_world_draft("A missing heirloom leaves several suspects.", template_id="mystery")
+
+    assert result.template_id == "mystery"
+    assert '"template": "mystery"' in provider.request.user_prompt
+    assert "clue-driven" in provider.request.user_prompt

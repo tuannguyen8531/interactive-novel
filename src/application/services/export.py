@@ -57,7 +57,7 @@ class PlaythroughExportApplicationService:
                     relationships_by_key[(relationship.branch_id, relationship.source_id, relationship.target_id)] = relationship
             jobs = tuple(job for job in await uow.canonical.list_derived_jobs() if job.playthrough_id == playthrough_id)
         return PlaythroughExport(
-            format_version="playthrough-export-1",
+            format_version="playthrough-export",
             exported_at=datetime.now(UTC),
             world=world,
             playthrough=playthrough,
@@ -93,7 +93,7 @@ class PlaythroughExportApplicationService:
             exported = TypeAdapter(PlaythroughExport).validate_python(envelope.payload)
         except ValidationError as error:
             raise ApplicationValidationError("Export bundle payload does not match the playthrough contract.") from error
-        if exported.format_version != "playthrough-export-1":
+        if exported.format_version != "playthrough-export":
             raise ApplicationValidationError("Unsupported playthrough export format.")
 
         seed_value = exported.world.canon_rules.get("world_seed")

@@ -158,7 +158,7 @@ class TokenUsageSnapshot(AIModel):
 class LLMRunTrace(AIModel):
     """Metadata needed to audit an AI proposal without storing raw prompt/output."""
 
-    schema_version: str = "llm-run-trace-1"
+    schema_version: str = "llm-run-trace"
     run_id: str = Field(min_length=1)
     logical_role: AIPromptRole
     physical_call_id: str = Field(min_length=1)
@@ -239,7 +239,7 @@ class OutcomeCandidate(AIModel):
 class TurnPlan(VersionedOutput):
     """Planner output: direction and checks, never an authoritative mutation."""
 
-    expected_schema_version: ClassVar[str] = "turn-plan-1"
+    expected_schema_version: ClassVar[str] = "turn-plan"
     expected_role: ClassVar[AIPromptRole] = AIPromptRole.PLANNER
     interpreted_player_intent: str = Field(min_length=1)
     candidate_beats: tuple[Beat, ...] = Field(min_length=1)
@@ -270,7 +270,7 @@ class UncertaintyNote(AIModel):
 class KnowledgeClaimProposal(AIModel):
     """Typed proposition; prose cannot substitute for this structure."""
 
-    schema_version: Literal["knowledge-claim-proposal-1"] = "knowledge-claim-proposal-1"
+    schema_version: Literal["knowledge-claim-proposal"] = "knowledge-claim-proposal"
     proposal_id: str = Field(min_length=1)
     source_role: AIPromptRole
     source_run_id: str = Field(min_length=1)
@@ -310,7 +310,7 @@ class KnowledgeClaimProposal(AIModel):
 
 
 class ClaimLinkProposal(AIModel):
-    schema_version: Literal["claim-link-proposal-1"] = "claim-link-proposal-1"
+    schema_version: Literal["claim-link-proposal"] = "claim-link-proposal"
     from_claim_id: str = Field(min_length=1)
     to_claim_id: str = Field(min_length=1)
     kind: ClaimLinkKind
@@ -325,7 +325,7 @@ class ClaimLinkProposal(AIModel):
 class KnowledgeRequirement(AIModel):
     """Perspective-aware request for evidence, not an assertion of truth."""
 
-    schema_version: Literal["knowledge-requirement-1"] = "knowledge-requirement-1"
+    schema_version: Literal["knowledge-requirement"] = "knowledge-requirement"
     requirement_id: str = Field(min_length=1)
     actor_id: str = Field(min_length=1)
     subject_id: str = Field(min_length=1)
@@ -347,7 +347,7 @@ class KnowledgeRequirement(AIModel):
 
 
 class ValidationQuery(AIModel):
-    schema_version: Literal["validation-query-1"] = "validation-query-1"
+    schema_version: Literal["validation-query"] = "validation-query"
     query_id: str = Field(min_length=1)
     requirement_id: str = Field(min_length=1)
     actor_id: str = Field(min_length=1)
@@ -370,7 +370,7 @@ class EvidenceReference(AIModel):
 
 
 class TargetedEvidenceManifest(AIModel):
-    schema_version: Literal["targeted-evidence-manifest-1"] = "targeted-evidence-manifest-1"
+    schema_version: Literal["targeted-evidence-manifest"] = "targeted-evidence-manifest"
     query_id: str = Field(min_length=1)
     branch_scope: str = Field(min_length=1)
     world_time: int = Field(ge=0)
@@ -396,7 +396,7 @@ class ConsistencyViolation(AIModel):
 
 
 class ConsistencyReport(VersionedOutput):
-    expected_schema_version: ClassVar[str] = "consistency-report-1"
+    expected_schema_version: ClassVar[str] = "consistency-report"
     expected_role: ClassVar[AIPromptRole] = AIPromptRole.CONTEXT_VALIDATOR
     status: ConsistencyStatus
     violations: tuple[ConsistencyViolation, ...] = Field(default_factory=tuple)
@@ -532,7 +532,7 @@ StateOperation = Annotated[
 class StatePatchProposal(AIModel):
     """Only typed operations may cross the authority boundary."""
 
-    schema_version: Literal["state-patch-proposal-1"] = "state-patch-proposal-1"
+    schema_version: Literal["state-patch-proposal"] = "state-patch-proposal"
     patch_id: str = Field(min_length=1)
     branch_id: str = Field(min_length=1)
     base_world_time: int = Field(ge=0)
@@ -541,7 +541,7 @@ class StatePatchProposal(AIModel):
 
 
 class SimulationResult(VersionedOutput):
-    expected_schema_version: ClassVar[str] = "simulation-result-1"
+    expected_schema_version: ClassVar[str] = "simulation-result"
     expected_role: ClassVar[AIPromptRole] = AIPromptRole.SIMULATOR
     npc_reactions: tuple[NPCReaction, ...] = Field(min_length=1)
     proposed_outcome: str = Field(min_length=1)
@@ -565,7 +565,7 @@ class ClaimReference(AIModel):
 class SceneSpec(AIModel):
     """Guard-facing scene artifact; Writer must not receive raw database state."""
 
-    schema_version: Literal["scene-spec-1"] = "scene-spec-1"
+    schema_version: Literal["scene-spec"] = "scene-spec"
     scene_id: str = Field(min_length=1)
     source_role: AIPromptRole
     source_run_id: str = Field(min_length=1)
@@ -608,7 +608,7 @@ class PlayerMoveSuggestion(AIModel):
 class NarrativeDraft(VersionedOutput):
     """Writer prose and non-authoritative next-move examples."""
 
-    expected_schema_version: ClassVar[str] = "narrative-draft-1"
+    expected_schema_version: ClassVar[str] = "narrative-draft"
     expected_role: ClassVar[AIPromptRole] = AIPromptRole.WRITER
     scene_id: str = Field(min_length=1)
     narrative_text: str = Field(min_length=1)
@@ -626,13 +626,13 @@ class CritiqueIssue(AIModel):
 
 
 class CritiqueResult(VersionedOutput):
-    expected_schema_version: ClassVar[str] = "critique-result-1"
+    expected_schema_version: ClassVar[str] = "critique-result"
     expected_role: ClassVar[AIPromptRole] = AIPromptRole.CRITIC
     scene_id: str = Field(min_length=1)
     decision: CritiqueDecision
     issues: tuple[CritiqueIssue, ...] = Field(default_factory=tuple)
     revision_instructions: tuple[str, ...] = Field(default_factory=tuple)
-    checked_scene_spec_version: Literal["scene-spec-1"] = "scene-spec-1"
+    checked_scene_spec_version: Literal["scene-spec"] = "scene-spec"
 
     @model_validator(mode="after")
     def revision_requires_instructions(self) -> Self:
@@ -699,8 +699,9 @@ class ThreadSeed(AIModel):
 class WorldSeed(VersionedOutput):
     """World-builder draft; persistence requires user confirmation later."""
 
-    expected_schema_version: ClassVar[str] = "world-seed-1"
+    expected_schema_version: ClassVar[str] = "world-seed"
     expected_role: ClassVar[AIPromptRole] = AIPromptRole.WORLD_BUILDER
+    template_id: str = Field(default="school_romance", min_length=1, max_length=80)
     title: str = Field(min_length=1)
     premise: str = Field(min_length=1)
     genre: str = Field(min_length=1)

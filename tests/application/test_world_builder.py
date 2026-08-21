@@ -206,3 +206,10 @@ def test_world_builder_rejects_obvious_opposite_canon_claims() -> None:
 
     with pytest.raises(ApplicationValidationError, match="opposite polarities"):
         WorldDraftApplicationService(_factory(_State())).validate_world_draft(WorldSeed.model_validate(payload))
+
+
+def test_world_builder_rejects_unknown_story_template() -> None:
+    seed = _seed().model_copy(update={"template_id": "not_registered"})
+
+    with pytest.raises(ApplicationValidationError, match="Unknown story template"):
+        WorldDraftApplicationService(_factory(_State())).validate_world_draft(seed)

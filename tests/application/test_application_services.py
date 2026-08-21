@@ -619,7 +619,7 @@ async def test_playthrough_export_contains_canonical_records_and_is_json_safe() 
     export = await PlaythroughExportApplicationService(_factory(store)).export_playthrough(playthrough.id)
 
     payload = export.as_dict()
-    assert payload["format_version"] == "playthrough-export-1"
+    assert payload["format_version"] == "playthrough-export"
     assert payload["world"]["id"] == world.id
     assert payload["events"][0]["event_id"] == "event-export"
     assert isinstance(payload["exported_at"], str)

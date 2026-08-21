@@ -14,7 +14,7 @@
         "qualifiers": {"context": "school_festival"},
         "valid_time": {"start": 120, "end": null},
         "branch_scope": "branch-root",
-        "schema_version": "claim-1"
+        "schema_version": "claim"
       },
       "expected": {"authoritative": true, "fingerprint_stable": true}
     },

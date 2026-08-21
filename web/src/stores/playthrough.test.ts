@@ -31,7 +31,7 @@ describe('backend playthrough branch workflows', () => {
     }
     const switched = { ...store.playthrough!, active_branch_id: child.id }
     const exported = {
-      format_version: 'playthrough-export-1',
+      format_version: 'playthrough-export',
       exported_at: '2026-01-01T00:00:00Z',
       world: store.world!,
       playthrough: switched,
