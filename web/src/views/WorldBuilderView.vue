@@ -74,7 +74,6 @@ function cancel(): void {
           <select v-model="store.templateId">
             <option v-for="template in store.templates" :key="template.id" :value="template.id">{{ template.name }}</option>
           </select>
-          <span class="muted small-copy">{{ selectedTemplate?.description }}</span>
         </label>
         <label>
           Tone preset
@@ -163,8 +162,14 @@ function cancel(): void {
           <div>
             <p class="eyebrow">Characters</p>
             <h2>Seeds with room to act</h2>
+            <p class="muted small-copy">Adjust ages (14+) and keep between two and four NPC profiles.</p>
           </div>
-          <span class="muted">{{ characters.length }} created</span>
+          <div class="section-heading-actions">
+            <span class="muted">{{ characters.length }} created · {{ store.npcCount }} NPCs</span>
+            <button class="secondary" type="button" :disabled="store.loading || !store.canAddNpc" @click="store.addNpc">
+              Add NPC
+            </button>
+          </div>
         </div>
         <div v-for="character in characters" :key="character.character_id" class="character-editor">
           <div class="character-editor-heading">
@@ -172,12 +177,33 @@ function cancel(): void {
               <strong>{{ character.character_id === store.draft.player_character.character_id ? 'Player' : 'NPC' }}</strong>
               <span class="muted"> · {{ character.age }} years old</span>
             </div>
-            <code>{{ character.character_id }}</code>
+            <div class="section-heading-actions">
+              <code>{{ character.character_id }}</code>
+              <button
+                v-if="character.character_id !== store.draft.player_character.character_id"
+                class="secondary"
+                type="button"
+                :disabled="store.loading || !store.canRemoveNpc"
+                @click="store.removeNpc(character.character_id)"
+              >
+                Remove
+              </button>
+            </div>
           </div>
           <div class="field-grid">
             <label>
               Name
               <input v-model="character.name" maxlength="160" />
+            </label>
+            <label>
+              Age
+              <input
+                v-model.number="character.age"
+                type="number"
+                min="14"
+                max="120"
+                @change="store.syncCharacterAge(character.character_id)"
+              />
             </label>
             <label>
               Role
@@ -386,6 +412,14 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.section-heading-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
 }
 
 .section-heading h2 {

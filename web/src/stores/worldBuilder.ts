@@ -1,9 +1,12 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ApiError, api } from '@/api/client'
-import type { StoryTemplate, WorldConfirmation, WorldRecord, WorldSeed } from '@/api/types'
+import type { StoryTemplate, WorldCharacterSeed, WorldConfirmation, WorldRecord, WorldSeed } from '@/api/types'
 
 export type WorldBuilderStage = 'prompt' | 'review' | 'confirmed'
+
+const MIN_NPC_PROFILES = 2
+const MAX_NPC_PROFILES = 4
 
 function errorText(cause: unknown): string {
   if (cause instanceof ApiError) {
@@ -47,6 +50,9 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
 
   const loading = computed(() => generating.value || validating.value || confirming.value)
   const createdWorld = computed<WorldRecord | null>(() => confirmation.value?.world ?? null)
+  const npcCount = computed(() => draft.value?.npc_profiles.length ?? 0)
+  const canAddNpc = computed(() => npcCount.value < MAX_NPC_PROFILES)
+  const canRemoveNpc = computed(() => npcCount.value > MIN_NPC_PROFILES)
 
   async function loadTemplates(): Promise<void> {
     try {
@@ -54,6 +60,63 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     } catch {
       // Keep the built-in school-romance fallback when the catalog is unavailable.
     }
+  }
+
+  function syncCharacterAge(characterId: string): void {
+    if (!draft.value) return
+    const character = [draft.value.player_character, ...draft.value.npc_profiles].find(
+      (item) => item.character_id === characterId
+    )
+    if (!character) return
+    character.age = Number.isFinite(character.age) ? Math.max(14, Math.trunc(character.age)) : 14
+    if (characterId in draft.value.opening_scene.participants) {
+      draft.value.opening_scene.participants[characterId] = character.age
+    }
+  }
+
+  function addNpc(): void {
+    if (!draft.value) return
+    if (!canAddNpc.value) {
+      error.value = 'A world can contain at most four NPC profiles.'
+      return
+    }
+    const existingIds = new Set([draft.value.player_character, ...draft.value.npc_profiles].map((item) => item.character_id))
+    let suffix = draft.value.npc_profiles.length + 1
+    let characterId = 'npc_' + suffix
+    while (existingIds.has(characterId)) {
+      suffix += 1
+      characterId = 'npc_' + suffix
+    }
+    const character: WorldCharacterSeed = {
+      character_id: characterId,
+      name: 'New character',
+      aliases: [],
+      age: draft.value.player_character.age,
+      role: 'supporting character',
+      background: 'A new character with room to develop.',
+      voice: 'Natural speaking style',
+      traits: ['curious'],
+      values: [],
+      goal_ids: [],
+      private_claim_ids: []
+    }
+    draft.value.npc_profiles.push(character)
+    error.value = null
+  }
+
+  function removeNpc(characterId: string): void {
+    if (!draft.value) return
+    if (characterId === draft.value.player_character.character_id) {
+      error.value = 'The player character cannot be removed from the world.'
+      return
+    }
+    if (!canRemoveNpc.value) {
+      error.value = 'A world must contain at least two NPC profiles.'
+      return
+    }
+    draft.value.npc_profiles = draft.value.npc_profiles.filter((item) => item.character_id !== characterId)
+    delete draft.value.opening_scene.participants[characterId]
+    error.value = null
   }
   const contentWarnings = computed(() => {
     if (!draft.value) return []
@@ -155,10 +218,16 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     validating,
     confirming,
     loading,
+    npcCount,
+    canAddNpc,
+    canRemoveNpc,
     error,
     validationMessages,
     contentWarnings,
     loadTemplates,
+    syncCharacterAge,
+    addNpc,
+    removeNpc,
     generate,
     validate,
     confirm,

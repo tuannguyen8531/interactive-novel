@@ -147,4 +147,34 @@ describe('world builder store', () => {
 
     expect(vi.mocked(api.generateWorldDraft).mock.calls[0][0]).toContain('adult_explicit_opt_in=true')
   })
+
+  it('edits character ages and keeps opening participants synchronized', () => {
+    const store = useWorldBuilderStore()
+    store.draft = seed()
+
+    store.syncCharacterAge('alice')
+    store.draft!.npc_profiles[0].age = 19
+    store.syncCharacterAge('alice')
+
+    expect(store.draft!.npc_profiles[0].age).toBe(19)
+    expect(store.draft!.opening_scene.participants.alice).toBe(19)
+  })
+
+  it('adds and removes NPC profiles within the contract bounds', () => {
+    const store = useWorldBuilderStore()
+    store.draft = seed()
+
+    store.addNpc()
+    store.addNpc()
+    expect(store.npcCount).toBe(4)
+    expect(store.canAddNpc).toBe(false)
+
+    const addedNpcId = store.draft!.npc_profiles[2].character_id
+    store.removeNpc(addedNpcId)
+    expect(store.npcCount).toBe(3)
+    store.removeNpc('alice')
+    expect(store.npcCount).toBe(2)
+    store.removeNpc('bob')
+    expect(store.npcCount).toBe(2)
+  })
 })
