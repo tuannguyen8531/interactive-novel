@@ -40,6 +40,9 @@ class RelationshipPolicy:
     dimension: str
     lower: float
     upper: float
+    max_gain: float = 0.2
+    max_loss: float = 0.3
+    allowed_event_types: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         expected = RELATIONSHIP_BOUNDS.get(self.dimension)
@@ -47,17 +50,30 @@ class RelationshipPolicy:
             raise DomainValidationError("unknown_relationship_dimension", f"Unknown relationship dimension: {self.dimension}.")
         if self.lower != expected[0] or self.upper != expected[1]:
             raise DomainValidationError("invalid_relationship_policy", f"Policy bounds do not match {self.dimension}.")
+        if self.max_gain <= 0 or self.max_loss <= 0:
+            raise DomainValidationError("invalid_relationship_policy", "Relationship delta limits must be positive.")
 
     def apply(self, current: float, proposed_delta: float) -> tuple[float, float]:
         if not isinstance(proposed_delta, (int, float)) or isinstance(proposed_delta, bool):
             raise DomainValidationError("invalid_relationship_delta", "Relationship delta must be numeric.")
         before = clamp(float(current), self.lower, self.upper)
-        after = clamp(before + float(proposed_delta), self.lower, self.upper)
+        bounded_delta = clamp(float(proposed_delta), -self.max_loss, self.max_gain)
+        after = clamp(before + bounded_delta, self.lower, self.upper)
         return after - before, after
 
+    def allows_event(self, event_type: str) -> bool:
+        return not self.allowed_event_types or event_type in self.allowed_event_types
 
-DEFAULT_RELATIONSHIP_POLICIES = {
-    dimension: RelationshipPolicy(dimension, *bounds) for dimension, bounds in RELATIONSHIP_BOUNDS.items()
+
+DEFAULT_RELATIONSHIP_POLICIES: dict[str, RelationshipPolicy] = {
+    "affection": RelationshipPolicy("affection", -1.0, 1.0, max_gain=0.15, max_loss=0.2),
+    "attraction": RelationshipPolicy("attraction", 0.0, 1.0, max_gain=0.1, max_loss=0.15),
+    "trust": RelationshipPolicy("trust", 0.0, 1.0, max_gain=0.1, max_loss=0.3),
+    "respect": RelationshipPolicy("respect", -1.0, 1.0, max_gain=0.15, max_loss=0.25),
+    "comfort": RelationshipPolicy("comfort", 0.0, 1.0, max_gain=0.15, max_loss=0.2),
+    "fear": RelationshipPolicy("fear", 0.0, 1.0, max_gain=0.25, max_loss=0.15),
+    "resentment": RelationshipPolicy("resentment", 0.0, 1.0, max_gain=0.2, max_loss=0.1),
+    "familiarity": RelationshipPolicy("familiarity", 0.0, 1.0),
 }
 
 
@@ -112,6 +128,11 @@ class RelationshipVector:
             raise DomainValidationError("familiarity_is_engine_derived", "Familiarity is derived from world history.")
         validated_delta, after = policy.apply(self.value(key), proposed_delta)
         return RelationshipVector({**self.values, key: after}), validated_delta, after
+
+    def with_derived_familiarity(self, value: float) -> RelationshipVector:
+        """Set the engine-derived familiarity projection without exposing an AI mutation path."""
+        policy = DEFAULT_RELATIONSHIP_POLICIES[str(RelationshipDimension.FAMILIARITY)]
+        return RelationshipVector({**self.values, RelationshipDimension.FAMILIARITY: policy.apply(0.0, value)[1]})
 
     def label(self) -> str:
         """A deliberately coarse projection; the vector remains authoritative."""

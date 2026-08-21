@@ -5,10 +5,11 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from src.domain.characters import Character, CharacterProfile
+from src.domain.engine import DomainEngine
 from src.domain.errors import GuardRejected
 from src.domain.events import Event
 from src.domain.guard import DomainGuard
-from src.domain.patch import AddEvent, ApplyRelationshipDelta, StatePatch
+from src.domain.patch import AddEvent, AdvanceClock, ApplyRelationshipDelta, StatePatch
 from src.domain.relationships import RELATIONSHIP_BOUNDS, RelationshipVector, derive_familiarity
 from src.domain.state import GameState
 from src.domain.values import Provenance
@@ -83,3 +84,35 @@ def test_directed_relationships_require_cause_and_preserve_audit_record() -> Non
     with pytest.raises(GuardRejected) as error:
         DomainGuard().validate_patch(state, missing_cause)
     assert error.value.code == "relationship_cause_event_required"
+
+
+def test_relationship_policy_clamps_asymmetric_delta_and_engine_derives_familiarity() -> None:
+    state = _state()
+    event = Event(
+        event_id="event-shared",
+        event_type="conversation",
+        world_time=0,
+        branch_scope="root",
+        actor_ids=("alice", "bob"),
+        salience=0.8,
+    )
+    patch = StatePatch(
+        (
+            AddEvent(event),
+            ApplyRelationshipDelta(
+                source_id="alice",
+                target_id="bob",
+                dimension="trust",
+                proposed_delta=0.9,
+                cause_event_id=event.event_id,
+                reason="They kept a promise.",
+                provenance=Provenance("test", "relationship-proposal"),
+            ),
+            AdvanceClock(60),
+        ),
+        branch_id="root",
+        base_world_time=0,
+    )
+    after = DomainEngine().apply(state, patch).after
+    assert after.relationship_vector("alice", "bob").value("trust") == 0.1
+    assert after.relationship_vector("alice", "bob").value("familiarity") > 0

@@ -274,6 +274,10 @@ class DomainGuard:
             _fail("familiarity_is_engine_derived", "Familiarity cannot be directly mutated.")
         if not operation.cause_event_id or operation.cause_event_id not in known_events:
             _fail("relationship_cause_event_required", "Relationship changes require an existing cause event.")
+        policy = DEFAULT_RELATIONSHIP_POLICIES[operation.dimension]
+        cause_event = known_events[operation.cause_event_id]
+        if not policy.allows_event(cause_event.event_type):
+            _fail("relationship_cause_event_invalid", "The cause event is not valid for this relationship dimension.")
         if not operation.reason.strip():
             _fail("relationship_reason_required", "Relationship changes require a reason.")
         if not hasattr(operation.provenance, "source_type"):

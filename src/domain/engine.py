@@ -31,7 +31,7 @@ from .patch import (
     UpdateBelief,
     UpdatePsychology,
 )
-from .relationships import RelationshipChange, RelationshipVector
+from .relationships import RelationshipChange, RelationshipVector, derive_familiarity
 from .state import GameState
 
 
@@ -97,7 +97,32 @@ class DomainEngine:
         working = state.copy()
         for operation_index, operation in enumerate(patch.operations):
             self._apply_operation(working, patch, operation_index, operation)
+        self._refresh_familiarity(working)
         return AppliedPatch(patch=patch, before=before, after=working)
+
+    @staticmethod
+    def _refresh_familiarity(state: GameState) -> None:
+        """Derive directed familiarity from shared canonical events and elapsed world time."""
+        shared_counts: dict[tuple[str, str], int] = {}
+        meaningful_counts: dict[tuple[str, str], int] = {}
+        for event in state.events.values():
+            participants = tuple(dict.fromkeys((*event.actor_ids, *event.target_ids, *event.witness_ids)))
+            for source_id in participants:
+                for target_id in participants:
+                    if source_id == target_id:
+                        continue
+                    key = (source_id, target_id)
+                    shared_counts[key] = shared_counts.get(key, 0) + 1
+                    if event.salience >= 0.5 or event.emotional_intensity >= 0.5:
+                        meaningful_counts[key] = meaningful_counts.get(key, 0) + 1
+        for key in set(state.relationships) | set(shared_counts):
+            vector = state.relationships.get(key, RelationshipVector.zero())
+            familiarity = derive_familiarity(
+                shared_scene_count=shared_counts.get(key, 0),
+                meaningful_event_count=meaningful_counts.get(key, 0),
+                elapsed_minutes=state.world_time,
+            )
+            state.relationships[key] = vector.with_derived_familiarity(familiarity)
 
     def revert(self, applied: AppliedPatch) -> GameState:
         """Return the exact pre-patch snapshot."""

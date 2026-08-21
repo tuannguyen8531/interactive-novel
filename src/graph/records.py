@@ -219,6 +219,7 @@ def build_canonical_bundle(state: TurnGraphState, game_state: GameState) -> Cano
         for operation in operation_list
         if isinstance(operation, ApplyRelationshipDelta)
     }
+    relationship_keys.update(key for key, vector in after.relationships.items() if before.relationships.get(key) != vector)
     relationships = tuple(
         RelationshipRecord(
             relationship_id=f"relationship:{source_id}:{target_id}",
