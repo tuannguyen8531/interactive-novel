@@ -27,6 +27,7 @@ function seed(): WorldSeed {
       name: 'Mina',
       aliases: [],
       age: 17,
+      gender: 'female',
       role: 'student',
       background: 'New to the club.',
       voice: 'curious',
@@ -41,6 +42,7 @@ function seed(): WorldSeed {
         name: 'Alice',
         aliases: [],
         age: 17,
+        gender: 'female',
         role: 'club president',
         background: 'Organized.',
         voice: 'precise',
@@ -54,6 +56,7 @@ function seed(): WorldSeed {
         name: 'Bob',
         aliases: [],
         age: 17,
+        gender: 'male',
         role: 'treasurer',
         background: 'Practical.',
         voice: 'dry',
@@ -201,15 +204,44 @@ describe('world builder store', () => {
 
     store.addNpc()
     store.addNpc()
-    expect(store.npcCount).toBe(4)
+    expect(store.npcCount).toBe(3)
     expect(store.canAddNpc).toBe(false)
 
     const addedNpcId = store.draft!.npc_profiles[2].character_id
+    expect(addedNpcId).toBe('new_character_3')
+    expect(store.draft!.npc_profiles[2]).toMatchObject({
+      gender: 'unspecified',
+      background: 'Describe this character’s history, current circumstances, motivations, important relationships, and a story-relevant hook.'
+    })
     store.removeNpc(addedNpcId)
-    expect(store.npcCount).toBe(3)
+    expect(store.npcCount).toBe(2)
     store.removeNpc('alice')
-    expect(store.npcCount).toBe(2)
+    expect(store.npcCount).toBe(1)
     store.removeNpc('bob')
-    expect(store.npcCount).toBe(2)
+    expect(store.npcCount).toBe(1)
+  })
+
+  it('derives an NPC ID from its name and remaps character references', () => {
+    const store = useWorldBuilderStore()
+    store.draft = seed()
+    const alice = store.draft.npc_profiles[0]
+    store.draft.initial_relationships = [{ source_id: 'alice', target_id: 'player', values: {} }]
+    store.draft.goals = [{ goal_id: 'alice_goal', owner_id: 'alice', description: 'Help the club.', priority: 0.8 }]
+    store.draft.threads = [
+      { thread_id: 'festival', premise: 'Prepare.', participant_ids: ['player', 'alice'], stakes: 'Trust.' }
+    ]
+    store.draft.opening_scene.consent = { 'alice:explicit': 'granted' }
+    store.draft.opening_scene.pov = 'alice'
+
+    alice.name = 'Lâm Như Nguyệt'
+    store.syncNpcIdentity(alice)
+
+    expect(alice.character_id).toBe('lam_nhu_nguyet')
+    expect(store.draft.opening_scene.participants).toEqual({ player: 17, lam_nhu_nguyet: 17 })
+    expect(store.draft.opening_scene.consent).toEqual({ 'lam_nhu_nguyet:explicit': 'granted' })
+    expect(store.draft.opening_scene.pov).toBe('lam_nhu_nguyet')
+    expect(store.draft.initial_relationships[0].source_id).toBe('lam_nhu_nguyet')
+    expect(store.draft.goals[0].owner_id).toBe('lam_nhu_nguyet')
+    expect(store.draft.threads[0].participant_ids).toEqual(['player', 'lam_nhu_nguyet'])
   })
 })

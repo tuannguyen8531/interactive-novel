@@ -19,6 +19,7 @@ class CharacterProfile:
     age_anchor: int
     age_anchor_world_time: int = 0
     aliases: tuple[str, ...] = ()
+    gender: str = "unspecified"
     role: str = ""
     background: str = ""
     appearance: str = ""

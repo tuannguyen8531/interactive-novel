@@ -164,7 +164,7 @@ Secrets ở environment/OS keyring; raw prompts/outputs không lưu mặc địn
 
 ## 9. Các quyết định sản phẩm đã khóa
 
-- Template MVP đầu tiên là school romance, 2–4 NPC chính.
+- Template MVP đầu tiên là school romance, 1–3 NPC chính.
 - POV cấu hình theo playthrough; mặc định là ngôi thứ hai.
 - Player có profile/state để lưu trạng thái thể hiện qua hành động, nhưng AI
   không tự phát minh hidden thoughts trái input.

@@ -96,9 +96,9 @@ function cancel(): void {
     <div>
       <p class="eyebrow">World Builder</p>
       <h1>Make a world worth remembering</h1>
-      <p class="lede">Describe a setting for the selected story template. The builder creates a draft first, then lets you edit every important seed before anything is saved.</p>
+      <p class="lede">Describe the story you want, then review and shape its world before you begin.</p>
     </div>
-    <span class="stage-pill">{{ store.stage === 'prompt' ? 'Draft prompt' : store.stage === 'review' ? 'Review draft' : 'Confirmed' }}</span>
+    <span class="stage-pill">{{ store.stage === 'prompt' ? 'Describe' : store.stage === 'review' ? 'Review' : 'Ready' }}</span>
   </section>
 
   <section v-if="store.stage === 'prompt'" class="builder-layout">
@@ -118,10 +118,10 @@ function cancel(): void {
             </select>
           </label>
           <div class="preset-field">
-            <span>Tone preset</span>
+            <span>Tone</span>
             <EditableCombobox
               v-model="store.tonePreset"
-              label="Tone preset"
+              label="Tone"
               placeholder="Choose or type a tone"
               :options="toneOptions"
             />
@@ -155,17 +155,17 @@ function cancel(): void {
         </div>
       </div>
       <button type="submit" :disabled="store.loading || !store.prompt.trim()">
-        {{ store.generating ? 'Creating draft…' : 'Create world draft' }}
+        {{ store.generating ? 'Creating your world…' : 'Create world' }}
       </button>
     </form>
 
     <aside class="card guidance-card">
-      <p class="eyebrow">Before confirmation</p>
-      <h2>Your draft stays private</h2>
+      <p class="eyebrow">Before you begin</p>
+      <h2>Shape the story your way</h2>
       <ul>
-        <li>AI output is checked against the typed WorldSeed contract.</li>
-        <li>You can edit title, premise, characters, locations and boundaries.</li>
-        <li>Canceling this screen makes no database request.</li>
+        <li>Review the world before starting the story.</li>
+        <li>Edit its title, premise, characters, places and content limits.</li>
+        <li>Nothing is saved until you choose to begin.</li>
       </ul>
     </aside>
   </section>
@@ -176,10 +176,10 @@ function cancel(): void {
         <div class="section-heading">
           <div>
             <p class="eyebrow">2 · Review and edit</p>
-            <h2>Shape the world before it becomes canon</h2>
+            <h2>Make the world feel right</h2>
           </div>
           <button class="secondary" type="button" :disabled="store.loading" @click="validate">
-            {{ store.validating ? 'Checking…' : 'Validate draft' }}
+            {{ store.validating ? 'Checking…' : 'Check changes' }}
           </button>
         </div>
         <div v-if="store.contentWarnings.length" class="warning-list" role="alert">
@@ -212,8 +212,8 @@ function cancel(): void {
         <div class="section-heading">
           <div>
             <p class="eyebrow">Characters</p>
-            <h2>Seeds with room to act</h2>
-            <p class="muted small-copy">Adjust ages (14+) and keep between two and four NPC profiles.</p>
+            <h2>Characters with room to grow</h2>
+            <p class="muted small-copy">Create between one and three supporting characters, all aged 14 or older.</p>
           </div>
           <div class="section-heading-actions">
             <span class="muted">{{ characters.length }} created · {{ store.npcCount }} NPCs</span>
@@ -229,7 +229,6 @@ function cancel(): void {
               <span class="muted"> · {{ character.age }} years old</span>
             </div>
             <div class="section-heading-actions">
-              <code>{{ character.character_id }}</code>
               <button
                 v-if="character.character_id !== store.draft.player_character.character_id"
                 class="secondary"
@@ -244,7 +243,7 @@ function cancel(): void {
           <div class="field-grid">
             <label>
               Name
-              <input v-model="character.name" maxlength="160" />
+              <input v-model="character.name" maxlength="160" @change="store.syncNpcIdentity(character)" />
             </label>
             <label>
               Age
@@ -257,6 +256,10 @@ function cancel(): void {
               />
             </label>
             <label>
+              Gender
+              <input v-model="character.gender" maxlength="80" placeholder="e.g. female, male, non-binary" />
+            </label>
+            <label>
               Role
               <input v-model="character.role" maxlength="160" />
             </label>
@@ -264,9 +267,14 @@ function cancel(): void {
               Voice
               <input v-model="character.voice" maxlength="300" />
             </label>
-            <label class="wide-field">
+            <label class="wide-field background-field">
               Background
-              <textarea v-model="character.background" rows="2" maxlength="2000" />
+              <textarea
+                v-model="character.background"
+                rows="6"
+                maxlength="6000"
+                placeholder="Formative history, current circumstances, motivations, important relationships or tensions, and a story hook…"
+              />
             </label>
           </div>
         </div>
@@ -275,8 +283,8 @@ function cancel(): void {
       <div class="card">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Locations and threads</p>
-            <h2>Where the first threads can move</h2>
+            <p class="eyebrow">Places and storylines</p>
+            <h2>Where the story can unfold</h2>
           </div>
         </div>
         <div v-for="location in store.draft.locations" :key="location.location_id" class="compact-editor">
@@ -291,11 +299,11 @@ function cancel(): void {
         </div>
         <div v-for="thread in store.draft.threads" :key="thread.thread_id" class="compact-editor">
           <label>
-            Thread premise
+            Storyline
             <input v-model="thread.premise" maxlength="2000" />
           </label>
           <label>
-            Stakes
+            What's at stake
             <input v-model="thread.stakes" maxlength="2000" />
           </label>
         </div>
@@ -304,8 +312,8 @@ function cancel(): void {
 
     <aside class="review-sidebar">
       <section class="card">
-        <p class="eyebrow">Content boundaries</p>
-        <h2>Safety presets</h2>
+        <p class="eyebrow">Story limits</p>
+        <h2>Content settings</h2>
         <label>
           Rating
           <select v-model="store.draft.content_boundaries.rating" @change="store.syncDraftRating">
@@ -331,8 +339,7 @@ function cancel(): void {
 
       <section class="card">
         <p class="eyebrow">Opening scene</p>
-        <h2>{{ store.draft.opening_scene.scene_id }}</h2>
-        <p class="muted small-copy">{{ store.draft.opening_scene.tone }} · {{ store.draft.opening_scene.pov }}</p>
+        <h2>How the story begins</h2>
         <p>{{ store.draft.opening_scene.visible_actions.join(' · ') }}</p>
         <p class="small-copy">
           Participants:
@@ -340,20 +347,14 @@ function cancel(): void {
             {{ index ? ' · ' : '' }}{{ characterName(characterId) }} ({{ age }})
           </span>
         </p>
-        <span class="draft-status">Awaiting confirmation</span>
-      </section>
-
-      <section class="card">
-        <p class="eyebrow">Typed seed</p>
-        <p class="small-copy">{{ store.draft.initial_claims.length }} claims · {{ store.draft.initial_relationships.length }} relations · {{ store.draft.initial_beliefs.length }} beliefs · {{ store.draft.threads.length }} threads</p>
-        <p class="muted small-copy">Confirm creates these records together with the world, playthrough, root branch and opening turn.</p>
+        <span class="draft-status">Ready to begin</span>
       </section>
 
       <div v-if="store.error" class="error-box" role="alert">{{ store.error }}</div>
       <div class="review-actions">
-        <button class="secondary" type="button" :disabled="store.loading" @click="cancel">Discard draft</button>
+        <button class="secondary" type="button" :disabled="store.loading" @click="cancel">Start over</button>
         <button type="submit" :disabled="store.loading || store.contentWarnings.length > 0">
-          {{ store.confirming ? 'Confirming…' : 'Confirm and open story' }}
+          {{ store.confirming ? 'Starting…' : 'Begin story' }}
         </button>
       </div>
     </aside>
@@ -479,6 +480,10 @@ textarea {
   grid-column: 1 / -1;
 }
 
+.background-field textarea {
+  min-height: 10rem;
+}
+
 .notice-box p,
 .guidance-card li {
   line-height: 1.5;
@@ -522,11 +527,6 @@ textarea {
 .character-editor:first-of-type {
   padding-top: 0;
   border-top: 0;
-}
-
-.character-editor-heading code {
-  color: var(--muted);
-  font-size: 0.75rem;
 }
 
 .warning-list {

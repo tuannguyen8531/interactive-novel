@@ -56,6 +56,7 @@ export interface WorldCharacterSeed {
   name: string
   aliases: string[]
   age: number
+  gender: string
   role: string
   background: string
   voice: string

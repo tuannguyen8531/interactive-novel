@@ -22,7 +22,14 @@ Return only JSON matching `world-seed` with role `world_builder`. Include
 versioned run and prompt metadata. The top-level object itself must be the
 WorldSeed: do not wrap it in `world_seed`, `metadata`, `result` or another
 envelope. Do not emit authority-bearing claims in this initial editable draft.
-Keep the opening scene `guard_approved` false. Use two to four NPC profiles.
+Keep the opening scene `guard_approved` false. Use one to three NPC profiles.
+Derive every NPC `character_id` from its name as a lowercase snake-case slug
+(for example, Aiko Tanaka becomes `aiko_tanaka`); never use placeholders such
+as `npc_one` or `npc_two`. Give every character a gender and a substantive
+three-to-six-sentence background. Cover formative history, current
+circumstances, motivations, important relationships or tensions, and at least
+one story-relevant hook. Do not merely repeat the character's name, role, voice,
+or trait list.
 Treat `opening_scene.world_time` as minutes since midnight on Day 1. Choose a
 time that fits the opening scene (for example, 480 means 08:00); do not default
 to midnight unless the requested premise actually begins there.
@@ -61,27 +68,30 @@ these authority-bearing records are added only by later validated workflows:
     "character_id": "player",
     "name": "Player character name",
     "age": 16,
+    "gender": "female",
     "role": "new club member",
-    "background": "Short background",
+    "background": "The player recently transferred after a difficult year at their previous school and hopes the culture club will offer a fresh start. They notice details others overlook but hesitate to trust unfamiliar people. Preparing for the festival gives them a practical reason to approach the club president. Their unresolved fear of being excluded can become either a source of empathy or a barrier to intimacy.",
     "voice": "Natural speaking style",
     "traits": ["curious"]
   },
   "npc_profiles": [
     {
-      "character_id": "npc_one",
-      "name": "First NPC",
+      "character_id": "aiko_tanaka",
+      "name": "Aiko Tanaka",
       "age": 16,
+      "gender": "female",
       "role": "club president",
-      "background": "Short background",
+      "background": "Aiko became club president after the previous leader graduated unexpectedly, leaving her responsible for an underfunded festival exhibition. Her family values reliability, so she hides how overwhelmed she feels and rarely delegates important work. She wants the festival to prove the club deserves to survive another year. The player's arrival offers needed help, but accepting it requires Aiko to risk showing vulnerability.",
       "voice": "Earnest speaking style",
       "traits": ["earnest"]
     },
     {
-      "character_id": "npc_two",
-      "name": "Second NPC",
+      "character_id": "ren_mori",
+      "name": "Ren Mori",
       "age": 16,
+      "gender": "male",
       "role": "club artist",
-      "background": "Short background",
+      "background": "Ren joined the club to find a quiet place to draw after repeated conflicts with a demanding art teacher. He observes interpersonal tension accurately but often mistakes silence for safety. He wants the festival display to preserve the club's identity without attracting unwanted scrutiny. His private sketches reveal details about the other members that could deepen trust or cause painful misunderstandings.",
       "voice": "Quiet speaking style",
       "traits": ["observant"]
     }
@@ -100,7 +110,7 @@ these authority-bearing records are added only by later validated workflows:
     "guard_approved": false,
     "world_time": 480,
     "tags": ["opening"],
-    "participants": {"player": 16, "npc_one": 16},
+    "participants": {"player": 16, "aiko_tanaka": 16},
     "consent": {},
     "violence_detail": "none",
     "approved_beats": ["The player enters the club room"],

@@ -29,7 +29,7 @@ from src.application.contracts.persistence import (
 from src.application.errors import ApplicationValidationError
 from src.application.ports.persistence import UowFactory
 from src.application.ports.worlds import WorldDraftGenerator
-from src.application.world_seed import opening_location_claim_id
+from src.application.world_seed import normalize_npc_character_ids, opening_location_claim_id
 from src.domain.characters import CharacterState
 from src.domain.knowledge import KnowledgeClaim
 from src.domain.values import TimeRange
@@ -111,7 +111,8 @@ class WorldDraftApplicationService:
     def validate_world_draft(self, seed: WorldSeed) -> WorldSeed:
         """Re-validate shape and semantic references before review or confirm."""
         try:
-            validated = WorldSeed.model_validate(seed.model_dump(mode="python"))
+            normalized = normalize_npc_character_ids(seed)
+            validated = WorldSeed.model_validate(normalized.model_dump(mode="python"))
             validate_semantics(validated)
         except AIContractValidationError as error:
             raise ApplicationValidationError(
@@ -574,6 +575,7 @@ def _character_record(world_id: str, seed: Any) -> CharacterRecord:
         profile={
             "public": {
                 "age": seed.age,
+                "gender": seed.gender,
                 "role": seed.role,
                 "background": seed.background,
                 "voice": seed.voice,

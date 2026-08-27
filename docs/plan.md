@@ -155,7 +155,7 @@ Không chấp nhận một bản văn hay hơn nếu nó phá canon hoặc knowl
 
 - Single-player, text-first.
 - Một template đầu tiên: school romance.
-- 2–4 NPC chính trong một playthrough.
+- 1–3 NPC chính trong một playthrough.
 - World Builder từ mô tả tự nhiên, sau đó cho người dùng xem và sửa bản nháp có cấu trúc.
 - Nhập hành động tự do.
 - Pipeline 5 vai trò AI:
@@ -1919,7 +1919,7 @@ WorldSeed tối thiểu:
 - Canon rules.
 - Locations.
 - Player character seed.
-- NPC profiles.
+- 1–3 NPC profiles; mỗi NPC có giới tính, background chi tiết và `character_id` được suy ra từ tên.
 - Initial directed relationships.
 - Public CanonFacts/KnowledgeClaims.
 - Private typed claims kèm visibility.
@@ -1933,6 +1933,7 @@ WorldSeed tối thiểu:
 ### 19.3. Validation
 
 - ID/alias không trùng.
+- Khi tên NPC đổi, mọi character reference phải được remap cùng `character_id`.
 - Mọi reference tồn tại.
 - Tuổi và nội dung phù hợp content policy.
 - Không có canon mâu thuẫn hiển nhiên.
@@ -1949,7 +1950,7 @@ Chỉ hỗ trợ school romance có cấu trúc tốt:
 - Trường học.
 - Lớp/phòng câu lạc bộ/sân trường/thư viện.
 - Người chơi.
-- 2–4 NPC chính.
+- 1–3 NPC chính.
 - Các archetype chỉ là seed, không khóa hành vi.
 - Một vài thread khởi đầu.
 

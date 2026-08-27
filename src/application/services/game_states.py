@@ -132,8 +132,9 @@ def _character(record: Any) -> Character:
             display_name=record.display_name,
             age_anchor=int(public.get("age", 18)),
             aliases=tuple(record.aliases),
+            gender=str(public.get("gender", "unspecified")),
             role=str(public.get("role", "")),
-            background=str(public.get("background", "")),
+            background=_background(public),
             appearance=str(public.get("appearance", "")),
             voice=str(public.get("voice", "")),
             traits=tuple(str(value) for value in public.get("traits", ())),
@@ -145,6 +146,14 @@ def _character(record: Any) -> Character:
             initial_secrets=tuple(str(value) for value in private.get("claim_ids", ())),
         )
     )
+
+
+def _background(public: Mapping[str, Any]) -> str:
+    background = str(public.get("background", "")).strip()
+    legacy_description = str(public.get("description", "")).strip()
+    if legacy_description and legacy_description not in background:
+        return f"{legacy_description}\n\n{background}".strip()
+    return background
 
 
 def _apply_world_seed(state: GameState, seed: WorldSeed) -> None:

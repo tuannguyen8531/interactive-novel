@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from src.domain.characters import Character, CharacterProfile
 from src.domain.codec import patch_from_payload, patch_to_payload, state_from_payload, state_to_payload
 from src.domain.engine import DomainEngine
 from src.domain.errors import GuardRejected
@@ -80,3 +81,19 @@ def test_scheduled_events_survive_patch_and_snapshot_codec() -> None:
     assert isinstance(patch_from_payload(payload).operations[0], ScheduleEvent)
     restored = state_from_payload(state_to_payload(state))
     assert restored.scheduled_events["schedule-1"].due_world_time == 5
+
+
+def test_snapshot_codec_discards_legacy_character_description() -> None:
+    state = GameState.empty(branch_id="root")
+    state.characters["alice"] = Character(
+        CharacterProfile("alice", "Alice", 17, background="A detailed and still-relevant background.")
+    )
+    payload = state_to_payload(state)
+    payload["characters"]["alice"]["profile"]["description"] = "Legacy short summary."
+
+    restored = state_from_payload(payload)
+
+    assert restored.characters["alice"].profile.background == (
+        "Legacy short summary.\n\nA detailed and still-relevant background."
+    )
+    assert not hasattr(restored.characters["alice"].profile, "description")

@@ -22,6 +22,7 @@ const input = ref<HTMLInputElement | null>(null)
 const open = ref(false)
 const query = ref('')
 const highlightedIndex = ref(-1)
+const suppressNextFocusOpen = ref(false)
 const listboxId = `editable-combobox-${Math.random().toString(36).slice(2)}`
 
 const filteredOptions = computed(() => {
@@ -53,11 +54,27 @@ function updateValue(event: Event): void {
   showOptions(value)
 }
 
+function handleFocus(): void {
+  if (suppressNextFocusOpen.value) {
+    suppressNextFocusOpen.value = false
+    return
+  }
+  showOptions()
+}
+
+function focusInputWithoutOpening(): void {
+  const target = input.value
+  if (!target || document.activeElement === target) return
+  suppressNextFocusOpen.value = true
+  target.focus()
+  suppressNextFocusOpen.value = false
+}
+
 function selectOption(option: ComboboxOption): void {
   emit('update:modelValue', option.value)
   query.value = ''
   open.value = false
-  void nextTick(() => input.value?.focus())
+  void nextTick(focusInputWithoutOpening)
 }
 
 function moveHighlight(offset: number): void {
@@ -110,7 +127,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeWhenOutsi
       :aria-label="label"
       :aria-controls="listboxId"
       :aria-expanded="open"
-      @focus="showOptions()"
+      @focus="handleFocus"
       @input="updateValue"
       @keydown="handleKeydown"
     />

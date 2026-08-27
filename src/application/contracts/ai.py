@@ -7,6 +7,7 @@ changes are represented only by typed claims and typed state operations.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from enum import StrEnum
 from typing import Annotated, Any, ClassVar, Literal, Self
 
@@ -679,13 +680,28 @@ class CharacterSeed(AIModel):
     name: str = Field(min_length=1)
     aliases: tuple[str, ...] = Field(default_factory=tuple)
     age: int = Field(ge=14)
+    gender: str = Field(default="unspecified", max_length=80)
     role: str = Field(min_length=1)
-    background: str = Field(min_length=1)
+    background: str = Field(min_length=1, max_length=6000)
     voice: str = Field(min_length=1)
     traits: tuple[str, ...] = Field(min_length=1)
     values: tuple[str, ...] = Field(default_factory=tuple)
     goal_ids: tuple[str, ...] = Field(default_factory=tuple)
     private_claim_ids: tuple[str, ...] = Field(default_factory=tuple)
+
+    @model_validator(mode="before")
+    @classmethod
+    def discard_legacy_description(cls, value: Any) -> Any:
+        """Read drafts created before description was folded into background."""
+
+        if isinstance(value, Mapping) and "description" in value:
+            normalized = dict(value)
+            legacy_description = str(normalized.pop("description", "")).strip()
+            background = str(normalized.get("background", "")).strip()
+            if legacy_description and legacy_description not in background:
+                normalized["background"] = f"{legacy_description}\n\n{background}".strip()
+            return normalized
+        return value
 
 
 class RelationshipSeed(AIModel):
@@ -729,7 +745,7 @@ class WorldSeed(VersionedOutput):
     content_boundaries: ContentBoundaryProposal
     locations: tuple[LocationSeed, ...] = Field(min_length=1)
     player_character: CharacterSeed
-    npc_profiles: tuple[CharacterSeed, ...] = Field(min_length=2, max_length=4)
+    npc_profiles: tuple[CharacterSeed, ...] = Field(min_length=1, max_length=3)
     initial_claims: tuple[KnowledgeClaimProposal, ...] = Field(default_factory=tuple)
     initial_relationships: tuple[RelationshipSeed, ...] = Field(default_factory=tuple)
     initial_beliefs: tuple[BeliefProposal, ...] = Field(default_factory=tuple)

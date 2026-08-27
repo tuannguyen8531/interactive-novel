@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from pydantic import ValidationError
 
 from src.application.contracts.ai import WorldSeed
 from src.application.contracts.persistence import BranchRecord, TurnRecord, utc_now
@@ -249,3 +250,102 @@ def test_world_builder_rejects_unknown_story_template() -> None:
 
     with pytest.raises(ApplicationValidationError, match="Unknown story template"):
         WorldDraftApplicationService(_factory(_State())).validate_world_draft(seed)
+
+
+def test_world_builder_accepts_one_npc_and_rejects_more_than_three() -> None:
+    payload = copy.deepcopy(json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"])
+    payload["npc_profiles"] = payload["npc_profiles"][:1]
+
+    assert len(WorldSeed.model_validate(payload).npc_profiles) == 1
+
+    payload["npc_profiles"] = [
+        *payload["npc_profiles"],
+        *copy.deepcopy(payload["npc_profiles"]),
+        *copy.deepcopy(payload["npc_profiles"]),
+        *copy.deepcopy(payload["npc_profiles"]),
+    ]
+    with pytest.raises(ValidationError, match="at most 3 items"):
+        WorldSeed.model_validate(payload)
+
+
+def test_world_builder_discards_legacy_character_descriptions() -> None:
+    payload = copy.deepcopy(json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"])
+    payload["player_character"]["description"] = "Legacy player summary."
+    payload["npc_profiles"][0]["description"] = "Legacy NPC summary."
+
+    seed = WorldSeed.model_validate(payload)
+
+    assert "description" not in seed.player_character.model_dump()
+    assert "description" not in seed.npc_profiles[0].model_dump()
+    assert seed.player_character.background.startswith("Legacy player summary.\n\n")
+    assert seed.npc_profiles[0].background.startswith("Legacy NPC summary.\n\n")
+
+
+def test_world_builder_derives_npc_ids_from_names_and_remaps_references() -> None:
+    payload = copy.deepcopy(json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"])
+    npc = payload["npc_profiles"][0]
+    npc["character_id"] = "npc_one"
+    npc["name"] = "Lâm Như Nguyệt"
+    npc["private_claim_ids"] = ["claim-alice-tea"]
+    payload["initial_claims"][0]["subject_id"] = "npc_one"
+    payload["initial_claims"][0]["branch_scope"] = "npc_one"
+    payload["initial_relationships"][0]["source_id"] = "npc_one"
+    payload["goals"][0]["owner_id"] = "npc_one"
+    payload["threads"][0]["participant_ids"] = ["player", "npc_one"]
+    payload["tensions"] = [
+        {
+            "tension_id": "tension-one",
+            "observer_id": "npc_one",
+            "rival_id": "bob",
+            "focus_id": "player",
+            "appraisal": "She worries Bob will take the player's attention.",
+        }
+    ]
+    payload["initial_beliefs"] = [
+        {
+            "belief_id": "belief-one",
+            "believer_id": "npc_one",
+            "claim_id": "claim-alice-tea",
+            "stance": "supports",
+            "confidence": 0.8,
+            "evidence_ids": [],
+            "counter_evidence_ids": [],
+            "branch_scope": "npc_one",
+            "world_time": 480,
+            "source_reliability": 0.9,
+        }
+    ]
+    payload["opening_scene"]["participants"] = {"player": 17, "npc_one": 17}
+    payload["opening_scene"]["consent"] = {"npc_one:explicit": "granted"}
+    payload["opening_scene"]["pov"] = "npc_one"
+    service = WorldDraftApplicationService(_factory(_State()))
+
+    normalized = service.validate_world_draft(WorldSeed.model_validate(payload))
+
+    assert normalized.npc_profiles[0].character_id == "lam_nhu_nguyet"
+    assert normalized.initial_claims[0].subject_id == "lam_nhu_nguyet"
+    assert normalized.initial_claims[0].branch_scope == "lam_nhu_nguyet"
+    assert normalized.initial_relationships[0].source_id == "lam_nhu_nguyet"
+    assert normalized.initial_beliefs[0].believer_id == "lam_nhu_nguyet"
+    assert normalized.initial_beliefs[0].branch_scope == "lam_nhu_nguyet"
+    assert normalized.goals[0].owner_id == "lam_nhu_nguyet"
+    assert normalized.tensions[0].observer_id == "lam_nhu_nguyet"
+    assert normalized.threads[0].participant_ids == ("player", "lam_nhu_nguyet")
+    assert normalized.opening_scene.participants == {"player": 17, "lam_nhu_nguyet": 17}
+    assert normalized.opening_scene.consent == {"lam_nhu_nguyet:explicit": "granted"}
+    assert normalized.opening_scene.pov == "lam_nhu_nguyet"
+
+
+def test_world_builder_preserves_stable_suffixes_for_duplicate_npc_names() -> None:
+    seed = _seed()
+    duplicate_names = (
+        seed.npc_profiles[0].model_copy(update={"character_id": "alice_2", "name": "Alice"}),
+        seed.npc_profiles[1].model_copy(update={"character_id": "alice", "name": "Alice"}),
+    )
+    service = WorldDraftApplicationService(_factory(_State()))
+
+    normalized = service.validate_world_draft(seed.model_copy(update={"npc_profiles": duplicate_names}))
+    normalized_again = service.validate_world_draft(normalized)
+
+    assert tuple(item.character_id for item in normalized.npc_profiles) == ("alice_2", "alice")
+    assert normalized_again == normalized

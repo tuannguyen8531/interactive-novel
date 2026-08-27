@@ -210,6 +210,10 @@ def state_from_payload(payload: Mapping[str, Any]) -> GameState:
     characters: dict[str, Character] = {}
     for character_id, value in payload.get("characters", {}).items():
         profile_data = dict(value["profile"])
+        legacy_description = str(profile_data.pop("description", "")).strip()
+        background = str(profile_data.get("background", "")).strip()
+        if legacy_description and legacy_description not in background:
+            profile_data["background"] = f"{legacy_description}\n\n{background}".strip()
         state_data = dict(value["state"])
         state_data["psychology"] = PsychologicalState(**state_data["psychology"])
         characters[str(character_id)] = Character(CharacterProfile(**profile_data), CharacterState(**state_data))
