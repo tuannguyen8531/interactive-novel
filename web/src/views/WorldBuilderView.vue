@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import EditableCombobox from '@/components/EditableCombobox.vue'
 import { useWorldBuilderStore } from '@/stores/worldBuilder'
 
 const router = useRouter()
@@ -14,6 +15,46 @@ const characters = computed(() =>
   store.draft ? [store.draft.player_character, ...store.draft.npc_profiles] : []
 )
 const selectedTemplate = computed(() => store.templates.find((item) => item.id === store.templateId))
+function toneLabel(value: string): string {
+  return value
+    .split(',')
+    .map((part) => part.trim().replace(/\b\w/g, (letter) => letter.toLocaleUpperCase()))
+    .join(' and ')
+}
+
+const toneOptions = computed(() => {
+  const values = [
+    'warm, reflective',
+    'playful, hopeful',
+    'quiet, bittersweet',
+    ...store.templates.map((template) => template.defaults.tone),
+    store.tonePreset
+  ]
+  return [...new Set(values.filter(Boolean))].map((value) => ({
+    value,
+    label: toneLabel(value)
+  }))
+})
+const ratingLabel = computed(() => {
+  if (store.ratingPreset === 'teen_14_plus') return 'Teen'
+  if (store.ratingPreset === 'mature_16_plus') return 'Mature'
+  return 'Adult'
+})
+const ratingDescription = computed(() => {
+  if (store.ratingPreset === 'teen_14_plus') return 'Keeps themes suitable for ages 14 and up.'
+  if (store.ratingPreset === 'mature_16_plus') return 'Allows heavier emotional and relationship themes.'
+  return 'Allows adult themes and enables explicit-content opt-in.'
+})
+const violenceLabel = computed(() => {
+  if (store.violencePreset === 'none') return 'No violence'
+  if (store.violencePreset === 'restrained') return 'Restrained violence'
+  return 'Detailed violence'
+})
+const violenceDescription = computed(() => {
+  if (store.violencePreset === 'none') return 'Violent actions are not depicted.'
+  if (store.violencePreset === 'restrained') return 'Violence may occur without vivid physical detail.'
+  return 'Violence and its physical consequences may be described directly.'
+})
 
 function characterName(characterId: string): string {
   return characters.value.find((character) => character.character_id === characterId)?.name ?? characterId
@@ -68,44 +109,50 @@ function cancel(): void {
         World description
         <textarea v-model="store.prompt" rows="7" maxlength="20000" placeholder="Describe the setting, characters, conflict, or mystery you want to explore…" />
       </label>
-      <div class="preset-grid">
-        <label>
-          Story template
-          <select v-model="store.templateId" @change="store.applySelectedTemplateDefaults">
-            <option v-for="template in store.templates" :key="template.id" :value="template.id">{{ template.name }}</option>
-          </select>
-        </label>
-        <label>
-          Tone preset
-          <input v-model="store.tonePreset" list="tone-presets" maxlength="80" />
-          <datalist id="tone-presets">
-            <option value="warm, reflective">Warm and reflective</option>
-            <option value="playful, hopeful">Playful and hopeful</option>
-            <option value="quiet, bittersweet">Quiet and bittersweet</option>
-            <option v-for="template in store.templates" :key="template.id" :value="template.defaults.tone" />
-          </datalist>
-        </label>
-        <label>
-          Content rating
-          <select v-model="store.ratingPreset">
-            <option value="teen_14_plus">Teen 14+</option>
-            <option value="mature_16_plus">Mature 16+</option>
-            <option value="adult_18_plus">Adult 18+</option>
-          </select>
-        </label>
-        <label>
-          Violence ceiling
-          <select v-model="store.violencePreset">
-            <option value="none">None</option>
-            <option value="restrained">Restrained</option>
-            <option value="detailed">Detailed</option>
-          </select>
-          <span class="muted small-copy">Maximum detail allowed when violence, torture, or sexual violence occurs.</span>
-        </label>
-      </div>
-      <div class="notice-box">
-        <strong>{{ selectedTemplate?.name ?? 'Story template' }}</strong>
-        <p>{{ selectedTemplate?.description ?? 'Choose a story template to shape the generated world.' }}</p>
+      <div class="preset-groups">
+        <div class="preset-row">
+          <label>
+            Story template
+            <select v-model="store.templateId" @change="store.applySelectedTemplateDefaults">
+              <option v-for="template in store.templates" :key="template.id" :value="template.id">{{ template.name }}</option>
+            </select>
+          </label>
+          <div class="preset-field">
+            <span>Tone preset</span>
+            <EditableCombobox
+              v-model="store.tonePreset"
+              label="Tone preset"
+              placeholder="Choose or type a tone"
+              :options="toneOptions"
+            />
+          </div>
+        </div>
+        <div class="notice-box preset-description">
+          <strong>{{ selectedTemplate?.name ?? 'Story template' }}</strong>
+          <p :title="selectedTemplate?.description">{{ selectedTemplate?.description ?? 'Choose a story template to shape the generated world.' }}</p>
+        </div>
+        <div class="preset-row">
+          <label>
+            Content rating
+            <select v-model="store.ratingPreset">
+              <option value="teen_14_plus">Teen 14+</option>
+              <option value="mature_16_plus">Mature 16+</option>
+              <option value="adult_18_plus">Adult 18+</option>
+            </select>
+          </label>
+          <label>
+            Violence ceiling
+            <select v-model="store.violencePreset">
+              <option value="none">None</option>
+              <option value="restrained">Restrained</option>
+              <option value="detailed">Detailed</option>
+            </select>
+          </label>
+        </div>
+        <div class="notice-box preset-description policy-notice">
+          <strong>{{ ratingLabel }} with {{ violenceLabel }}</strong>
+          <p>{{ ratingDescription }} {{ violenceDescription }}</p>
+        </div>
       </div>
       <button type="submit" :disabled="store.loading || !store.prompt.trim()">
         {{ store.generating ? 'Creating draft…' : 'Create world draft' }}
@@ -352,7 +399,8 @@ function cancel(): void {
   gap: 1rem;
 }
 
-label {
+label,
+.preset-field {
   display: grid;
   gap: 0.4rem;
   color: var(--muted);
@@ -387,15 +435,44 @@ textarea {
   line-height: 1.5;
 }
 
-.preset-grid,
+.preset-row,
 .field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.9rem;
 }
 
-.preset-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.preset-groups {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.preset-description {
+  display: grid;
+  height: 7.25rem;
+  grid-template-rows: auto 1fr;
+  align-content: start;
+  gap: 0.25rem;
+  margin: 0;
+  padding-bottom: 1.1rem;
+  overflow: hidden;
+}
+
+.preset-description strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-description p {
+  margin: 0;
+}
+
+.policy-notice {
+  border-color: #d8aa99;
+  background: #fae9e1;
+  box-shadow: inset 0.22rem 0 var(--accent);
+  color: var(--accent-dark);
 }
 
 .wide-field {
@@ -538,10 +615,14 @@ textarea {
 }
 
 @media (max-width: 560px) {
-  .preset-grid,
+  .preset-row,
   .field-grid,
   .compact-editor {
     grid-template-columns: 1fr;
+  }
+
+  .preset-description {
+    height: 8.5rem;
   }
 }
 </style>
