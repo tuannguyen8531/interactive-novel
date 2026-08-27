@@ -1,7 +1,15 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ApiError, api } from '@/api/client'
-import type { StoryTemplate, WorldCharacterSeed, WorldConfirmation, WorldRecord, WorldSeed } from '@/api/types'
+import type {
+  ContentRating,
+  StoryTemplate,
+  ViolenceCeiling,
+  WorldCharacterSeed,
+  WorldConfirmation,
+  WorldRecord,
+  WorldSeed
+} from '@/api/types'
 
 export type WorldBuilderStage = 'prompt' | 'review' | 'confirmed'
 
@@ -24,7 +32,7 @@ function errorText(cause: unknown): string {
 export const useWorldBuilderStore = defineStore('worldBuilder', () => {
   const prompt = ref('A gentle school romance around a culture club preparing for its first festival.')
   const tonePreset = ref('warm, reflective')
-  const ratingPreset = ref('teen_14_plus')
+  const ratingPreset = ref<ContentRating>('teen_14_plus')
   const templateId = ref('school_romance')
   const templates = ref<StoryTemplate[]>([
     {
@@ -32,13 +40,22 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
       name: 'School romance',
       description: 'A character-driven romance around school, class, or club life.',
       genre: 'school_romance',
-      default_tone: 'warm, reflective',
-      default_presets: {},
+      prompt_instructions: 'Build a grounded, relationship-driven school setting.',
+      defaults: {
+        tone: 'warm, reflective',
+        rating: 'teen_14_plus',
+        violence_ceiling: 'none'
+      },
+      narrative_profile: {
+        primary_focus: 'romance',
+        romance_priority: 'high',
+        relationship_pacing: 'slow_burn'
+      },
       opening_guidance: [],
       version: '1'
     }
   ])
-  const violencePreset = ref('none')
+  const violencePreset = ref<ViolenceCeiling>('none')
   const stage = ref<WorldBuilderStage>('prompt')
   const draft = ref<WorldSeed | null>(null)
   const confirmation = ref<WorldConfirmation | null>(null)
@@ -57,9 +74,24 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
   async function loadTemplates(): Promise<void> {
     try {
       templates.value = await api.listStoryTemplates()
+      applySelectedTemplateDefaults()
     } catch {
       // Keep the built-in school-romance fallback when the catalog is unavailable.
     }
+  }
+
+  function applySelectedTemplateDefaults(): void {
+    const selected = templates.value.find((item) => item.id === templateId.value)
+    if (!selected) return
+    tonePreset.value = selected.defaults.tone
+    ratingPreset.value = selected.defaults.rating
+    violencePreset.value = selected.defaults.violence_ceiling
+  }
+
+  function syncDraftRating(): void {
+    if (!draft.value) return
+    draft.value.content_boundaries.adult_explicit_opt_in =
+      draft.value.content_boundaries.rating === 'adult_18_plus'
   }
 
   function syncCharacterAge(characterId: string): void {
@@ -131,21 +163,18 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     return warnings
   })
 
-  function requestPrompt(): string {
-    return [
-      prompt.value.trim(),
-      'Template: ' + templateId.value + '.',
-      'Tone preset: ' + tonePreset.value + '.',
-      'Content preset: rating=' + ratingPreset.value + ', violence=' + violencePreset.value + ', adult_explicit_opt_in=' + (ratingPreset.value === 'adult_18_plus') + '.'
-    ].join('\n')
-  }
-
   async function generate(): Promise<WorldSeed> {
     generating.value = true
     error.value = null
     validationMessages.value = []
     try {
-      const generated = await api.generateWorldDraft(requestPrompt(), templateId.value)
+      const generated = await api.generateWorldDraft({
+        prompt: prompt.value.trim(),
+        template_id: templateId.value,
+        tone: tonePreset.value.trim(),
+        rating: ratingPreset.value,
+        violence_ceiling: violencePreset.value
+      })
       draft.value = generated
       confirmation.value = null
       stage.value = 'review'
@@ -225,6 +254,8 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     validationMessages,
     contentWarnings,
     loadTemplates,
+    applySelectedTemplateDefaults,
+    syncDraftRating,
     syncCharacterAge,
     addNpc,
     removeNpc,

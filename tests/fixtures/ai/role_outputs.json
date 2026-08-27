@@ -12,7 +12,7 @@
     "content_boundaries": {
       "rating": "teen_14_plus",
       "topic_boundaries": {"adult_explicit": "excluded"},
-      "violence_ceiling": "non_graphic",
+      "violence_ceiling": "restrained",
       "adult_explicit_opt_in": false
     },
     "locations": [
@@ -109,6 +109,7 @@
       "tags": ["romantic_affection"],
       "participants": {"player": 17, "alice": 17},
       "consent": {},
+      "violence_detail": "none",
       "approved_beats": ["meet-alice"],
       "visible_actions": ["enter library"],
       "allowed_dialogue_intents": ["greeting"],
@@ -137,7 +138,9 @@
     "required_checks": [{"check_id": "check-location", "check_type": "location", "subject_id": "alice", "rationale": "Alice must be able to meet the player."}],
     "possible_outcomes": [{"outcome_id": "outcome-cooperate", "description": "Alice accepts a bounded offer of help.", "likelihood": 0.7, "risk_flags": []}],
     "pacing_note": "Advance the club thread without resolving the relationship.",
-    "safety_constraints": ["Keep the scene teen-safe."]
+    "safety_constraints": ["Keep the scene teen-safe."],
+    "content_tags": ["romantic_affection"],
+    "violence_detail": "none"
   },
   "simulator": {
     "schema_version": "simulation-result",

@@ -5,7 +5,7 @@
     "teen_world": {
       "schema_version": "content",
       "rating": "teen_14_plus",
-      "violence_ceiling": "non_graphic",
+      "violence_ceiling": "restrained",
       "adult_explicit_opt_in": false,
       "topic_boundaries": {
         "grooming": "excluded",
@@ -13,10 +13,7 @@
         "non_consensual_sexual": "excluded",
         "adult_explicit": "excluded",
         "sexualized_nudity": "excluded",
-        "fetishization": "excluded",
-        "violence_gore": "excluded",
-        "violence_torture_detail": "excluded",
-        "violence_sexual": "excluded"
+        "fetishization": "excluded"
       },
       "consent": {
         "required": true,
@@ -27,7 +24,7 @@
     "mature_world": {
       "schema_version": "content",
       "rating": "mature_16_plus",
-      "violence_ceiling": "non_graphic",
+      "violence_ceiling": "restrained",
       "adult_explicit_opt_in": false,
       "topic_boundaries": {
         "grooming": "excluded",
@@ -35,10 +32,7 @@
         "non_consensual_sexual": "excluded",
         "adult_explicit": "opt_in",
         "sexualized_nudity": "excluded",
-        "fetishization": "excluded",
-        "violence_gore": "excluded",
-        "violence_torture_detail": "excluded",
-        "violence_sexual": "excluded"
+        "fetishization": "excluded"
       },
       "consent": {
         "required": true,
@@ -49,7 +43,7 @@
     "adult_world_opted_in": {
       "schema_version": "content",
       "rating": "adult_18_plus",
-      "violence_ceiling": "non_graphic",
+      "violence_ceiling": "restrained",
       "adult_explicit_opt_in": true,
       "topic_boundaries": {
         "grooming": "excluded",
@@ -57,10 +51,7 @@
         "non_consensual_sexual": "excluded",
         "adult_explicit": "opt_in",
         "sexualized_nudity": "opt_in",
-        "fetishization": "excluded",
-        "violence_gore": "excluded",
-        "violence_torture_detail": "excluded",
-        "violence_sexual": "excluded"
+        "fetishization": "excluded"
       },
       "consent": {
         "required": true,

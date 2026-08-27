@@ -28,7 +28,7 @@ function makeWorld(): WorldRecord {
     genre: 'school_romance',
     tone: 'warm, reflective',
     canon_rules: { setting: 'Hoshikawa Academy', season: 'early autumn' },
-    content_policy: { rating: 'teen_14_plus', violence_ceiling: 'non_graphic' },
+    content_policy: { rating: 'teen_14_plus', violence_ceiling: 'restrained' },
     schema_version: 1,
     created_at: now,
     updated_at: now

@@ -3,13 +3,16 @@
   "name": "Mystery",
   "description": "A clue-driven story built around secrets, investigation, and competing interpretations.",
   "genre": "mystery",
-  "default_tone": "tense, observant",
-  "prompt_instructions": "Build a clue-driven setting with a clear initial question, suspects or competing explanations, and evidence that can be discovered without making the answer canonical in the opening scene. Give central characters distinct motives and knowledge boundaries.",
-  "default_presets": {
+  "prompt_instructions": "Build a romance-led, clue-driven setting with a clear initial question, suspects or competing explanations, and evidence that can be discovered without making the answer canonical in the opening scene. Develop attraction through trust, secrets, suspicion, and conflicting loyalties. Give central characters distinct motives and knowledge boundaries.",
+  "defaults": {
     "tone": "tense, observant",
     "rating": "teen_14_plus",
-    "violence_ceiling": "non_graphic",
-    "adult_explicit_opt_in": false
+    "violence_ceiling": "restrained"
+  },
+  "narrative_profile": {
+    "primary_focus": "romance",
+    "romance_priority": "high",
+    "relationship_pacing": "trust_through_mystery"
   },
   "opening_guidance": [
     "Present an unexplained incident or unanswered question.",

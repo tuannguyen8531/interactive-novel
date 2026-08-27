@@ -40,7 +40,7 @@ from src.application.contracts.providers import (
     ProviderCancelledError,
 )
 from src.application.contracts.retrieval import InitialContextRequest, RetrievalScope
-from src.domain.content import ConsentState
+from src.domain.content import ConsentState, ViolenceCeiling
 from src.domain.content import SceneSpec as DomainSceneSpec
 from src.domain.errors import GuardRejected
 from src.domain.events import Belief, Observation
@@ -223,6 +223,14 @@ class TurnGraphNodes:
             )
         context_manifest = manifest.as_context()
         context_manifest["authoritative_ids"] = _authoritative_ids(game_state)
+        context_manifest["world_profile"] = dict(game_state.metadata.get("world_profile", {}))
+        if game_state.policy is not None:
+            context_manifest["content_policy"] = {
+                "rating": game_state.policy.rating.value,
+                "violence_ceiling": game_state.policy.violence_ceiling.value,
+                "adult_explicit_opt_in": game_state.policy.adult_explicit_opt_in,
+                "topic_boundaries": {key: value.value for key, value in game_state.policy.topic_boundaries.items()},
+            }
         return {"context_manifest": context_manifest}
 
     async def _plan(self, state: TurnGraphState) -> dict[str, Any]:
@@ -1003,20 +1011,23 @@ def scene_from_plan(
     beats = tuple(item.description for item in plan.candidate_beats)
     visible_actions = beats or (simulation.proposed_outcome,)
     claims = tuple(ClaimReference(claim_id=item.proposal_id) for item in simulation.claim_proposals)
+    world_profile = game_state.metadata.get("world_profile", {})
+    tone = world_profile.get("tone", "gentle") if isinstance(world_profile, Mapping) else "gentle"
     return AISceneSpec(
         scene_id=f"scene-{state['turn_run_id']}",
         source_role=AIPromptRole.PLANNER,
         source_run_id=state["turn_run_id"],
         guard_approved=False,
         world_time=game_state.world_time,
-        tags=("romantic_affection",),
+        tags=plan.content_tags,
         participants=participants,
         consent={},
+        violence_detail=plan.violence_detail,
         approved_beats=beats or (simulation.proposed_outcome,),
         visible_actions=visible_actions,
         allowed_dialogue_intents=tuple(plan.intended_focus),
         pov="second_person",
-        tone="gentle",
+        tone=str(tone or "gentle"),
         continuity_details=tuple(plan.pacing_note for _ in (0,)),
         allowed_claims=claims,
         forbidden_claims=(),
@@ -1031,6 +1042,7 @@ def domain_scene_from_ai(scene: AISceneSpec) -> DomainSceneSpec:
         tags=scene.tags,
         participants=scene.participants,
         consent={key: ConsentState(value.value) for key, value in scene.consent.items()},
+        violence_detail=ViolenceCeiling(scene.violence_detail.value),
     )
 
 

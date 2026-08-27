@@ -149,6 +149,42 @@ async def test_world_builder_keeps_generated_draft_transient_until_confirmed() -
 
 
 @pytest.mark.asyncio
+async def test_world_builder_authoritatively_applies_user_presets_over_ai_output() -> None:
+    service = WorldDraftApplicationService(_factory(_State()), generator=_Generator(_seed()))
+
+    draft = await service.generate_world_draft(
+        "A romantic investigation.",
+        template_id="mystery",
+        tone="intimate, ominous",
+        rating="mature_16_plus",
+        violence_ceiling="detailed",
+    )
+
+    assert draft.template_id == "mystery"
+    assert draft.genre == "mystery"
+    assert draft.tone == draft.opening_scene.tone == "intimate, ominous"
+    assert draft.content_boundaries.rating.value == "mature_16_plus"
+    assert draft.content_boundaries.violence_ceiling.value == "detailed"
+    assert draft.content_boundaries.adult_explicit_opt_in is False
+
+
+@pytest.mark.asyncio
+async def test_adult_rating_automatically_enables_explicit_opt_in() -> None:
+    seed = _seed()
+    player = seed.player_character.model_copy(update={"age": 18})
+    npcs = tuple(item.model_copy(update={"age": 18}) for item in seed.npc_profiles)
+    participants = {character_id: 18 for character_id in seed.opening_scene.participants}
+    opening_scene = seed.opening_scene.model_copy(update={"participants": participants})
+    adult_seed = seed.model_copy(update={"player_character": player, "npc_profiles": npcs, "opening_scene": opening_scene})
+    service = WorldDraftApplicationService(_factory(_State()), generator=_Generator(adult_seed))
+
+    draft = await service.generate_world_draft("An adult romance.", rating="adult_18_plus")
+
+    assert draft.content_boundaries.rating.value == "adult_18_plus"
+    assert draft.content_boundaries.adult_explicit_opt_in is True
+
+
+@pytest.mark.asyncio
 async def test_confirm_creates_playable_opening_bundle_with_canonical_artifacts() -> None:
     store = _State()
     service = WorldDraftApplicationService(_factory(store), generator=_Generator(_seed()))

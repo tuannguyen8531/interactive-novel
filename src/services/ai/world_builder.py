@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from uuid import uuid4
 
-from src.application.contracts.ai import AIPromptRole, WorldSeed
+from src.application.contracts.ai import AIPromptRole, RatingValue, ViolenceCeilingValue, WorldSeed
 from src.application.contracts.providers import ProviderRequest
 from src.application.ports.providers import ProviderGateway
 from src.services.ai.contracts import AIContractRegistry
@@ -29,9 +29,21 @@ class ProviderWorldDraftGenerator:
         self._contracts = contracts or AIContractRegistry()
         self._templates = templates or StoryTemplateRegistry()
 
-    async def generate_world_draft(self, prompt: str, *, template_id: str = "school_romance") -> WorldSeed:
+    async def generate_world_draft(
+        self,
+        prompt: str,
+        *,
+        template_id: str = "school_romance",
+        tone: str | None = None,
+        rating: RatingValue | str | None = None,
+        violence_ceiling: ViolenceCeilingValue | str | None = None,
+    ) -> WorldSeed:
         definition = self._prompts.get(AIPromptRole.WORLD_BUILDER)
         template = self._templates.get(template_id)
+        effective_tone = tone.strip() if tone is not None else template.defaults.tone
+        effective_rating = RatingValue(rating or template.defaults.rating.value)
+        effective_ceiling = ViolenceCeilingValue(violence_ceiling or template.defaults.violence_ceiling.value)
+        adult_explicit_opt_in = effective_rating == RatingValue.ADULT_18_PLUS
         run_id = str(uuid4())
         physical_call_id = str(uuid4())
         input_envelope = {
@@ -41,7 +53,13 @@ class ProviderWorldDraftGenerator:
             "template": template.id,
             "prompt": prompt.strip(),
             "template_instructions": template.prompt_instructions,
-            "presets": dict(template.default_presets),
+            "presets": {
+                "tone": effective_tone,
+                "rating": effective_rating.value,
+                "violence_ceiling": effective_ceiling.value,
+                "adult_explicit_opt_in": adult_explicit_opt_in,
+            },
+            "narrative_profile": template.narrative_profile.as_dict(),
             "opening_guidance": list(template.opening_guidance),
         }
         request = ProviderRequest(
@@ -85,7 +103,23 @@ class ProviderWorldDraftGenerator:
         )
         if not isinstance(result, WorldSeed):
             raise TypeError("World builder contract returned a non-WorldSeed response.")
-        return result.model_copy(update={"template_id": template.id})
+        boundaries = result.content_boundaries.model_copy(
+            update={
+                "rating": effective_rating,
+                "violence_ceiling": effective_ceiling,
+                "adult_explicit_opt_in": adult_explicit_opt_in,
+            }
+        )
+        opening_scene = result.opening_scene.model_copy(update={"tone": effective_tone})
+        return result.model_copy(
+            update={
+                "template_id": template.id,
+                "genre": template.genre,
+                "tone": effective_tone,
+                "content_boundaries": boundaries,
+                "opening_scene": opening_scene,
+            }
+        )
 
 
 __all__ = ["ProviderWorldDraftGenerator"]

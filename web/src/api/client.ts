@@ -5,6 +5,7 @@ import type {
   BranchRecord,
   CharacterView,
   ConnectivityResult,
+  ContentRating,
   JobEvent,
   InspectorPayload,
   MemoryView,
@@ -17,6 +18,7 @@ import type {
   RelationshipView,
   TimelineEvent,
   TurnJobView,
+  ViolenceCeiling,
   WorldConfirmation,
   WorldRecord,
   WorldSeed,
@@ -123,8 +125,13 @@ export const api = {
   listStoryTemplates: (): Promise<StoryTemplate[]> => request<StoryTemplate[]>('/api/story-templates'),
   deleteWorld: (worldId: string): Promise<void> =>
     request<void>(`/api/worlds/${encodeURIComponent(worldId)}`, { method: 'DELETE' }),
-  generateWorldDraft: (prompt: string, templateId = 'school_romance'): Promise<WorldSeed> =>
-    request<WorldSeed>('/api/world-drafts', jsonBody({ prompt, template_id: templateId })),
+  generateWorldDraft: (payload: {
+    prompt: string
+    template_id?: string
+    tone?: string
+    rating?: ContentRating
+    violence_ceiling?: ViolenceCeiling
+  }): Promise<WorldSeed> => request<WorldSeed>('/api/world-drafts', jsonBody(payload)),
   validateWorldDraft: (draft: WorldSeed): Promise<WorldSeed> =>
     request<WorldSeed>('/api/world-drafts/validate', jsonBody({ draft })),
   confirmWorldDraft: (draft: WorldSeed, worldId?: string): Promise<WorldConfirmation> =>

@@ -138,14 +138,49 @@ describe('world builder store', () => {
     expect(confirmSpy).not.toHaveBeenCalled()
   })
 
-  it('requests adult explicit opt-in for an adult rating', async () => {
+  it('sends typed presets and lets the backend derive adult explicit opt-in', async () => {
     vi.spyOn(api, 'generateWorldDraft').mockResolvedValue(seed())
     const store = useWorldBuilderStore()
     store.ratingPreset = 'adult_18_plus'
 
     await store.generate()
 
-    expect(vi.mocked(api.generateWorldDraft).mock.calls[0][0]).toContain('adult_explicit_opt_in=true')
+    expect(vi.mocked(api.generateWorldDraft).mock.calls[0][0]).toMatchObject({
+      template_id: 'school_romance',
+      tone: 'warm, reflective',
+      rating: 'adult_18_plus',
+      violence_ceiling: 'none'
+    })
+  })
+
+  it('applies data-driven defaults when the selected template changes', () => {
+    const store = useWorldBuilderStore()
+    store.templates.push({
+      id: 'gothic_romance',
+      name: 'Gothic romance',
+      description: 'Secrets and dangerous attraction.',
+      genre: 'gothic_romance',
+      prompt_instructions: 'Keep romance central.',
+      defaults: {
+        tone: 'intimate, ominous',
+        rating: 'adult_18_plus',
+        violence_ceiling: 'detailed'
+      },
+      narrative_profile: {
+        primary_focus: 'romance',
+        romance_priority: 'high',
+        relationship_pacing: 'slow_burn'
+      },
+      opening_guidance: ['Begin with attraction and uncertainty.'],
+      version: '1'
+    })
+    store.templateId = 'gothic_romance'
+
+    store.applySelectedTemplateDefaults()
+
+    expect(store.tonePreset).toBe('intimate, ominous')
+    expect(store.ratingPreset).toBe('adult_18_plus')
+    expect(store.violencePreset).toBe('detailed')
   })
 
   it('edits character ages and keeps opening participants synchronized', () => {

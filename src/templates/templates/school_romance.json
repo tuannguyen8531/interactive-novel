@@ -3,13 +3,16 @@
   "name": "School romance",
   "description": "A character-driven romance around school, class, or club life.",
   "genre": "school_romance",
-  "default_tone": "warm, reflective",
   "prompt_instructions": "Build a grounded school, class, or club setting. Focus on trust, communication, personal boundaries, and gradual relationship change. Keep two to four central NPCs with independent goals.",
-  "default_presets": {
+  "defaults": {
     "tone": "warm, reflective",
     "rating": "teen_14_plus",
-    "violence_ceiling": "none",
-    "adult_explicit_opt_in": false
+    "violence_ceiling": "none"
+  },
+  "narrative_profile": {
+    "primary_focus": "romance",
+    "romance_priority": "high",
+    "relationship_pacing": "slow_burn"
   },
   "opening_guidance": [
     "Start in a school, classroom, or student club location.",

@@ -34,11 +34,15 @@ async def generate_world_draft(
     services: ApplicationContainer = _services_dependency,
 ):
     generator = services.world_drafts.generate_world_draft
-    if "template_id" in signature(generator).parameters:
-        draft = await generator(payload.prompt, template_id=payload.template_id)
-    else:
-        # Keep older injected test/adaptor services source-compatible.
-        draft = await generator(payload.prompt)
+    parameters = signature(generator).parameters
+    requested = {
+        "template_id": payload.template_id,
+        "tone": payload.tone,
+        "rating": payload.rating,
+        "violence_ceiling": payload.violence_ceiling,
+    }
+    kwargs = {key: value for key, value in requested.items() if key in parameters and value is not None}
+    draft = await generator(payload.prompt, **kwargs)
     return public_json(draft)
 
 

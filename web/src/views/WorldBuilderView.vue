@@ -71,17 +71,19 @@ function cancel(): void {
       <div class="preset-grid">
         <label>
           Story template
-          <select v-model="store.templateId">
+          <select v-model="store.templateId" @change="store.applySelectedTemplateDefaults">
             <option v-for="template in store.templates" :key="template.id" :value="template.id">{{ template.name }}</option>
           </select>
         </label>
         <label>
           Tone preset
-          <select v-model="store.tonePreset">
+          <input v-model="store.tonePreset" list="tone-presets" maxlength="80" />
+          <datalist id="tone-presets">
             <option value="warm, reflective">Warm and reflective</option>
             <option value="playful, hopeful">Playful and hopeful</option>
             <option value="quiet, bittersweet">Quiet and bittersweet</option>
-          </select>
+            <option v-for="template in store.templates" :key="template.id" :value="template.defaults.tone" />
+          </datalist>
         </label>
         <label>
           Content rating
@@ -95,8 +97,10 @@ function cancel(): void {
           Violence ceiling
           <select v-model="store.violencePreset">
             <option value="none">None</option>
-            <option value="non_graphic">Non-graphic</option>
+            <option value="restrained">Restrained</option>
+            <option value="detailed">Detailed</option>
           </select>
+          <span class="muted small-copy">Maximum detail allowed when violence, torture, or sexual violence occurs.</span>
         </label>
       </div>
       <div class="notice-box">
@@ -257,7 +261,7 @@ function cancel(): void {
         <h2>Safety presets</h2>
         <label>
           Rating
-          <select v-model="store.draft.content_boundaries.rating">
+          <select v-model="store.draft.content_boundaries.rating" @change="store.syncDraftRating">
             <option value="teen_14_plus">Teen 14+</option>
             <option value="mature_16_plus">Mature 16+</option>
             <option value="adult_18_plus">Adult 18+</option>
@@ -267,8 +271,8 @@ function cancel(): void {
           Violence ceiling
           <select v-model="store.draft.content_boundaries.violence_ceiling">
             <option value="none">None</option>
-            <option value="non_graphic">Non-graphic</option>
-            <option value="graphic">Graphic</option>
+            <option value="restrained">Restrained</option>
+            <option value="detailed">Detailed</option>
           </select>
         </label>
         <label class="checkbox-row">

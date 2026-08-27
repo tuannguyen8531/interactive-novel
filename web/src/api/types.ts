@@ -1,3 +1,18 @@
+export type ContentRating = 'teen_14_plus' | 'mature_16_plus' | 'adult_18_plus'
+export type ViolenceCeiling = 'none' | 'restrained' | 'detailed'
+
+export interface StoryTemplateDefaults {
+  tone: string
+  rating: ContentRating
+  violence_ceiling: ViolenceCeiling
+}
+
+export interface NarrativeProfile {
+  primary_focus: string
+  romance_priority: string
+  relationship_pacing: string
+}
+
 export interface HealthResponse {
   status: 'ok'
   service: string
@@ -9,8 +24,9 @@ export interface StoryTemplate {
   name: string
   description: string
   genre: string
-  default_tone: string
-  default_presets: Record<string, unknown>
+  prompt_instructions: string
+  defaults: StoryTemplateDefaults
+  narrative_profile: NarrativeProfile
   opening_guidance: string[]
   version: string
 }
@@ -29,9 +45,9 @@ export interface WorldRecord {
 }
 
 export interface WorldContentBoundaries {
-  rating: 'teen_14_plus' | 'mature_16_plus' | 'adult_18_plus' | string
+  rating: ContentRating | string
   topic_boundaries: Record<string, 'allow' | 'opt_in' | 'excluded' | string>
-  violence_ceiling: 'none' | 'non_graphic' | 'graphic' | string
+  violence_ceiling: ViolenceCeiling | string
   adult_explicit_opt_in: boolean
 }
 
@@ -83,6 +99,7 @@ export interface WorldSceneSpec {
   tags: string[]
   participants: Record<string, number>
   consent: Record<string, string>
+  violence_detail?: ViolenceCeiling | string
   approved_beats: string[]
   visible_actions: string[]
   allowed_dialogue_intents: string[]

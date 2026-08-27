@@ -14,7 +14,8 @@ def test_story_template_registry_loads_the_bundled_catalog() -> None:
 
     assert registry.ids() == ("school_romance", "mystery", "fantasy_adventure")
     assert registry.get("MYSTERY").name == "Mystery"
-    assert registry.get("fantasy_adventure").default_presets["violence_ceiling"] == "non_graphic"
+    assert registry.get("fantasy_adventure").defaults.violence_ceiling.value == "restrained"
+    assert registry.get("mystery").narrative_profile.primary_focus == "romance"
 
 
 def test_story_template_public_shape_is_json_serializable() -> None:
@@ -25,7 +26,8 @@ def test_story_template_public_shape_is_json_serializable() -> None:
     json.dumps(public)
     assert public["id"] == "school_romance"
     assert public["opening_guidance"]
-    assert public["default_presets"]["rating"] == "teen_14_plus"
+    assert public["defaults"]["rating"] == "teen_14_plus"
+    assert public["narrative_profile"]["romance_priority"] == "high"
 
 
 def test_story_template_registry_discovers_unlisted_json_files(tmp_path: Path) -> None:

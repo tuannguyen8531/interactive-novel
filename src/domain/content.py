@@ -24,8 +24,13 @@ class TopicBoundary(StrEnum):
 
 class ViolenceCeiling(StrEnum):
     NONE = "none"
-    NON_GRAPHIC = "non_graphic"
-    GRAPHIC = "graphic"
+    RESTRAINED = "restrained"
+    DETAILED = "detailed"
+
+    @classmethod
+    def _missing_(cls, value: object) -> ViolenceCeiling | None:
+        legacy = {"non_graphic": cls.RESTRAINED, "graphic": cls.DETAILED}
+        return legacy.get(str(value))
 
 
 class ContentDecision(StrEnum):
@@ -63,6 +68,10 @@ KNOWN_CONTENT_TAGS = {
     "grooming",
     "exploitation",
     "non_consensual_sexual",
+    "violence",
+    "violence:torture",
+    "sexual_violence",
+    # Legacy tags remain readable for persisted scene artifacts.
     "violence_non_graphic",
     "violence_gore",
     "violence_torture_detail",
@@ -109,7 +118,7 @@ class ContentPolicy:
     schema_version: str = "content"
     rating: Rating = Rating.TEEN_14_PLUS
     topic_boundaries: Mapping[str, TopicBoundary] = field(default_factory=dict)
-    violence_ceiling: ViolenceCeiling = ViolenceCeiling.NON_GRAPHIC
+    violence_ceiling: ViolenceCeiling = ViolenceCeiling.RESTRAINED
     adult_explicit_opt_in: bool = False
     consent: ConsentRequirements = field(default_factory=ConsentRequirements)
     player_overrides: ContentPolicyOverride | None = None
@@ -142,7 +151,7 @@ class ContentPolicy:
             schema_version=str(mapping.get("schema_version", "content")),
             rating=Rating(mapping.get("rating", Rating.TEEN_14_PLUS)),
             topic_boundaries={str(tag): TopicBoundary(value) for tag, value in mapping.get("topic_boundaries", {}).items()},
-            violence_ceiling=ViolenceCeiling(mapping.get("violence_ceiling", ViolenceCeiling.NON_GRAPHIC)),
+            violence_ceiling=ViolenceCeiling(mapping.get("violence_ceiling", ViolenceCeiling.RESTRAINED)),
             adult_explicit_opt_in=bool(mapping.get("adult_explicit_opt_in", False)),
             consent=ConsentRequirements(
                 required=bool(consent.get("required", True)),
@@ -156,12 +165,18 @@ class ContentPolicy:
         return replace(self, player_overrides=override)
 
     def world_boundary(self, tag: str) -> TopicBoundary:
-        return self.topic_boundaries.get(tag, TopicBoundary.ALLOW)
+        if tag in self.topic_boundaries:
+            return self.topic_boundaries[tag]
+        parent = tag.partition(":")[0]
+        return self.topic_boundaries.get(parent, TopicBoundary.ALLOW)
 
     def player_boundary(self, tag: str) -> TopicBoundary:
         if self.player_overrides is None:
             return TopicBoundary.ALLOW
-        return self.player_overrides.topic_boundaries.get(tag, TopicBoundary.ALLOW)
+        if tag in self.player_overrides.topic_boundaries:
+            return self.player_overrides.topic_boundaries[tag]
+        parent = tag.partition(":")[0]
+        return self.player_overrides.topic_boundaries.get(parent, TopicBoundary.ALLOW)
 
     def effective_boundary(self, tag: str) -> tuple[TopicBoundary, str | None]:
         world = self.world_boundary(tag)
@@ -192,6 +207,7 @@ class SceneSpec:
     tags: tuple[str, ...] = ()
     participants: Mapping[str, int] = field(default_factory=dict)
     consent: Mapping[str, ConsentState | str] = field(default_factory=dict)
+    violence_detail: ViolenceCeiling = ViolenceCeiling.NONE
     scene_id: str = "scene-proposal"
 
     def __post_init__(self) -> None:
@@ -209,6 +225,7 @@ class SceneSpec:
         object.__setattr__(self, "tags", normalized_tags)
         object.__setattr__(self, "participants", normalized_participants)
         object.__setattr__(self, "consent", normalized_consent)
+        object.__setattr__(self, "violence_detail", ViolenceCeiling(self.violence_detail))
 
     @classmethod
     def from_profiles(
@@ -218,6 +235,7 @@ class SceneSpec:
         profiles: Mapping[str, Any],
         tags: tuple[str, ...] = (),
         consent: Mapping[str, ConsentState | str] | None = None,
+        violence_detail: ViolenceCeiling | str = ViolenceCeiling.NONE,
         scene_id: str = "scene-proposal",
     ) -> SceneSpec:
         participants = {character_id: profile.age_at(world_time) for character_id, profile in profiles.items()}
@@ -226,6 +244,7 @@ class SceneSpec:
             tags=tags,
             participants=participants,
             consent=consent or {},
+            violence_detail=ViolenceCeiling(violence_detail),
             scene_id=scene_id,
         )
 
@@ -326,11 +345,28 @@ def evaluate_scene(policy: ContentPolicy, scene: SceneSpec) -> PolicyDecision:
             safe_tags=("non_graphic_intimacy",),
         )
 
-    violent_tags = tags & {"violence_gore", "violence_torture_detail", "violence_sexual"}
-    if violent_tags:
-        return _decision(policy, scene, ContentDecision.DENY, "violence_over_ceiling")
-    if "violence_non_graphic" in tags and policy.violence_ceiling == ViolenceCeiling.NONE:
-        return _decision(policy, scene, ContentDecision.DENY, "violence_over_ceiling")
+    violence_tags = tags & {
+        "violence",
+        "violence:torture",
+        "sexual_violence",
+        "violence_non_graphic",
+        "violence_gore",
+        "violence_torture_detail",
+        "violence_sexual",
+    }
+    if violence_tags:
+        detail = scene.violence_detail
+        if tags & {"violence_gore", "violence_torture_detail", "violence_sexual"}:
+            detail = ViolenceCeiling.DETAILED
+        elif "violence_non_graphic" in tags and detail == ViolenceCeiling.NONE:
+            detail = ViolenceCeiling.RESTRAINED
+        detail_rank = {
+            ViolenceCeiling.NONE: 0,
+            ViolenceCeiling.RESTRAINED: 1,
+            ViolenceCeiling.DETAILED: 2,
+        }
+        if detail == ViolenceCeiling.NONE or detail_rank[detail] > detail_rank[policy.violence_ceiling]:
+            return _decision(policy, scene, ContentDecision.DENY, "violence_over_ceiling")
 
     for tag in scene.tags:
         boundary, reason = policy.effective_boundary(tag)

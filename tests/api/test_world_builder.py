@@ -4,6 +4,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import httpx
 import pytest
@@ -22,9 +23,24 @@ class _WorldDraftService:
     def __init__(self, seed: WorldSeed) -> None:
         self.seed = seed
         self.confirmations = 0
+        self.generate_options: dict[str, Any] = {}
 
-    async def generate_world_draft(self, prompt: str) -> WorldSeed:
+    async def generate_world_draft(
+        self,
+        prompt: str,
+        *,
+        template_id: str = "school_romance",
+        tone: str | None = None,
+        rating: str | None = None,
+        violence_ceiling: str | None = None,
+    ) -> WorldSeed:
         assert prompt
+        self.generate_options = {
+            "template_id": template_id,
+            "tone": tone,
+            "rating": str(rating) if rating is not None else None,
+            "violence_ceiling": str(violence_ceiling) if violence_ceiling is not None else None,
+        }
         return self.seed
 
     def validate_world_draft(self, seed: WorldSeed) -> WorldSeed:
@@ -87,7 +103,16 @@ async def test_world_builder_endpoints_generate_review_and_confirm_without_raw_d
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        generated = await client.post("/api/world-drafts", json={"prompt": "A gentle school romance."})
+        generated = await client.post(
+            "/api/world-drafts",
+            json={
+                "prompt": "A gentle school romance.",
+                "template_id": "school_romance",
+                "tone": "playful, hopeful",
+                "rating": "mature_16_plus",
+                "violence_ceiling": "restrained",
+            },
+        )
         edited = dict(generated.json())
         edited["title"] = "Edited Courtyard"
         validated = await client.post("/api/world-drafts/validate", json={"draft": edited})
@@ -100,6 +125,12 @@ async def test_world_builder_endpoints_generate_review_and_confirm_without_raw_d
     assert confirmed.json()["world"]["id"] == "world-api"
     assert confirmed.json()["opening_scene"]["scene_id"] == "opening-scene"
     assert world_drafts.confirmations == 1
+    assert world_drafts.generate_options == {
+        "template_id": "school_romance",
+        "tone": "playful, hopeful",
+        "rating": "mature_16_plus",
+        "violence_ceiling": "restrained",
+    }
 
 
 @pytest.mark.asyncio

@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from src.application.contracts.ai import AIPromptRole, SimulationResult, TurnPlan
 from src.application.contracts.providers import (
     ConnectivityResult,
     EmbeddingResponse,
@@ -34,6 +35,7 @@ from src.domain.guard import DomainGuard
 from src.domain.state import GameState
 from src.graph import TurnPipeline, TurnPipelineDependencies, TurnPipelineRequest
 from src.graph.checkpoint import build_in_memory_checkpointer
+from src.graph.nodes import scene_from_plan
 from src.services.ai.contracts import AIContractRegistry
 from src.services.retrieval.embeddings import DEFAULT_EMBEDDING_VERSION, InMemoryEmbeddingStore
 from src.services.retrieval.tracing import InMemoryRetrievalTraceStore
@@ -200,6 +202,27 @@ def make_request(state: GameState, run_id: str = "turn-run-1") -> TurnPipelineRe
         actor_id="player",
         game_state=state,
     )
+
+
+def test_scene_uses_planned_content_classification_and_persisted_world_tone() -> None:
+    contracts = AIContractRegistry()
+    plan = contracts.parse(AIPromptRole.PLANNER, ROLE_OUTPUTS["planner"])
+    simulation = contracts.parse(AIPromptRole.SIMULATOR, ROLE_OUTPUTS["simulator"])
+    assert isinstance(plan, TurnPlan)
+    assert isinstance(simulation, SimulationResult)
+    state = make_game_state()
+    state.metadata["world_profile"] = {"tone": "intimate, ominous"}
+
+    scene = scene_from_plan(
+        {"turn_run_id": "turn-run-1", "actor_id": "player"},  # type: ignore[arg-type]
+        state,
+        plan,
+        simulation,
+    )
+
+    assert scene.tags == ("romantic_affection",)
+    assert scene.violence_detail.value == "none"
+    assert scene.tone == "intimate, ominous"
 
 
 def make_pipeline(

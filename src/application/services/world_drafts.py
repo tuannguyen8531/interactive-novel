@@ -7,7 +7,7 @@ from inspect import signature
 from typing import Any
 from uuid import uuid4
 
-from src.application.contracts.ai import SceneSpec, WorldSeed
+from src.application.contracts.ai import RatingValue, SceneSpec, ViolenceCeilingValue, WorldSeed
 from src.application.contracts.persistence import (
     BeliefEvidenceRecord,
     BeliefRecord,
@@ -63,19 +63,49 @@ class WorldDraftApplicationService:
         self._generator = generator
         self._templates = templates or StoryTemplateRegistry()
 
-    async def generate_world_draft(self, prompt: str, *, template_id: str = "school_romance") -> WorldSeed:
+    async def generate_world_draft(
+        self,
+        prompt: str,
+        *,
+        template_id: str = "school_romance",
+        tone: str | None = None,
+        rating: RatingValue | str | None = None,
+        violence_ceiling: ViolenceCeilingValue | str | None = None,
+    ) -> WorldSeed:
         if not prompt.strip():
             raise ApplicationValidationError("World draft prompt must not be empty.")
         if self._generator is None:
             raise ApplicationValidationError("World draft generator is not configured.")
         template = self._require_template(template_id)
+        effective_tone = tone.strip() if tone is not None else template.defaults.tone
+        effective_rating = RatingValue(rating or template.defaults.rating.value)
+        effective_ceiling = ViolenceCeilingValue(violence_ceiling or template.defaults.violence_ceiling.value)
         generator_method: Any = self._generator.generate_world_draft
-        if "template_id" in signature(generator_method).parameters:
-            generated = await generator_method(prompt.strip(), template_id=template_id)
-        else:
-            # Keep older injected test/adaptor implementations source-compatible.
-            generated = await generator_method(prompt.strip())
-            generated = generated.model_copy(update={"template_id": template.id})
+        parameters = signature(generator_method).parameters
+        requested = {
+            "template_id": template.id,
+            "tone": effective_tone,
+            "rating": effective_rating,
+            "violence_ceiling": effective_ceiling,
+        }
+        kwargs = {key: value for key, value in requested.items() if key in parameters}
+        generated = await generator_method(prompt.strip(), **kwargs)
+        boundaries = generated.content_boundaries.model_copy(
+            update={
+                "rating": effective_rating,
+                "violence_ceiling": effective_ceiling,
+                "adult_explicit_opt_in": effective_rating == RatingValue.ADULT_18_PLUS,
+            }
+        )
+        generated = generated.model_copy(
+            update={
+                "template_id": template.id,
+                "genre": template.genre,
+                "tone": effective_tone,
+                "content_boundaries": boundaries,
+                "opening_scene": generated.opening_scene.model_copy(update={"tone": effective_tone}),
+            }
+        )
         return self.validate_world_draft(generated)
 
     def validate_world_draft(self, seed: WorldSeed) -> WorldSeed:
@@ -96,7 +126,8 @@ class WorldDraftApplicationService:
     async def confirm_world(self, seed: WorldSeed, *, world_id: str | None = None) -> WorldRecord:
         """Legacy world-only confirmation kept for older callers."""
         validated = self.validate_world_draft(seed)
-        world, characters = _build_world_records(validated, world_id=world_id)
+        template = self._require_template(validated.template_id)
+        world, characters = _build_world_records(validated, template=template, world_id=world_id)
         async with self._uow_factory() as uow:
             await uow.worlds.add(world)
             for character in characters:
@@ -113,7 +144,8 @@ class WorldDraftApplicationService:
     ) -> WorldConfirmation:
         """Atomically create the world and its playable opening branch."""
         validated = self.validate_world_draft(seed)
-        world, characters = _build_world_records(validated, world_id=world_id)
+        template = self._require_template(validated.template_id)
+        world, characters = _build_world_records(validated, template=template, world_id=world_id)
         player = validated.player_character
         opening_time = validated.opening_scene.world_time
         playthrough = PlaythroughRecord.new(
@@ -167,7 +199,12 @@ class WorldDraftApplicationService:
             raise ApplicationValidationError(str(error), details={"template_id": template_id}) from error
 
 
-def _build_world_records(seed: WorldSeed, *, world_id: str | None) -> tuple[WorldRecord, tuple[CharacterRecord, ...]]:
+def _build_world_records(
+    seed: WorldSeed,
+    *,
+    template: StoryTemplate,
+    world_id: str | None,
+) -> tuple[WorldRecord, tuple[CharacterRecord, ...]]:
     world = WorldRecord.new(
         world_id=world_id,
         name=seed.title,
@@ -177,6 +214,7 @@ def _build_world_records(seed: WorldSeed, *, world_id: str | None) -> tuple[Worl
         canon_rules={
             "world_seed": seed.model_dump(mode="json"),
             "world_builder": {"confirmed": True, "template": seed.template_id},
+            "narrative_profile": template.narrative_profile.as_dict(),
         },
         content_policy=seed.content_boundaries.model_dump(mode="json"),
     )

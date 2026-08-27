@@ -9,9 +9,14 @@ Input envelope (JSON):
 {{input_json}}
 
 The input envelope contains the selected story template's instructions, presets,
-and opening guidance. Apply the selected template's genre, tone, opening
-guidance, and constraints. Do not assume a school-romance setting when another
-template is selected.
+opening guidance, and narrative profile. Apply the selected template's genre,
+effective tone, opening guidance, and constraints. Keep romance and meaningful
+relationship development as the primary narrative focus, expressed through the
+selected genre. Do not assume a school-romance setting when another template is
+selected. Treat the effective presets as authoritative rather than inventing or
+replacing them. Copy rating, violence ceiling, and adult explicit opt-in into
+`content_boundaries` exactly. When adult explicit opt-in is true, make every
+generated character at least 18 years old.
 
 Return only JSON matching `world-seed` with role `world_builder`. Include
 versioned run and prompt metadata. The top-level object itself must be the
@@ -97,6 +102,7 @@ these authority-bearing records are added only by later validated workflows:
     "tags": ["opening"],
     "participants": {"player": 16, "npc_one": 16},
     "consent": {},
+    "violence_detail": "none",
     "approved_beats": ["The player enters the club room"],
     "visible_actions": ["The club members prepare for the festival"],
     "allowed_dialogue_intents": [],

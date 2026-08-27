@@ -81,8 +81,13 @@ class RatingValue(StrEnum):
 
 class ViolenceCeilingValue(StrEnum):
     NONE = "none"
-    NON_GRAPHIC = "non_graphic"
-    GRAPHIC = "graphic"
+    RESTRAINED = "restrained"
+    DETAILED = "detailed"
+
+    @classmethod
+    def _missing_(cls, value: object) -> ViolenceCeilingValue | None:
+        legacy = {"non_graphic": cls.RESTRAINED, "graphic": cls.DETAILED}
+        return legacy.get(str(value))
 
 
 ParseStatus = Literal["not_parsed", "parsed", "repaired", "failed"]
@@ -258,6 +263,8 @@ class TurnPlan(VersionedOutput):
     possible_outcomes: tuple[OutcomeCandidate, ...] = Field(min_length=1)
     pacing_note: str = Field(min_length=1)
     safety_constraints: tuple[str, ...] = Field(default_factory=tuple)
+    content_tags: tuple[str, ...] = Field(default_factory=tuple)
+    violence_detail: ViolenceCeilingValue = ViolenceCeilingValue.NONE
 
 
 class NPCReaction(AIModel):
@@ -578,9 +585,10 @@ class SceneSpec(AIModel):
     source_run_id: str = Field(min_length=1)
     guard_approved: bool = False
     world_time: int = Field(ge=0)
-    tags: tuple[str, ...] = Field(min_length=1)
+    tags: tuple[str, ...] = Field(default_factory=tuple)
     participants: dict[str, int] = Field(min_length=1)
     consent: dict[str, ConsentStateValue] = Field(default_factory=dict)
+    violence_detail: ViolenceCeilingValue = ViolenceCeilingValue.NONE
     approved_beats: tuple[str, ...] = Field(min_length=1)
     visible_actions: tuple[str, ...] = Field(min_length=1)
     allowed_dialogue_intents: tuple[str, ...] = Field(default_factory=tuple)
@@ -653,6 +661,11 @@ class ContentBoundaryProposal(AIModel):
     topic_boundaries: dict[str, TopicBoundaryValue] = Field(default_factory=dict)
     violence_ceiling: ViolenceCeilingValue
     adult_explicit_opt_in: bool = False
+
+    @field_validator("violence_ceiling", mode="before")
+    @classmethod
+    def normalize_legacy_violence_ceiling(cls, value: Any) -> Any:
+        return {"non_graphic": "restrained", "graphic": "detailed"}.get(value, value)
 
 
 class LocationSeed(AIModel):

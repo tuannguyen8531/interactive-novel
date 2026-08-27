@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from src.application.contracts.ai import WorldSeed
+from src.application.contracts.ai import RatingValue, ViolenceCeilingValue, WorldSeed
 from src.application.contracts.persistence import JSONValue
 
 
@@ -48,6 +48,9 @@ class WorldDraftGenerateRequest(BaseModel):
 
     prompt: str = Field(min_length=1, max_length=20_000)
     template_id: str = Field(default="school_romance", min_length=1, max_length=80)
+    tone: str | None = Field(default=None, min_length=1, max_length=80)
+    rating: RatingValue | None = None
+    violence_ceiling: ViolenceCeilingValue | None = None
 
 
 class WorldDraftRequest(BaseModel):

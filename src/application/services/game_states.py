@@ -64,6 +64,13 @@ class GameStateApplicationService:
             "branch_head_turn_id": branch.head_turn_id,
             "rng_seed": playthrough.rng_seed,
             "rng_state": deepcopy(playthrough.rng_state),
+            "world_profile": {
+                "template_id": seed.template_id if seed is not None else None,
+                "genre": world.genre,
+                "tone": world.tone,
+                "premise": world.premise,
+                "narrative_profile": dict(world.canon_rules.get("narrative_profile", {})),
+            },
         }
         if seed is not None:
             _apply_world_seed(state, seed)

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .models import StoryTemplate
+from .models import NarrativeProfile, StoryTemplate, StoryTemplateDefaults
 
 
 class StoryTemplateRegistryError(ValueError):
@@ -66,14 +66,35 @@ class StoryTemplateRegistry:
     @classmethod
     def _load_template(cls, path: Path, *, expected_id: str) -> StoryTemplate:
         data = cls._load_json(path)
+        defaults_data = _mapping(data, "defaults")
+        if not defaults_data and ("default_tone" in data or "default_presets" in data):
+            legacy_presets = _mapping(data, "default_presets")
+            defaults_data = {
+                **legacy_presets,
+                "tone": data.get("default_tone", legacy_presets.get("tone", "warm, reflective")),
+            }
+        narrative_data = _mapping(data, "narrative_profile")
+        try:
+            defaults = StoryTemplateDefaults(
+                tone=str(defaults_data.get("tone", "warm, reflective")),
+                rating=defaults_data.get("rating", "teen_14_plus"),
+                violence_ceiling=defaults_data.get("violence_ceiling", "none"),
+            )
+            narrative_profile = NarrativeProfile(
+                primary_focus=str(narrative_data.get("primary_focus", "romance")),
+                romance_priority=str(narrative_data.get("romance_priority", "high")),
+                relationship_pacing=str(narrative_data.get("relationship_pacing", "earned_progression")),
+            )
+        except (TypeError, ValueError) as error:
+            raise StoryTemplateRegistryError(f"Invalid story template defaults or narrative profile: {path}.") from error
         template = StoryTemplate(
             id=_required_text(data, "id"),
             name=_required_text(data, "name"),
             description=_required_text(data, "description"),
             genre=_required_text(data, "genre"),
-            default_tone=_required_text(data, "default_tone"),
             prompt_instructions=_required_text(data, "prompt_instructions"),
-            default_presets=_mapping(data, "default_presets"),
+            defaults=defaults,
+            narrative_profile=narrative_profile,
             opening_guidance=_text_tuple(data, "opening_guidance"),
             version=_required_text(data, "version"),
         )
