@@ -55,6 +55,7 @@ def _candidate(
     fingerprint: str | None = None,
     salience: float = 0.5,
     entities: tuple[str, ...] = (),
+    branch_scope: str | None = None,
 ) -> MemoryCandidate:
     return MemoryCandidate(
         source_id=source_id,
@@ -65,13 +66,50 @@ def _candidate(
         text=text,
         owner_id=owner,
         visibility=visibility,
-        branch_scope=branch,
+        branch_scope=branch if branch_scope is None else branch_scope,
         claim_id=claim_id,
         source_event_id=source_event_id,
         normalized_fingerprint=fingerprint,
         salience=salience,
         entity_ids=entities,
     )
+
+
+@pytest.mark.asyncio
+async def test_owner_scoped_private_memory_is_visible_only_to_its_owner() -> None:
+    private = _candidate(
+        "alice-private-claim",
+        kind=MemoryKind.CLAIM,
+        owner="alice",
+        visibility="private",
+        branch_scope="alice",
+        text="Alice has drafted a private letter.",
+    )
+    assembler = ContextAssembler(trace_store=InMemoryRetrievalTraceStore())
+
+    alice_manifest = await assembler.build_initial_context(
+        InitialContextRequest(
+            run_id="run-alice-private",
+            role="planner",
+            scope=_scope(owner="alice"),
+            query_text="private letter",
+            token_budget=500,
+        ),
+        [private],
+    )
+    bob_manifest = await assembler.build_initial_context(
+        InitialContextRequest(
+            run_id="run-bob-private",
+            role="planner",
+            scope=_scope(owner="bob"),
+            query_text="private letter",
+            token_budget=500,
+        ),
+        [private],
+    )
+
+    assert [entry.source_id for entry in alice_manifest.entries] == ["alice-private-claim"]
+    assert bob_manifest.entries == ()
 
 
 @pytest.mark.asyncio

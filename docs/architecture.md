@@ -84,7 +84,7 @@ provenance phù hợp. API không trả ORM record trực tiếp.
 ```text
 raw input
   → normalize_input
-  → initial context + hard-scoped retrieval
+  → initial context + hard-scoped retrieval + bounded public character profiles
   → Planner artifact
   → Simulator artifact
   → Claim Extractor / typed proposed operations
@@ -100,9 +100,33 @@ raw input
   → derived outbox jobs
 ```
 
-Writer chỉ nhận `SceneSpec` gồm beat, visible action, allowed dialogue intent,
-POV, tone, continuity details, allowed/restricted facts và length target. Writer
-không nhận toàn bộ database và không trả state patch. Critic không đổi outcome
+Initial context chỉ đưa vào tối đa bốn nhân vật liên quan (actor, nhân vật được
+nhắc tới và người cùng địa điểm); mỗi background bị giới hạn độ dài. Planner,
+Simulator, Writer và Critic dùng hồ sơ công khai này để giữ động cơ và cách hành
+xử nhất quán. Quan hệ định lượng và tension chỉ dành cho các vai lập kế hoạch,
+mô phỏng và kiểm tra; Writer/Critic không nhận các score nội bộ. Claim/secret
+riêng tư chỉ được retrieval khi `owner_id` khớp chính chủ. Với NPC liên quan,
+owner-scoped private claims được ghép trực tiếp vào context nội bộ của Simulator
+và Context Validator để chi phối lựa chọn mà không xuất hiện trong initial
+context công khai, Planner, Writer hay Critic.
+
+WorldSeed định dạng hiện hành chỉ qua validation khi mỗi character có ít nhất
+một goal thuộc chính mình, một public typed claim mang
+`source=character_background`, và tham gia ít nhất một narrative thread. Mọi
+private claim phải được owner liên kết qua `private_claim_ids`. Sau xác nhận,
+typed claims trở thành CanonFacts; prose background vẫn là hồ sơ công khai chứ
+không tự có quyền mutation. Validation còn chặn trường hợp public background
+trực tiếp chứa identifier hoặc giá trị văn bản của private claim; diễn đạt
+ngữ nghĩa gián tiếp tiếp tục được prompt và Context Validator kiểm soát.
+WorldSeed v1.5 chỉ cho `initial_claims.subject_id` trỏ tới character/location
+đã khai báo; global world rules ở lại trong premise/canon prose. Preflight gom
+các lỗi coverage và cross-reference liên quan vào một diagnostic set để lượt
+structured-output repair duy nhất có thể sửa toàn bộ payload thay vì lần lượt
+vấp từng invariant.
+
+Writer nhận `SceneSpec`, evidence đã authorize và bounded public character
+profiles; không nhận toàn bộ database, score quan hệ/tension nội bộ và không trả
+state patch. Critic không đổi outcome
 hoặc state. Guard là cửa deterministic cuối cùng trước commit.
 
 ## 5. Canonical transaction

@@ -73,6 +73,16 @@ config/prompt versions, world-time interval, token/timing metadata và
 appearance/voice, traits, values, boundaries, long-term goals, likes/dislikes,
 initial secrets.
 
+`background` là hồ sơ công khai, ổn định, dùng để giữ nhất quán động cơ,
+giọng nói và cách nhân vật phản ứng; không chứa bí mật. Khi World Builder tạo
+draft, các chi tiết cần tác động lâu dài còn được đề xuất thành typed claims,
+goals, quan hệ có hướng, tension ba ngôi và narrative threads. Bí mật phải nằm
+trong private claim theo owner và không được đưa vào shared character context.
+Draft định dạng hiện hành bắt buộc mỗi character liên kết ít nhất một owned
+goal, một public background claim và một thread. Private NPC claims chỉ được
+Simulator/Context Validator dùng như internal motivation; Writer/Critic không
+nhận context này.
+
 `CharacterState` thay đổi: location, physical condition, emotional state,
 short-term goals, attention target, stress/fatigue, inventory reference và last
 active turn. Không sửa profile để lưu cảm xúc tạm thời.

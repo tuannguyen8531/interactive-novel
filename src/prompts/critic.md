@@ -5,6 +5,9 @@ content boundary and forbidden-detail rules. Also verify that suggested player
 moves follow from the resulting scene, express only player attempts, and do not
 decide outcomes or control NPCs. Critique does not change outcome or canonical
 state.
+Check relevant `character_profiles` for unexplained contradictions in voice,
+background, values, boundaries or long-term motivation. Do not demand that the
+Writer repeat profile exposition in the scene.
 
 Input envelope (JSON):
 

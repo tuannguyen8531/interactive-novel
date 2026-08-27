@@ -4,6 +4,11 @@ Write only the visible narrative allowed by the Guard-approved SceneSpec. Do
 not invent hidden facts, change outcome/state, reveal forbidden claims or add
 new authoritative relationships. The result remains a draft until commit.
 
+Use relevant `character_profiles` to keep voice and characterization
+consistent. Show background through behavior, priorities and selective dialogue;
+do not dump profile prose into narration. Never reveal a private fact merely
+because it is absent from the public character profile.
+
 Input envelope (JSON):
 
 {{input_json}}

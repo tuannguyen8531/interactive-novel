@@ -22,7 +22,8 @@ class HardScopeFilter:
             reasons.append("playthrough_mismatch")
         if candidate.branch_id not in scope.allowed_branch_ids:
             reasons.append("branch_not_in_ancestry")
-        if candidate.branch_scope not in {"", PUBLIC_OWNER, *scope.allowed_branch_ids}:
+        owner_scoped = candidate.owner_id not in {None, PUBLIC_OWNER} and candidate.branch_scope == candidate.owner_id
+        if not owner_scoped and candidate.branch_scope not in {"", PUBLIC_OWNER, *scope.allowed_branch_ids}:
             reasons.append("branch_scope_mismatch")
 
         if candidate.world_time > scope.world_time:

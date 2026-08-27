@@ -75,6 +75,8 @@ from .runtime import TurnGraphRuntime
 from .state import TurnGraphState
 
 _T = TypeVar("_T")
+_MAX_CONTEXT_CHARACTERS = 4
+_MAX_CONTEXT_BACKGROUND_CHARS = 2_000
 
 
 class TurnGraphNodes:
@@ -203,12 +205,14 @@ class TurnGraphNodes:
             world_time=game_state.world_time,
             owner_id=state.get("actor_id"),
         )
+        query_entity_ids = _query_entity_ids(state, game_state)
+        relevant_character_ids = _relevant_character_ids(game_state, query_entity_ids)
         request = InitialContextRequest(
             run_id=state["turn_run_id"],
             role=AIPromptRole.PLANNER.value,
             scope=scope,
             query_text=state.get("normalized_input", state["raw_input"]),
-            entity_ids=_query_entity_ids(state, game_state),
+            entity_ids=tuple(dict.fromkeys((*query_entity_ids, *relevant_character_ids))),
             token_budget=2_000,
             max_items=40,
             recent_event_limit=8,
@@ -222,8 +226,12 @@ class TurnGraphNodes:
                 provider=self.runtime.provider,
             )
         context_manifest = manifest.as_context()
-        context_manifest["authoritative_ids"] = _authoritative_ids(game_state)
+        context_manifest["authoritative_ids"] = _authoritative_ids(game_state, owner_id=state.get("actor_id"))
         context_manifest["world_profile"] = dict(game_state.metadata.get("world_profile", {}))
+        context_manifest["character_profiles"] = _public_character_profiles(game_state, relevant_character_ids)
+        context_manifest["story_threads"] = _relevant_story_threads(game_state, relevant_character_ids)
+        context_manifest["character_relationships"] = _relevant_relationships(game_state, relevant_character_ids)
+        context_manifest["emotional_tensions"] = _relevant_tensions(game_state, relevant_character_ids)
         if game_state.policy is not None:
             context_manifest["content_policy"] = {
                 "rating": game_state.policy.rating.value,
@@ -242,7 +250,14 @@ class TurnGraphNodes:
             roles = (AIPromptRole.PLANNER, AIPromptRole.SIMULATOR)
         else:
             roles = (AIPromptRole.PLANNER,)
-        result = await self._execute(roles, state, {role: context for role in roles}, call_prefix="plan")
+        contexts = {role: context for role in roles}
+        if AIPromptRole.SIMULATOR in roles:
+            contexts[AIPromptRole.SIMULATOR] = _with_private_character_context(
+                context,
+                self.runtime.request.game_state,
+                actor_id=state.get("actor_id"),
+            )
+        result = await self._execute(roles, state, contexts, call_prefix="plan")
         plan = cast(TurnPlan, result.artifacts[AIPromptRole.PLANNER])
         update: dict[str, Any] = {"plan": plan, **_trace_update(state, result)}
         if AIPromptRole.SIMULATOR in result.artifacts:
@@ -259,6 +274,11 @@ class TurnGraphNodes:
             state,
             plan=plan.model_dump(mode="json"),
             repair_feedback=state.get("repair_feedback"),
+        )
+        context = _with_private_character_context(
+            context,
+            self.runtime.request.game_state,
+            actor_id=state.get("actor_id"),
         )
         result = await self._execute(
             (AIPromptRole.SIMULATOR,),
@@ -382,6 +402,11 @@ class TurnGraphNodes:
             plan=plan.model_dump(mode="json") if isinstance(plan, TurnPlan) else None,
             simulation=simulation.model_dump(mode="json") if isinstance(simulation, SimulationResult) else None,
             claim_extraction=_claim_extraction_context(extraction),
+        )
+        context = _with_private_character_context(
+            context,
+            self.runtime.request.game_state,
+            actor_id=state.get("actor_id"),
         )
         result = await self._execute(
             (AIPromptRole.CONTEXT_VALIDATOR,),
@@ -558,6 +583,9 @@ class TurnGraphNodes:
             simulation=simulation.model_dump(mode="json"),
             scene_spec=scene.model_dump(mode="json"),
         )
+        context.pop("character_relationships", None)
+        context.pop("emotional_tensions", None)
+        context.pop("private_character_context", None)
         result = await self._execute(
             (AIPromptRole.WRITER,),
             state,
@@ -585,6 +613,9 @@ class TurnGraphNodes:
             scene_spec=scene.model_dump(mode="json"),
             draft=draft.model_dump(mode="json"),
         )
+        context.pop("character_relationships", None)
+        context.pop("emotional_tensions", None)
+        context.pop("private_character_context", None)
         result = await self._execute(
             (AIPromptRole.CRITIC,),
             state,
@@ -811,23 +842,155 @@ def _mentions_entity(query_text: str, name: str) -> bool:
     return bool(normalized and re.search(rf"(?<!\w){re.escape(normalized)}(?!\w)", query_text))
 
 
-def _authoritative_ids(game_state: Any) -> dict[str, list[str]]:
+def _relevant_character_ids(game_state: Any, entity_ids: tuple[str, ...]) -> tuple[str, ...]:
+    """Select the actor, mentioned characters and nearby participants within a small bound."""
+
+    relevant = [entity_id for entity_id in entity_ids if entity_id in game_state.characters]
+    actor_id = relevant[0] if relevant else None
+    actor = game_state.characters.get(actor_id) if actor_id is not None else None
+    actor_location = actor.state.location_id if actor is not None else None
+    if actor_location is not None:
+        relevant.extend(
+            character_id
+            for character_id, character in sorted(game_state.characters.items())
+            if character.state.location_id == actor_location
+        )
+    return tuple(dict.fromkeys(relevant))[:_MAX_CONTEXT_CHARACTERS]
+
+
+def _public_character_profiles(game_state: Any, character_ids: tuple[str, ...]) -> dict[str, dict[str, Any]]:
+    """Expose bounded stable public characterization without private secrets."""
+
+    profiles: dict[str, dict[str, Any]] = {}
+    all_goals = game_state.metadata.get("character_goals", {})
+    goals_by_character = all_goals if isinstance(all_goals, Mapping) else {}
+    for character_id in character_ids:
+        character = game_state.characters.get(character_id)
+        if character is None:
+            continue
+        profile = character.profile
+        background = profile.background.strip()
+        if len(background) > _MAX_CONTEXT_BACKGROUND_CHARS:
+            background = f"{background[: _MAX_CONTEXT_BACKGROUND_CHARS - 1].rstrip()}…"
+        profiles[character_id] = {
+            "character_id": character_id,
+            "name": profile.display_name,
+            "aliases": list(profile.aliases),
+            "age": profile.age_at(game_state.world_time),
+            "gender": profile.gender,
+            "role": profile.role,
+            "background": background,
+            "voice": profile.voice,
+            "traits": list(profile.traits),
+            "values": list(profile.values),
+            "boundaries": list(profile.boundaries),
+            "goal_ids": list(profile.long_term_goals),
+            "goals": list(goals_by_character.get(character_id, ())),
+        }
+    return profiles
+
+
+def _with_private_character_context(
+    context: Mapping[str, Any],
+    game_state: Any,
+    *,
+    actor_id: str | None,
+) -> dict[str, Any]:
+    """Give simulation roles owner-scoped NPC canon without exposing it to prose roles."""
+
+    result = dict(context)
+    profiles = context.get("character_profiles", {})
+    character_ids = tuple(profiles) if isinstance(profiles, Mapping) else ()
+    private_context: dict[str, dict[str, Any]] = {}
+    for character_id in character_ids:
+        if character_id == actor_id:
+            continue
+        claims = [
+            {
+                "claim_id": claim.claim_id,
+                "predicate": claim.predicate,
+                "object_id": claim.object_id,
+                "typed_value": claim.typed_value,
+                "polarity": claim.polarity,
+                "qualifiers": dict(claim.qualifiers),
+                "valid_time": {"start": claim.valid_time.start, "end": claim.valid_time.end},
+            }
+            for _, claim in sorted(game_state.claims.items())
+            if claim.branch_scope == character_id and claim.valid_time.contains(game_state.world_time)
+        ]
+        if claims:
+            private_context[character_id] = {"owner_id": character_id, "claims": claims}
+    if private_context:
+        result["private_character_context"] = private_context
+    else:
+        result.pop("private_character_context", None)
+    return result
+
+
+def _relevant_story_threads(game_state: Any, character_ids: tuple[str, ...]) -> list[dict[str, Any]]:
+    relevant = set(character_ids)
+    return [
+        {
+            "thread_id": thread.thread_id,
+            "premise": thread.premise,
+            "participant_ids": list(thread.participant_ids),
+            "stakes": thread.stakes,
+            "status": thread.status.value,
+            "progress": thread.progress,
+            "urgency": thread.urgency,
+        }
+        for _, thread in sorted(game_state.threads.items())
+        if not thread.participant_ids or relevant.intersection(thread.participant_ids)
+    ][:8]
+
+
+def _relevant_relationships(game_state: Any, character_ids: tuple[str, ...]) -> list[dict[str, Any]]:
+    relevant = set(character_ids)
+    relationships = []
+    for (source_id, target_id), vector in sorted(game_state.relationships.items()):
+        if source_id not in relevant or target_id not in relevant:
+            continue
+        values = {dimension: value for dimension, value in vector.values.items() if abs(value) > 1e-9}
+        relationships.append({"source_id": source_id, "target_id": target_id, "values": values})
+    return relationships
+
+
+def _relevant_tensions(game_state: Any, character_ids: tuple[str, ...]) -> list[dict[str, Any]]:
+    relevant = set(character_ids)
+    raw_tensions = game_state.metadata.get("emotional_tensions", ())
+    if not isinstance(raw_tensions, (tuple, list)):
+        return []
+    return [
+        dict(item)
+        for item in raw_tensions
+        if isinstance(item, Mapping)
+        and {str(item.get("observer_id")), str(item.get("rival_id")), str(item.get("focus_id"))}.issubset(relevant)
+    ][:8]
+
+
+def _authoritative_ids(game_state: Any, *, owner_id: str | None = None) -> dict[str, list[str]]:
     """Expose only exact, Guard-authorized identifiers to logical AI roles."""
 
     goal_ids: set[str] = set()
     item_ids: set[str] = set()
     secret_ids: set[str] = set()
-    for character in game_state.characters.values():
+    for character_id, character in game_state.characters.items():
         goal_ids.update(character.profile.long_term_goals)
         goal_ids.update(character.state.short_term_goals)
         goal_ids.update(character.state.psychology.active_goals)
         item_ids.update(character.state.inventory_ids)
-        secret_ids.update(character.profile.initial_secrets)
+        if character_id == owner_id:
+            secret_ids.update(character.profile.initial_secrets)
+    visible_claim_ids = [
+        claim_id
+        for claim_id, claim in game_state.claims.items()
+        if claim.branch_scope in {"public", *game_state.branch_ancestry} or claim.branch_scope == owner_id
+    ]
     return {
         "character_ids": sorted(game_state.characters),
         "location_ids": sorted(game_state.locations),
         "event_ids": sorted(game_state.events),
-        "claim_ids": sorted(game_state.claims),
+        "claim_ids": sorted(visible_claim_ids),
         "goal_ids": sorted(goal_ids),
         "item_ids": sorted(item_ids),
         "secret_ids": sorted(secret_ids),

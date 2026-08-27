@@ -357,11 +357,12 @@ class BaseProvider(ABC):
             repair_request = replace(
                 structured_request,
                 system_prompt=(
-                    "Return only valid JSON matching the requested schema. Do not include Markdown fences or commentary."
+                    "Return only valid JSON matching the requested schema. Resolve every listed validation failure, "
+                    "not merely the first one. Do not include Markdown fences or commentary."
                 ),
                 user_prompt=(
                     f"Repair this invalid structured response for schema {schema.name}.\n\n"
-                    f"Validation failure:\n{self._repair_diagnostic(first_error)}\n\n"
+                    f"All validation failures:\n{self._repair_diagnostic(first_error)}\n\n"
                     f"Invalid output:\n{response.text}"
                 ),
                 repair_attempt=1,

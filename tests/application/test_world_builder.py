@@ -16,10 +16,16 @@ from src.application.ports.persistence import UowFactory
 from src.application.services.world_drafts import WorldDraftApplicationService
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "ai" / "role_outputs.json"
+WORLD_BUILDER_PROMPT = Path(__file__).parents[2] / "src" / "prompts" / "world_builder.md"
 
 
 def _seed() -> WorldSeed:
     return WorldSeed.model_validate(json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"])
+
+
+def _current_seed_payload() -> dict[str, Any]:
+    content = WORLD_BUILDER_PROMPT.read_text(encoding="utf-8")
+    return json.loads(content.split("```json", 1)[1].split("```", 1)[0])
 
 
 class _State:
@@ -245,6 +251,47 @@ def test_world_builder_rejects_obvious_opposite_canon_claims() -> None:
         WorldDraftApplicationService(_factory(_State())).validate_world_draft(WorldSeed.model_validate(payload))
 
 
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    (
+        (lambda payload: payload["player_character"].update({"goal_ids": []}), "at least one owned goal"),
+        (
+            lambda payload: payload["initial_claims"][0]["qualifiers"].update({"source": "other"}),
+            "public_fact claim",
+        ),
+        (
+            lambda payload: [
+                thread.update({"participant_ids": [item for item in thread["participant_ids"] if item != "player"]})
+                for thread in payload["threads"]
+            ],
+            "actionable thread",
+        ),
+    ),
+)
+def test_current_world_builder_requires_structured_background_coverage(mutate, message: str) -> None:
+    payload = _current_seed_payload()
+    mutate(payload)
+
+    with pytest.raises(ApplicationValidationError, match=message):
+        WorldDraftApplicationService(_factory(_State())).validate_world_draft(WorldSeed.model_validate(payload))
+
+
+def test_current_world_builder_rejects_unlinked_private_claim() -> None:
+    payload = _current_seed_payload()
+    payload["npc_profiles"][0]["private_claim_ids"] = []
+
+    with pytest.raises(ApplicationValidationError, match="private claim"):
+        WorldDraftApplicationService(_factory(_State())).validate_world_draft(WorldSeed.model_validate(payload))
+
+
+def test_current_world_builder_rejects_direct_private_claim_leak_in_public_background() -> None:
+    payload = _current_seed_payload()
+    payload["npc_profiles"][0]["background"] += " Aiko keeps a resignation letter hidden in her desk."
+
+    with pytest.raises(ApplicationValidationError, match="directly exposes"):
+        WorldDraftApplicationService(_factory(_State())).validate_world_draft(WorldSeed.model_validate(payload))
+
+
 def test_world_builder_rejects_unknown_story_template() -> None:
     seed = _seed().model_copy(update={"template_id": "not_registered"})
 
@@ -287,10 +334,11 @@ def test_world_builder_derives_npc_ids_from_names_and_remaps_references() -> Non
     npc["character_id"] = "npc_one"
     npc["name"] = "Lâm Như Nguyệt"
     npc["private_claim_ids"] = ["claim-alice-tea"]
-    payload["initial_claims"][0]["subject_id"] = "npc_one"
-    payload["initial_claims"][0]["branch_scope"] = "npc_one"
+    private_claim = next(item for item in payload["initial_claims"] if item["proposal_id"] == "claim-alice-tea")
+    private_claim["subject_id"] = "npc_one"
+    private_claim["branch_scope"] = "npc_one"
     payload["initial_relationships"][0]["source_id"] = "npc_one"
-    payload["goals"][0]["owner_id"] = "npc_one"
+    next(item for item in payload["goals"] if item["goal_id"] == "goal_alice")["owner_id"] = "npc_one"
     payload["threads"][0]["participant_ids"] = ["player", "npc_one"]
     payload["tensions"] = [
         {
@@ -321,14 +369,15 @@ def test_world_builder_derives_npc_ids_from_names_and_remaps_references() -> Non
     service = WorldDraftApplicationService(_factory(_State()))
 
     normalized = service.validate_world_draft(WorldSeed.model_validate(payload))
+    normalized_private_claim = next(item for item in normalized.initial_claims if item.proposal_id == "claim-alice-tea")
 
     assert normalized.npc_profiles[0].character_id == "lam_nhu_nguyet"
-    assert normalized.initial_claims[0].subject_id == "lam_nhu_nguyet"
-    assert normalized.initial_claims[0].branch_scope == "lam_nhu_nguyet"
+    assert normalized_private_claim.subject_id == "lam_nhu_nguyet"
+    assert normalized_private_claim.branch_scope == "lam_nhu_nguyet"
     assert normalized.initial_relationships[0].source_id == "lam_nhu_nguyet"
     assert normalized.initial_beliefs[0].believer_id == "lam_nhu_nguyet"
     assert normalized.initial_beliefs[0].branch_scope == "lam_nhu_nguyet"
-    assert normalized.goals[0].owner_id == "lam_nhu_nguyet"
+    assert next(item for item in normalized.goals if item.goal_id == "goal_alice").owner_id == "lam_nhu_nguyet"
     assert normalized.tensions[0].observer_id == "lam_nhu_nguyet"
     assert normalized.threads[0].participant_ids == ("player", "lam_nhu_nguyet")
     assert normalized.opening_scene.participants == {"player": 17, "lam_nhu_nguyet": 17}
@@ -343,6 +392,17 @@ def test_world_builder_preserves_stable_suffixes_for_duplicate_npc_names() -> No
         seed.npc_profiles[1].model_copy(update={"character_id": "alice", "name": "Alice"}),
     )
     service = WorldDraftApplicationService(_factory(_State()))
+    seed = seed.model_copy(
+        update={
+            "initial_claims": tuple(item for item in seed.initial_claims if item.subject_id != "bob"),
+            "goals": tuple(item for item in seed.goals if item.owner_id != "bob"),
+            "threads": tuple(
+                item.model_copy(update={"participant_ids": tuple(value for value in item.participant_ids if value != "bob")})
+                for item in seed.threads
+            ),
+        }
+    )
+    duplicate_names = (duplicate_names[0], duplicate_names[1].model_copy(update={"goal_ids": ()}))
 
     normalized = service.validate_world_draft(seed.model_copy(update={"npc_profiles": duplicate_names}))
     normalized_again = service.validate_world_draft(normalized)

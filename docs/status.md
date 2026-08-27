@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20
+Updated: 2026-08-27
 
 This file is the concise implementation tracker. `docs/plan.md` remains the
 product and architecture roadmap.
@@ -8,6 +8,7 @@ product and architecture roadmap.
 | Area | Status | Evidence / notes |
 |---|---|---|
 | World Builder and playable turn loop | Complete | Real REST/SSE backend, editable draft and canonical confirmation |
+| Structured character backgrounds | Complete | Current drafts require owned goals, public background claims and threads; v1.5 aggregates repair diagnostics and rejects undeclared/global claim subjects; private NPC canon is isolated to Simulator/Validator |
 | Save/load, fork and switch | Complete | Server-persisted active branch, canonical replay, ancestry visibility and repeated-undo tests |
 | Regenerate | Complete | Dedicated API/UI; creates a branch before the selected turn and resubmits its action |
 | Undo | Complete | Dedicated API/UI; activates a history-preserving branch at the parent turn |
@@ -28,8 +29,8 @@ product and architecture roadmap.
 Current validation baseline:
 
 - Ruff and Pyright clean.
-- 206 backend tests passing.
-- 36 frontend tests passing.
+- 268 backend tests passing.
+- 41 frontend tests passing.
 - Vue production build passing.
 
 Update this file whenever a workflow or gate changes; do not infer progress from

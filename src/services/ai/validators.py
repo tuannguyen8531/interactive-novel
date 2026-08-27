@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable
 from typing import Any, NoReturn
 
@@ -108,7 +109,21 @@ def _validate_world_seed(seed: WorldSeed) -> None:
     known_characters = set(character_ids)
     known_locations = {item.location_id for item in seed.locations}
     known_goals = {item.goal_id for item in seed.goals}
+    goals_by_id = {item.goal_id: item for item in seed.goals}
+    claims_by_id = {item.proposal_id: item for item in seed.initial_claims}
     known_entities = known_characters | known_locations
+    requires_structured_background = _semantic_version_at_least(seed.prompt_version, (1, 4, 0))
+    if requires_structured_background:
+        diagnostics = _current_world_seed_diagnostics(
+            seed,
+            character_seeds=character_seeds,
+            known_characters=known_characters,
+            known_locations=known_locations,
+            goals_by_id=goals_by_id,
+            claims_by_id=claims_by_id,
+        )
+        if diagnostics:
+            raise AIContractValidationError("semantic", diagnostics)
     if not set(seed.opening_scene.participants).issubset(known_characters):
         _raise("opening_scene.participants", "unknown_character_reference", "opening scene references an unknown character")
     if seed.opening_scene.guard_approved:
@@ -128,6 +143,12 @@ def _validate_world_seed(seed: WorldSeed) -> None:
             "adult explicit content cannot be enabled while a character is under 18",
         )
     for index, character in enumerate(character_seeds):
+        if requires_structured_background and not character.goal_ids:
+            _raise(
+                f"characters.{index}.goal_ids",
+                "background_goal_missing",
+                "every current-format character background must reference at least one owned goal",
+            )
         for goal_id in character.goal_ids:
             if goal_id not in known_goals:
                 _raise(
@@ -135,8 +156,14 @@ def _validate_world_seed(seed: WorldSeed) -> None:
                     "unknown_goal_reference",
                     "character goal reference is unknown",
                 )
+            if requires_structured_background and goals_by_id[goal_id].owner_id != character.character_id:
+                _raise(
+                    f"characters.{index}.goal_ids",
+                    "goal_owner_mismatch",
+                    "character goal references must point to goals owned by that character",
+                )
         for claim_id in character.private_claim_ids:
-            claim = next((item for item in seed.initial_claims if item.proposal_id == claim_id), None)
+            claim = claims_by_id.get(claim_id)
             if claim is None:
                 _raise(
                     f"characters.{index}.private_claim_ids",
@@ -148,6 +175,43 @@ def _validate_world_seed(seed: WorldSeed) -> None:
                     f"characters.{index}.private_claim_ids",
                     "private_claim_visibility_mismatch",
                     "private claim visibility must be scoped to its owning character",
+                )
+            if requires_structured_background and (
+                claim.subject_id != character.character_id or claim.predicate != "secret_exists"
+            ):
+                _raise(
+                    f"characters.{index}.private_claim_ids",
+                    "private_secret_claim_invalid",
+                    "current-format private claim references must be owner-scoped secret_exists claims",
+                )
+            if requires_structured_background and any(
+                marker in _normalize_prose(character.background) for marker in _private_claim_markers(claim)
+            ):
+                _raise(
+                    f"characters.{index}.background",
+                    "private_claim_leaked_to_background",
+                    "public background directly exposes an owner-scoped private claim",
+                )
+        if requires_structured_background:
+            background_claims = [
+                claim
+                for claim in seed.initial_claims
+                if claim.subject_id == character.character_id
+                and claim.predicate == "public_fact"
+                and claim.branch_scope == "public"
+                and claim.qualifiers.get("source") == "character_background"
+            ]
+            if not background_claims:
+                _raise(
+                    f"characters.{index}.background",
+                    "structured_background_claim_missing",
+                    "every current-format background needs a public_fact claim marked source=character_background",
+                )
+            if not any(character.character_id in thread.participant_ids for thread in seed.threads):
+                _raise(
+                    f"characters.{index}.background",
+                    "background_thread_missing",
+                    "every current-format background needs an actionable thread involving that character",
                 )
     for index, relationship in enumerate(seed.initial_relationships):
         if relationship.source_id == relationship.target_id:
@@ -214,6 +278,14 @@ def _validate_world_seed(seed: WorldSeed) -> None:
                 "unknown_entity_reference",
                 "claim subject is not a known world entity",
             )
+        if requires_structured_background and claim.branch_scope != "public":
+            owner = next(item for item in character_seeds if item.character_id == claim.branch_scope)
+            if claim.proposal_id not in owner.private_claim_ids:
+                _raise(
+                    f"initial_claims.{index}",
+                    "unlinked_private_claim",
+                    "every current-format private claim must be referenced by its owner's private_claim_ids",
+                )
     claim_fingerprints = {item.proposal_id for item in seed.initial_claims}
     for index, belief in enumerate(seed.initial_beliefs):
         if belief.believer_id not in known_characters:
@@ -239,6 +311,180 @@ def _require_unique(values: Iterable[str], path: str) -> None:
     materialized = tuple(values)
     if len(set(materialized)) != len(materialized):
         _raise(path, "duplicate_identity", f"{path} contains duplicate IDs")
+
+
+def _semantic_version_at_least(value: str, minimum: tuple[int, int, int]) -> bool:
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:[-+].*)?", value.strip())
+    if match is None:
+        return False
+    return tuple(int(part) for part in match.groups()) >= minimum
+
+
+def _current_world_seed_diagnostics(
+    seed: WorldSeed,
+    *,
+    character_seeds: tuple[Any, ...],
+    known_characters: set[str],
+    known_locations: set[str],
+    goals_by_id: dict[str, Any],
+    claims_by_id: dict[str, KnowledgeClaimProposal],
+) -> tuple[ContractDiagnostic, ...]:
+    """Collect repairable v1.4 cross-reference errors in one provider round trip."""
+
+    diagnostics: list[ContractDiagnostic] = []
+
+    def add(path: str, code: str, message: str) -> None:
+        diagnostics.append(ContractDiagnostic(path, code, message))
+
+    for index, character in enumerate(character_seeds):
+        if not character.goal_ids:
+            add(
+                f"characters.{index}.goal_ids",
+                "background_goal_missing",
+                "every current-format character background must reference at least one owned goal",
+            )
+        for goal_id in character.goal_ids:
+            goal = goals_by_id.get(goal_id)
+            if goal is None:
+                add(
+                    f"characters.{index}.goal_ids",
+                    "unknown_goal_reference",
+                    f"goal {goal_id!r} does not exist",
+                )
+            elif goal.owner_id != character.character_id:
+                add(
+                    f"characters.{index}.goal_ids",
+                    "goal_owner_mismatch",
+                    f"goal {goal_id!r} is not owned by {character.character_id!r}",
+                )
+
+        background_claims = [
+            claim
+            for claim in seed.initial_claims
+            if claim.subject_id == character.character_id
+            and claim.predicate == "public_fact"
+            and claim.branch_scope == "public"
+            and claim.qualifiers.get("source") == "character_background"
+        ]
+        if not background_claims:
+            add(
+                f"characters.{index}.background",
+                "structured_background_claim_missing",
+                (
+                    f"character {character.character_id!r} needs a public_fact claim whose subject_id exactly matches "
+                    "that character_id and whose qualifiers.source is character_background"
+                ),
+            )
+        if not any(character.character_id in thread.participant_ids for thread in seed.threads):
+            add(
+                f"characters.{index}.background",
+                "background_thread_missing",
+                f"character {character.character_id!r} must participate in at least one actionable thread",
+            )
+
+        for claim_id in character.private_claim_ids:
+            claim = claims_by_id.get(claim_id)
+            if claim is None:
+                add(
+                    f"characters.{index}.private_claim_ids",
+                    "unknown_claim_reference",
+                    f"private claim {claim_id!r} does not exist",
+                )
+                continue
+            if claim.branch_scope != character.character_id:
+                add(
+                    f"characters.{index}.private_claim_ids",
+                    "private_claim_visibility_mismatch",
+                    f"private claim {claim_id!r} must use branch_scope {character.character_id!r}",
+                )
+            if claim.subject_id != character.character_id or claim.predicate != "secret_exists":
+                add(
+                    f"characters.{index}.private_claim_ids",
+                    "private_secret_claim_invalid",
+                    f"private claim {claim_id!r} must be an owner-scoped secret_exists claim",
+                )
+            if any(marker in _normalize_prose(character.background) for marker in _private_claim_markers(claim)):
+                add(
+                    f"characters.{index}.background",
+                    "private_claim_leaked_to_background",
+                    "public background directly exposes an owner-scoped private claim",
+                )
+
+    for index, claim in enumerate(seed.initial_claims):
+        if claim.branch_scope != "public" and claim.branch_scope not in known_characters:
+            add(
+                f"initial_claims.{index}.branch_scope",
+                "unknown_visibility_owner",
+                "claim visibility must be public or owned by a known character",
+            )
+        if claim.predicate == "located_at":
+            if claim.subject_id not in known_characters or claim.object_id not in known_locations:
+                add(
+                    f"initial_claims.{index}",
+                    "invalid_location_claim_reference",
+                    "located_at claims must reference a known character and location",
+                )
+        elif claim.predicate == "goal_active":
+            if claim.subject_id not in known_characters or claim.object_id not in goals_by_id:
+                add(
+                    f"initial_claims.{index}",
+                    "invalid_goal_claim_reference",
+                    "goal_active claims must reference a known character and goal",
+                )
+        elif claim.predicate in {"age_is", "physical_condition", "secret_exists"}:
+            if claim.subject_id not in known_characters:
+                add(
+                    f"initial_claims.{index}.subject_id",
+                    "unknown_character_reference",
+                    "claim subject is not a known character",
+                )
+        elif claim.predicate in {"romantic_interest", "commitment_status"}:
+            if claim.subject_id not in known_characters or claim.object_id not in known_characters:
+                add(
+                    f"initial_claims.{index}",
+                    "invalid_character_claim_reference",
+                    "relationship claims must reference known characters",
+                )
+        elif claim.subject_id not in known_characters | known_locations:
+            add(
+                f"initial_claims.{index}.subject_id",
+                "unknown_entity_reference",
+                (
+                    f"subject_id {claim.subject_id!r} is unknown; use an exact character_id or location_id, "
+                    "and omit global world-rule claims"
+                ),
+            )
+        if claim.branch_scope != "public":
+            owner = next((item for item in character_seeds if item.character_id == claim.branch_scope), None)
+            if owner is not None and claim.proposal_id not in owner.private_claim_ids:
+                add(
+                    f"initial_claims.{index}",
+                    "unlinked_private_claim",
+                    "every current-format private claim must be referenced by its owner's private_claim_ids",
+                )
+
+    return tuple(diagnostics)
+
+
+def _normalize_prose(value: str) -> str:
+    return " ".join(re.sub(r"[^\w]+", " ", value.replace("_", " ").casefold()).split())
+
+
+def _private_claim_markers(claim: KnowledgeClaimProposal) -> tuple[str, ...]:
+    markers: set[str] = set()
+    if claim.object_id is not None:
+        normalized_object = _normalize_prose(claim.object_id)
+        if len(normalized_object) >= 8:
+            markers.add(normalized_object)
+        subject_parts = set(_normalize_prose(claim.subject_id).split())
+        ownerless_object = " ".join(part for part in normalized_object.split() if part not in subject_parts)
+        if len(ownerless_object) >= 8:
+            markers.add(ownerless_object)
+    if isinstance(claim.typed_value, str):
+        normalized_value = _normalize_prose(claim.typed_value)
+        if len(normalized_value) >= 8:
+            markers.add(normalized_value)
+    return tuple(sorted(markers))
 
 
 def _require_unique_aliases(character_ids: Iterable[str], aliases: Iterable[str]) -> None:

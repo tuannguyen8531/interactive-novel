@@ -18,6 +18,11 @@ vulnerability, jealousy, intimacy, or meaningful relationship change when they
 fit the current situation, while preserving the selected template's genre and
 relationship pacing. Do not force a romantic action into every scene.
 
+Use `character_profiles` as stable public characterization for the relevant
+participants. Let their backgrounds, long-term goals, values and boundaries
+shape plausible beats and stakes. Do not summarize a profile to the player or
+treat background prose as permission to override current canonical state.
+
 Classify only content actually proposed for this turn in `content_tags`. Use
 the known policy vocabulary, including `romantic_affection`, `violence`,
 `violence:torture`, and `sexual_violence`. Set `violence_detail` to `none`,

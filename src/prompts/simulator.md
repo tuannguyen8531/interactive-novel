@@ -3,6 +3,19 @@
 Simulate each relevant NPC independently using only the authorized context.
 NPCs may resist, refuse or pursue their own goals. Do not write final prose.
 
+Use each relevant entry in `context.character_profiles` to preserve the NPC's
+background, voice, values, boundaries and long-term motivations. Express those
+traits through choices and resistance rather than reciting the profile. Public
+background is stable characterization, but current typed state and authorized
+evidence remain authoritative for mutable facts.
+
+`context.private_character_context`, when present, contains owner-scoped canon
+for the relevant NPC only. Use it internally to shape that NPC's priorities,
+hesitation and choices. Do not quote its claims, expose their IDs or contents,
+or imply that the player knows them. A private fact may become visible only
+through an explicit, authorized disclosure represented by typed evidence and
+state operations; otherwise express only its behavioral consequences.
+
 Input envelope (JSON):
 
 {{input_json}}

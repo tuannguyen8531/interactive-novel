@@ -103,6 +103,15 @@ async def test_confirmed_world_builder_seed_round_trips_all_opening_artifacts(da
 
 async def test_game_state_hydrates_seed_replays_turn_and_builds_snapshot(database) -> None:
     payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]
+    payload["tensions"] = [
+        {
+            "tension_id": "tension-alice-bob-player",
+            "observer_id": "alice",
+            "rival_id": "bob",
+            "focus_id": "player",
+            "appraisal": "Alice worries Bob will earn the player's trust first.",
+        }
+    ]
     seed = WorldSeed.model_validate(payload)
     uow_factory = make_uow_factory(database)
     confirmation = await WorldDraftApplicationService(uow_factory).confirm_world_bundle(seed)
@@ -124,6 +133,8 @@ async def test_game_state_hydrates_seed_replays_turn_and_builds_snapshot(databas
         if claim.predicate == "located_at"
     } == {(character_id, "located_at", seed.locations[0].location_id) for character_id in seed.opening_scene.participants}
     assert len(opening.relationships) == len(seed.initial_relationships)
+    assert opening.metadata["character_goals"]["alice"][0]["goal_id"] == "goal_alice"
+    assert opening.metadata["emotional_tensions"][0]["tension_id"] == "tension-alice-bob-player"
     assert opening.policy is not None
     assert {event.event_type for event in opening.events.values()} == {"opening_scene"}
     assert all(

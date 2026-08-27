@@ -32,6 +32,9 @@ from src.application.ports.providers import ProviderPort
 from src.domain.characters import Character, CharacterProfile, CharacterState
 from src.domain.content import ContentPolicy
 from src.domain.guard import DomainGuard
+from src.domain.knowledge import KnowledgeClaim
+from src.domain.narrative import NarrativeThread
+from src.domain.relationships import RelationshipVector
 from src.domain.state import GameState
 from src.graph import TurnPipeline, TurnPipelineDependencies, TurnPipelineRequest
 from src.graph.checkpoint import build_in_memory_checkpointer
@@ -68,6 +71,7 @@ class FakeProvider(ProviderPort):
         self.sequences = {role: [copy.deepcopy(item) for item in values] for role, values in (sequences or {}).items()}
         self.calls: list[tuple[str, tuple[str, ...]]] = []
         self.fused_calls: list[tuple[str, ...]] = []
+        self.requests: list[ProviderRequest] = []
         self.contracts = AIContractRegistry()
 
     async def generate_text(self, request: ProviderRequest) -> ProviderResponse:
@@ -75,6 +79,7 @@ class FakeProvider(ProviderPort):
 
     async def generate_structured(self, request: ProviderRequest, schema: StructuredSchema) -> StructuredResponse:
         role = str(request.role)
+        self.requests.append(request)
         self.calls.append((request.physical_call_id, (role,)))
         payload = self._next_payload(role)
         return StructuredResponse(response=self._response(request, json.dumps(payload)), data=payload)
@@ -85,6 +90,7 @@ class FakeProvider(ProviderPort):
         schemas: Mapping[Any, StructuredSchema],
     ) -> Mapping[Any, StructuredResponse]:
         roles = tuple(str(role) for role in requests)
+        self.requests.extend(requests.values())
         self.fused_calls.append(roles)
         self.calls.append((next(iter(requests.values())).physical_call_id, roles))
         payloads = {str(role): self._next_payload(str(role)) for role in requests}
@@ -186,8 +192,30 @@ def make_game_state() -> GameState:
     )
     state.locations = {"library", "courtyard"}
     state.characters = {
-        "player": Character(CharacterProfile("player", "Mina", 17), CharacterState()),
-        "alice": Character(CharacterProfile("alice", "Alice", 17), CharacterState()),
+        "player": Character(
+            CharacterProfile(
+                "player",
+                "Mina",
+                17,
+                role="new club member",
+                background="Mina transferred schools and hopes the club will offer a fresh start.",
+                voice="curious and direct",
+            ),
+            CharacterState(),
+        ),
+        "alice": Character(
+            CharacterProfile(
+                "alice",
+                "Alice",
+                17,
+                role="club president",
+                background="Alice inherited responsibility for an underfunded festival exhibition.",
+                voice="warm but precise",
+                traits=("diligent", "reserved"),
+                initial_secrets=("secret-alice-letter",),
+            ),
+            CharacterState(),
+        ),
     }
     return state
 
@@ -418,6 +446,140 @@ async def test_initial_context_exposes_exact_authoritative_ids() -> None:
     assert identifiers["character_ids"] == ["alice", "player"]
     assert identifiers["location_ids"] == ["courtyard", "library"]
     assert identifiers["event_ids"] == []
+
+
+@pytest.mark.asyncio
+async def test_initial_context_includes_bounded_public_character_backgrounds() -> None:
+    provider = FakeProvider()
+    state = make_game_state()
+    state.claims["secret-alice-letter"] = KnowledgeClaim(
+        "alice",
+        "secret_exists",
+        object_id="alice-letter",
+        branch_scope="alice",
+        claim_id="secret-alice-letter",
+    )
+    result = await make_pipeline(provider, FakeCommitter()).run(make_request(state, "character-profile-run"))
+
+    context_manifest = result.get("context_manifest")
+    assert isinstance(context_manifest, dict)
+    profiles = context_manifest["character_profiles"]
+    assert profiles["player"]["background"] == "Mina transferred schools and hopes the club will offer a fresh start."
+    assert profiles["alice"] == {
+        "character_id": "alice",
+        "name": "Alice",
+        "aliases": [],
+        "age": 17,
+        "gender": "unspecified",
+        "role": "club president",
+        "background": "Alice inherited responsibility for an underfunded festival exhibition.",
+        "voice": "warm but precise",
+        "traits": ["diligent", "reserved"],
+        "values": [],
+        "boundaries": [],
+        "goal_ids": [],
+        "goals": [],
+    }
+    assert "initial_secrets" not in profiles["alice"]
+    assert "private_character_context" not in context_manifest
+    assert context_manifest["authoritative_ids"]["secret_ids"] == []
+    assert "secret-alice-letter" not in context_manifest["authoritative_ids"]["claim_ids"]
+
+    planner_request = next(request for request in provider.requests if request.role == AIPromptRole.PLANNER)
+    simulator_request = next(request for request in provider.requests if request.role == AIPromptRole.SIMULATOR)
+    validator_request = next(request for request in provider.requests if request.role == AIPromptRole.CONTEXT_VALIDATOR)
+    writer_request = next(request for request in provider.requests if request.role == AIPromptRole.WRITER)
+    critic_request = next(request for request in provider.requests if request.role == AIPromptRole.CRITIC)
+    assert "Alice inherited responsibility" in planner_request.user_prompt
+    assert "Alice inherited responsibility" in simulator_request.user_prompt
+    assert "Alice inherited responsibility" in writer_request.user_prompt
+    assert "secret-alice-letter" not in planner_request.user_prompt
+    assert "secret-alice-letter" in simulator_request.user_prompt
+    assert "secret-alice-letter" in validator_request.user_prompt
+    assert "secret-alice-letter" not in writer_request.user_prompt
+    assert "secret-alice-letter" not in critic_request.user_prompt
+    assert '"character_relationships"' not in writer_request.user_prompt
+    assert '"emotional_tensions"' not in writer_request.user_prompt
+    assert '"character_relationships"' not in critic_request.user_prompt
+    assert '"emotional_tensions"' not in critic_request.user_prompt
+
+
+@pytest.mark.asyncio
+async def test_fast_mode_keeps_private_npc_context_inside_simulation_roles() -> None:
+    provider = FakeProvider()
+    state = make_game_state()
+    state.claims["secret-alice-letter"] = KnowledgeClaim(
+        "alice",
+        "secret_exists",
+        object_id="alice-letter",
+        branch_scope="alice",
+        claim_id="secret-alice-letter",
+    )
+
+    await make_pipeline(provider, FakeCommitter(), mode="fast").run(make_request(state, "fast-private-context-run"))
+
+    prompts = {request.role: request.user_prompt for request in provider.requests}
+    assert "secret-alice-letter" not in prompts[AIPromptRole.PLANNER]
+    assert "secret-alice-letter" in prompts[AIPromptRole.SIMULATOR]
+    assert "secret-alice-letter" in prompts[AIPromptRole.CONTEXT_VALIDATOR]
+    assert "secret-alice-letter" not in prompts[AIPromptRole.WRITER]
+    assert "secret-alice-letter" not in prompts[AIPromptRole.CRITIC]
+
+
+@pytest.mark.asyncio
+async def test_initial_context_connects_background_to_goals_relationships_tensions_and_threads() -> None:
+    state = make_game_state()
+    for character_id, character in tuple(state.characters.items()):
+        state.characters[character_id] = Character(character.profile, CharacterState(location_id="library"))
+    state.characters["bob"] = Character(
+        CharacterProfile(
+            "bob",
+            "Bob",
+            18,
+            role="club artist",
+            background="Bob wants the exhibition to preserve the club's identity.",
+        ),
+        CharacterState(location_id="library"),
+    )
+    state.metadata["character_goals"] = {
+        "alice": [
+            {
+                "goal_id": "goal-alice-save-club",
+                "owner_id": "alice",
+                "description": "Save the club through a successful exhibition.",
+                "priority": 0.9,
+            }
+        ]
+    }
+    state.metadata["emotional_tensions"] = [
+        {
+            "tension_id": "tension-alice-bob-player",
+            "observer_id": "alice",
+            "rival_id": "bob",
+            "focus_id": "player",
+            "appraisal": "Alice worries Bob will gain the player's trust first.",
+        }
+    ]
+    state.relationships[("alice", "bob")] = RelationshipVector.from_mapping({"trust": 0.3, "respect": 0.4})
+    state.threads["thread-save-club"] = NarrativeThread(
+        "thread-save-club",
+        "The exhibition may determine whether the club survives.",
+        "root",
+        participant_ids=("player", "alice", "bob"),
+        stakes="Failure could dissolve the club.",
+        urgency=0.7,
+    )
+
+    result = await make_pipeline(FakeProvider(), FakeCommitter()).run(make_request(state, "structured-background-run"))
+
+    context_manifest = result.get("context_manifest")
+    assert isinstance(context_manifest, dict)
+    assert context_manifest["character_profiles"]["alice"]["goals"][0]["goal_id"] == "goal-alice-save-club"
+    assert context_manifest["character_relationships"] == [
+        {"source_id": "alice", "target_id": "bob", "values": {"respect": 0.4, "trust": 0.3}}
+    ]
+    assert context_manifest["emotional_tensions"][0]["tension_id"] == "tension-alice-bob-player"
+    assert context_manifest["story_threads"][0]["thread_id"] == "thread-save-club"
 
 
 @pytest.mark.asyncio

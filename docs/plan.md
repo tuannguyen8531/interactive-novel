@@ -1920,6 +1920,10 @@ WorldSeed tối thiểu:
 - Locations.
 - Player character seed.
 - 1–3 NPC profiles; mỗi NPC có giới tính, background chi tiết và `character_id` được suy ra từ tên.
+- Background là hồ sơ công khai, ổn định; secret phải là private typed claim theo owner.
+- Các chi tiết background cần dẫn dắt cốt truyện được đề xuất thêm dưới dạng claims, goals, quan hệ, tension và threads, rồi chỉ thành canonical sau bước xác nhận/validation.
+- Validation hiện hành bắt buộc mỗi character có owned goal, public background claim và thread; private claim phải được owner liên kết. Simulator/Context Validator nhận private NPC context riêng, Writer/Critic không nhận.
+- WorldSeed v1.5 gom lỗi semantic có thể repair trong một lượt và không cho initial claim dùng subject toàn cục chưa khai báo như `world`.
 - Initial directed relationships.
 - Public CanonFacts/KnowledgeClaims.
 - Private typed claims kèm visibility.

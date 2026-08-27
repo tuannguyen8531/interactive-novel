@@ -157,6 +157,11 @@ def _background(public: Mapping[str, Any]) -> str:
 
 
 def _apply_world_seed(state: GameState, seed: WorldSeed) -> None:
+    state.metadata["character_goals"] = {
+        character_id: [goal.model_dump(mode="json") for goal in seed.goals if goal.owner_id == character_id]
+        for character_id in (seed.player_character.character_id, *(item.character_id for item in seed.npc_profiles))
+    }
+    state.metadata["emotional_tensions"] = [item.model_dump(mode="json") for item in seed.tensions]
     state.locations.update(location.location_id for location in seed.locations)
     opening_location_id = seed.locations[0].location_id
     for character_id in seed.opening_scene.participants:

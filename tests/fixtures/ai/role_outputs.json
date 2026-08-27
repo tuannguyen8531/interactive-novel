@@ -30,7 +30,7 @@
       "voice": "curious and direct",
       "traits": ["observant"],
       "values": ["honesty"],
-      "goal_ids": [],
+      "goal_ids": ["goal_player"],
       "private_claim_ids": []
     },
     "npc_profiles": [
@@ -59,11 +59,32 @@
         "voice": "dry and thoughtful",
         "traits": ["practical"],
         "values": ["fairness"],
-        "goal_ids": [],
+        "goal_ids": ["goal_bob"],
         "private_claim_ids": []
       }
     ],
     "initial_claims": [
+      {
+        "schema_version": "knowledge-claim-proposal",
+        "proposal_id": "claim-player-transfer",
+        "source_role": "world_builder",
+        "source_run_id": "world-run-1",
+        "claim_type": "knowledge_claim",
+        "subject_id": "player",
+        "predicate": "public_fact",
+        "typed_value": "Mina transferred schools after a difficult year.",
+        "polarity": "positive",
+        "qualifiers": {"source": "character_background"},
+        "valid_time": {"start": 0},
+        "branch_scope": "public",
+        "provenance": {
+          "source_type": "world_seed",
+          "source_id": "world-run-1",
+          "run_id": "world-run-1",
+          "prompt_version": "1.0.0",
+          "model_metadata": {}
+        }
+      },
       {
         "schema_version": "knowledge-claim-proposal",
         "proposal_id": "claim-alice-tea",
@@ -74,7 +95,28 @@
         "predicate": "public_fact",
         "typed_value": "prefers tea",
         "polarity": "positive",
-        "qualifiers": {},
+        "qualifiers": {"source": "character_background"},
+        "valid_time": {"start": 0},
+        "branch_scope": "public",
+        "provenance": {
+          "source_type": "world_seed",
+          "source_id": "world-run-1",
+          "run_id": "world-run-1",
+          "prompt_version": "1.0.0",
+          "model_metadata": {}
+        }
+      },
+      {
+        "schema_version": "knowledge-claim-proposal",
+        "proposal_id": "claim-bob-treasurer",
+        "source_role": "world_builder",
+        "source_run_id": "world-run-1",
+        "claim_type": "knowledge_claim",
+        "subject_id": "bob",
+        "predicate": "public_fact",
+        "typed_value": "Bob became treasurer after finding neglected club records.",
+        "polarity": "positive",
+        "qualifiers": {"source": "character_background"},
         "valid_time": {"start": 0},
         "branch_scope": "public",
         "provenance": {
@@ -91,14 +133,16 @@
     ],
     "initial_beliefs": [],
     "goals": [
-      {"goal_id": "goal_alice", "owner_id": "alice", "description": "Finish the festival plan.", "priority": 0.8}
+      {"goal_id": "goal_player", "owner_id": "player", "description": "Find a place to belong in the club.", "priority": 0.7},
+      {"goal_id": "goal_alice", "owner_id": "alice", "description": "Finish the festival plan.", "priority": 0.8},
+      {"goal_id": "goal_bob", "owner_id": "bob", "description": "Keep the festival budget honest.", "priority": 0.7}
     ],
     "tensions": [],
     "threads": [
       {
         "thread_id": "thread_club",
         "premise": "The culture club must finish its festival display.",
-        "participant_ids": ["player", "alice"],
+        "participant_ids": ["player", "alice", "bob"],
         "stakes": "The display may be cancelled."
       }
     ],
