@@ -57,7 +57,11 @@ describe('provider store', () => {
     store.toggleFallback('writer', 'local', true)
     await store.save('fast', true)
 
-    const payload = vi.mocked(api.updateProviderSettings).mock.calls[0][0] as Record<string, any>
+    const payload = vi.mocked(api.updateProviderSettings).mock.calls[0][0] as {
+      mode: string
+      targets: Record<string, Record<string, unknown>>
+      role_routes: Record<string, unknown>
+    }
     expect(payload.mode).toBe('fast')
     expect(payload.targets[cloudName]).toMatchObject({
       provider: 'gemini',
