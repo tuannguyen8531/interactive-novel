@@ -3,6 +3,7 @@
 [![Python 3.14+](https://img.shields.io/badge/python-3.14%2B-blue.svg)](https://www.python.org/)
 [![Node.js 20+](https://img.shields.io/badge/node-20%2B-green.svg)](https://nodejs.org/)
 [![uv](https://img.shields.io/badge/package%20manager-uv-2b2b2b.svg)](https://docs.astral.sh/uv/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Local-first AI-powered interactive visual novel/RPG engine. It is a narrative
 simulation system rather than a simple chat transcript: the engine owns
@@ -104,34 +105,6 @@ Extra Pytest arguments go after `--`, for example:
 uv run test -- --maxfail=1 -k health
 ```
 
-## Configuration and privacy
-
-Copy `.env.example` to `.env` and keep provider credentials there. On first
-launch, provider targets, model IDs, execution mode, and routing are seeded into
-`runtime/settings.json`; the Settings / Providers screen can then edit the
-persisted configuration. Remove only that file to seed it again without
-deleting worlds or logs.
-
-The same screen exposes **Story language** (`English` or `Vietnamese`). It is a
-default for newly generated worlds; the selected language is copied into each
-world seed and carried through planning, writing, suggested actions and future
-turns. Existing worlds keep their own language when the default changes. Set
-`STORY_LANGUAGE=vi` in `.env` to seed Vietnamese on first launch.
-
-The UI and `runtime/settings.json` store provider choices and environment
-variable names, never secret values. Shell environment variables take
-precedence over `.env`. Keep `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, and other
-credentials out of frontend code, prompts, SSE events, and logs.
-
-Provider request, response, and error payloads are logged under
-`runtime/logs/YYYY-MM-DD/`. Credentials and URL query strings are redacted, but
-logs may still contain private story content. Review them before sharing and
-use `LOG_RETENTION_DAYS` to control daily-log retention.
-
-The Developer Inspector is disabled by default. Enable it for a session with
-`INTERACTIVE_NOVEL_DEBUG=true`, then build the UI with
-`VITE_ENABLE_INSPECTOR=true uv run build`.
-
 ## Validation
 
 Apply safe Ruff fixes and formatting, then run the full validation pipeline:
@@ -155,3 +128,7 @@ uv run build
 | [Architecture](docs/architecture.md) | Module ownership, data authority, and dependency direction |
 | [Domain model](docs/domain-model.md) | World, turn, event, knowledge, relationship, and branch contracts |
 | [Content policy](docs/content-policy.md) | Age, consent, privacy, and violence boundaries |
+
+## License
+
+MIT. See [LICENSE](LICENSE).
