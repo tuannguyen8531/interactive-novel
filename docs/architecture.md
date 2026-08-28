@@ -118,12 +118,12 @@ thread. Every private claim must be linked by its owner through
 background remains a public profile and has no mutation authority by itself.
 Validation also rejects public background that directly contains a private
 claim identifier or text value; indirect semantic disclosure remains controlled
-by the prompt and Context Validator. WorldSeed v1.5 allows
-`initial_claims.subject_id` to refer only to declared characters or locations;
-global world rules remain in premise or canon prose. Preflight groups related
-coverage and cross-reference errors into one diagnostic set so a single
-structured-output repair can fix the complete payload instead of failing one
-invariant at a time.
+by the prompt and Context Validator. WorldSeed prompt v1.6 carries the
+canonical story language and allows `initial_claims.subject_id` to refer only
+to declared characters or locations; global world rules remain in premise or
+canon prose. Preflight groups related coverage and cross-reference errors into
+one diagnostic set so a single structured-output repair can fix the complete
+payload instead of failing one invariant at a time.
 
 Writer receives `SceneSpec`, authorized evidence, bounded public character
 profiles, and the canonical story language; it does not receive the whole
