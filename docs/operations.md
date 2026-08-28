@@ -1,8 +1,8 @@
-# Vận hành alpha
+# Alpha operations
 
-## Khởi động lần đầu
+## First launch
 
-Từ thư mục dự án:
+From the project directory:
 
 ```bash
 uv sync
@@ -12,13 +12,13 @@ uv run build
 uv run serve
 ```
 
-`doctor` chỉ tạo các thư mục runtime và kiểm tra readiness; nó không gọi
-provider. Dữ liệu canonical nằm ở `runtime/game.db`, còn checkpoint LangGraph
-nằm riêng ở `runtime/checkpoints.db`. Sau `uv run build`, backend phục vụ SPA
-đã build tại `http://127.0.0.1:8000`; `/api`, `/docs` và `/openapi.json` vẫn là
-các route backend riêng.
+`doctor` only creates the runtime directories and checks readiness; it does not
+call a provider. Canonical data lives in `runtime/game.db`, while LangGraph
+checkpoints are kept separately in `runtime/checkpoints.db`. After `uv run
+build`, the backend serves the built SPA at `http://127.0.0.1:8000`; `/api`,
+`/docs`, and `/openapi.json` remain separate backend routes.
 
-Khi phát triển giao diện với hot reload, dùng hai terminal:
+For frontend hot reload, use two terminals:
 
 ```bash
 # terminal 1
@@ -28,34 +28,33 @@ uv run serve
 cd web && npm run dev
 ```
 
-Kiểm tra dự án theo cùng quy ước với `novel-ai-trans`:
+Run the standard project validation pipeline:
 
 ```bash
 uv run test
 uv run test --no-frontend
 ```
 
-Mặc định lệnh chạy Ruff, Pyright, Pytest và Vue unit tests; cờ
-`--no-frontend` chỉ bỏ qua Vue unit tests khi cần kiểm tra riêng backend.
-Nếu chạy trong sandbox và một API test không trả kết quả sau 30 giây, hãy dừng
-lệnh từ môi trường chạy; đây không phải giới hạn của `uv run test` khi chạy
-bên ngoài sandbox.
+By default, the command runs Ruff, Pyright, Pytest, and the Vue unit tests;
+`--no-frontend` only skips the Vue unit tests for backend-only validation. If an
+API test does not return after 30 seconds in a sandbox, terminate the command
+and rerun the remaining checks as described in [Sandbox testing](#sandbox-testing).
 
-## Integrity và backup
+## Integrity and backup
 
-Kiểm tra database:
+Check the database:
 
 ```bash
 uv run backup integrity
 ```
 
-Tạo backup nhất quán qua SQLite online-backup API:
+Create a consistent backup through the SQLite online-backup API:
 
 ```bash
 uv run backup create --output runtime/exports/game.db.backup
 ```
 
-Khôi phục vào đường dẫn đã chỉ rõ:
+Restore to an explicitly selected path:
 
 ```bash
 uv run backup restore \
@@ -63,73 +62,83 @@ uv run backup restore \
   --database runtime/game.db
 ```
 
-Lệnh restore kiểm tra integrity của nguồn, ghi vào file tạm, kiểm tra file đích
-rồi mới thay thế atomically. Hãy giữ một bản backup ngoài thư mục runtime trước
-khi restore vào database đang dùng.
+The restore command checks the source integrity, writes to a temporary file,
+checks the destination, and only then replaces it atomically. Keep a backup
+outside the runtime directory before restoring the active database.
 
-Export playthrough dạng JSON thường có ở `GET /api/playthroughs/{id}/export`.
-Endpoint `.../export/bundle` thêm checksum; `POST /api/exports/validate` kiểm
-tra checksum và scope. `POST /api/exports/import` thực hiện exact restore một
-bundle đã ký checksum bằng cách tái dựng opening records và replay từng typed
-patch qua canonical commit. Import từ chối ID đang tồn tại; hãy xóa world cũ
-trước khi restore đúng bundle đó. UI tương ứng nằm trong **Data → Import bundle**.
+A normal JSON playthrough export is available at
+`GET /api/playthroughs/{id}/export`. The `.../export/bundle` endpoint adds a
+checksum; `POST /api/exports/validate` checks the checksum and scope;
+`POST /api/exports/import` performs an exact restore of a checksummed bundle by
+rebuilding opening records and replaying each typed patch through the canonical
+commit path. Import rejects an existing ID, so remove the old world before
+restoring that same bundle. The corresponding UI is **Data → Import bundle**.
 
-Trang **Data** cũng cho phép tạo/list/restore backup. API chỉ chấp nhận tên file
-an toàn bên trong `runtime/exports`, không nhận đường dẫn filesystem tùy ý. Khi
-restore, turn workers được dừng, connection pool được đóng, file được thay thế
-atomically rồi workers mới chạy lại.
+The **Data** page can also create, list, and restore backups. The API accepts
+only safe filenames inside `runtime/exports`; arbitrary filesystem paths are
+rejected. During restore, turn workers stop, the connection pool closes, the
+file is replaced atomically, and new workers start afterward.
 
-## Provider, telemetry và bảo mật
+## Providers, telemetry, and security
 
-- Provider lỗi được chuyển thành lỗi an toàn và không được làm mất canonical
-  save; fallback chỉ chạy khi lỗi cho phép.
-- Telemetry mặc định tắt. Chỉ khi đặt `TELEMETRY_ENABLED=true` mới tạo
-  `runtime/logs/telemetry.jsonl`; file chỉ chứa latency, token counts, cost ước
-  tính và provider metadata, không chứa prompt/output.
-- Mọi provider call được ghi riêng theo ngày vào
-  `runtime/logs/YYYY-MM-DD/request.log`, `response.log` và `error.log`, tương tự
-  `novel-ai-trans`. Request/response chứa đầy đủ payload gửi tới và nhận từ
-  provider; credentials và query string vẫn được che. Log có thể chứa nội
-  dung truyện riêng tư, vì vậy cần kiểm tra trước khi chia sẻ. Số ngày
-  giữ log do `LOG_RETENTION_DAYS` điều khiển (mặc định 30).
-- `INTERACTIVE_NOVEL_DEBUG` và `VITE_ENABLE_INSPECTOR` mặc định tắt. Muốn
-  dùng Inspector phải bật backend, sau đó build frontend với cờ Vite.
-  Không đặt API key trong frontend,
-  prompt, event SSE hoặc log.
-- Input người chơi được giới hạn, chuẩn hóa và gắn nhãn untrusted; cờ prompt
-  injection không biến input thành system/developer instruction.
+- Provider failures are converted into safe errors and must not lose the
+  canonical save; fallback runs only for errors that permit it.
+- Telemetry is disabled by default. Only `TELEMETRY_ENABLED=true` creates
+  `runtime/logs/telemetry.jsonl`; it contains latency, token counts, estimated
+  cost, and provider metadata, not prompts or outputs.
+- Every provider call is logged by day in
+  `runtime/logs/YYYY-MM-DD/request.log`, `response.log`, and `error.log`.
+  Request and response logs contain the complete payload sent to and received
+  from the provider; credentials and query strings are redacted. Logs may
+  contain private story content, so review them before sharing. Retention is
+  controlled by `LOG_RETENTION_DAYS` (30 days by default).
+- `INTERACTIVE_NOVEL_DEBUG` and `VITE_ENABLE_INSPECTOR` are disabled by
+  default. To use the Inspector, enable the backend and then build the
+  frontend with the Vite flag. Never put an API key in the frontend, prompts,
+  SSE events, or logs.
+- Player input is bounded, normalized, and labeled untrusted; prompt-injection
+  flags do not turn it into a system or developer instruction.
 
 ## Alpha feedback loop
 
-Người dùng có thể gửi rating/comment qua `POST /api/feedback`. Feedback được
-giới hạn kích thước, redact secret phổ biến và ghi vào
-`runtime/logs/feedback.jsonl`; đây là dữ liệu opt-in riêng, không phải memory
-canon.
+Users can submit a rating and comment through `POST /api/feedback`. Feedback is
+size-limited, common secrets are redacted, and the result is written to
+`runtime/logs/feedback.jsonl`; this is opt-in private data, not canonical
+memory.
 
-Form tương ứng nằm trong trang **Data**.
+The corresponding form is on the **Data** page.
 
-## Quality gates và benchmark
+## Quality gates and benchmarks
 
-- Frontend fixture acceptance chạy 30 lượt trong Vitest.
-- Persistence soak commit/replay 100 lượt và kiểm tra branch head/invariants.
-- Memory gate chạy 100 lượt, kiểm tra cả consolidation lẫn critical-memory
-  Recall@5 = 1.00 qua nhiều cửa sổ thời gian.
-- Canonical failure injection chạy qua từng bước của transaction và xác nhận
-  rollback không để lại partial turn.
-- `uv run quality-report` tổng hợp telemetry provider thật theo turn. Báo cáo
-  không giả lập số liệu khi telemetry chưa có sample.
+- Frontend fixture acceptance runs 30 turns in Vitest.
+- The persistence soak commits and replays 100 turns and checks the branch head
+  and invariants.
+- The memory gate runs 100 turns and checks consolidation plus critical-memory
+  Recall@5 = 1.00 across multiple time windows.
+- Canonical failure injection runs through every transaction step and confirms
+  that rollback leaves no partial turn.
+- `uv run quality-report` aggregates real-provider telemetry by turn. It does
+  not fabricate measurements when no telemetry sample exists.
 
-Browser E2E bằng Playwright hiện được chủ động hoãn để tránh thêm browser binary
-và dependency nặng; API integration, Vue store acceptance và production build
-vẫn nằm trong validation mặc định.
+Browser E2E with Playwright is intentionally deferred to avoid adding browser
+ binaries and heavy dependencies; API integration, Vue store acceptance, and
+ the production build remain part of the normal validation surface.
 
-Gate 30 lượt hiện chứng minh luồng tương tác và state không thoái hóa.
-Chất lượng văn phong/narrative của model là gate theo môi trường: cần
-khóa provider, model và hardware trước khi ghi baseline, không suy ra từ
-fixture deterministic.
+The 30-turn gate currently proves that the interaction flow and state do not
+degrade. Model prose and narrative quality are environment-bound gates: choose
+and lock a provider, model, and hardware before recording a baseline; do not
+infer it from deterministic fixtures.
 
-## Kiểm thử trong sandbox
+## Sandbox testing
 
-Các test persistence/API có thể cần SQLite lifecycle hoặc provider thật. Khi một
-test API/sandbox không trả kết quả trong 30 giây, dừng test đó, bỏ qua phần test
-đã treo và ghi rõ trong báo cáo; không tải package mới khi chưa có phép.
+Persistence and API tests may depend on SQLite lifecycle behavior or a provider.
+When an API test does not return after 30 seconds in a sandbox, terminate the
+test, skip the stuck API group, and record that fact in the report:
+
+```bash
+uv run test -- --ignore=tests/api
+```
+
+Do not repeatedly retry the same sandbox-only hang or download new packages
+without permission. Do not treat the hang as an application failure unless it
+also reproduces outside the sandbox.

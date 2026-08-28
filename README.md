@@ -1,103 +1,151 @@
 # Interactive Novel
 
-Local-first AI-powered interactive visual novel/RPG engine. The current alpha
-includes the playable Vue application, AI turn pipeline, canonical SQLite
-persistence, branching/regeneration/undo, hybrid memory retrieval, portable
-import/export, backup/restore and developer diagnostics.
+[![Python 3.14+](https://img.shields.io/badge/python-3.14%2B-blue.svg)](https://www.python.org/)
+[![Node.js 20+](https://img.shields.io/badge/node-20%2B-green.svg)](https://nodejs.org/)
+[![uv](https://img.shields.io/badge/package%20manager-uv-2b2b2b.svg)](https://docs.astral.sh/uv/)
 
-See [docs/status.md](docs/status.md) for the implementation matrix. The large
-design document remains a roadmap, not a reliable progress tracker by itself.
+Local-first AI-powered interactive visual novel/RPG engine. It is a narrative
+simulation system rather than a simple chat transcript: the engine owns
+canonical world state, typed claims, events, relationships, memory, branches,
+and turn history while AI components propose and express outcomes.
 
-## Development
+```text
+World + player action
+    -> turn graph and scoped memory retrieval
+    -> deterministic validation and state guard
+    -> canonical SQLite commit
+    -> Vue play screen through REST/SSE
+```
 
-Requirements: Python 3.14+, `uv`, Node.js 20+ and npm.
+## Highlights
+
+- Build and validate playable worlds with the World Builder and story templates.
+- Run an AI-assisted turn pipeline with Planner, Simulator, Validator, Writer,
+  and Critic roles behind typed contracts.
+- Keep canonical game state in SQLite with event history, snapshots, branches,
+  fork, regenerate, undo, and replay support.
+- Use hybrid memory retrieval with knowledge visibility, provenance, and
+  rebuildable derived indexes.
+- Export and import playthroughs, create verified database backups, and restore
+  them atomically through the CLI or Data screen.
+- Use Ollama locally or Gemini and OpenRouter in the cloud, with configurable
+  role routing, fallback, privacy settings, and opt-in telemetry.
+- Open a deterministic frontend fixture without an LLM provider for local UI
+  development and the ten-turn acceptance loop.
+
+## Requirements
+
+- Python 3.14+
+- [uv](https://docs.astral.sh/uv/)
+- Node.js 20+ and npm for the Vue frontend
+- One supported provider for server-backed AI turns:
+  [Ollama](https://ollama.com/), [Gemini](https://aistudio.google.com/apikey),
+  or [OpenRouter](https://openrouter.ai/keys)
+
+The deterministic **Open fixture** flow does not require a configured provider.
+
+## Quick start
+
+From the project directory:
 
 ```bash
 uv sync
+cp .env.example .env
+uv run doctor
+uv run migrate
 uv run build
 uv run serve
 ```
 
-After `uv run build`, `uv run serve` serves the built Vue SPA and backend from
-`http://127.0.0.1:8000`. The health endpoint is
-`http://127.0.0.1:8000/api/health`.
+Open <http://127.0.0.1:8000>. The health endpoint is
+<http://127.0.0.1:8000/api/health>. Use **Open fixture** for a provider-free
+local run, or configure a provider before creating a server-backed playthrough.
 
-## Provider configuration
+`uv run doctor` creates the runtime directories and checks readiness without
+calling a provider. The canonical database is `runtime/game.db`; LangGraph
+execution checkpoints are kept separately in `runtime/checkpoints.db`.
 
-Create the local environment file once:
+## Use the web GUI
 
-```bash
-cp .env.example .env
-```
-
-On the first launch, provider targets, model IDs, execution mode and routing are
-seeded from `.env` into `runtime/settings.json`. The Settings / Providers screen
-then edits this persisted configuration and applies it to the running provider
-router when saved. Remove only `runtime/settings.json` to seed it from `.env`
-again without deleting worlds or logs.
-The model field discovers available IDs from the selected provider, while still
-allowing a custom model ID when the catalog is unavailable or incomplete.
-
-Provider calls are logged like `novel-ai-trans` under
-`runtime/logs/YYYY-MM-DD/{request,response,error}.log`. Request and response logs
-include the complete provider payloads for local debugging. Credentials and URL
-query strings are redacted. Set `LOG_RETENTION_DAYS` to control daily-log
-retention (default: 30 days). These logs may contain private story content and
-should not be shared without review.
-
-Developer Inspector is disabled by default on both sides. Enable the endpoint
-with `INTERACTIVE_NOVEL_DEBUG=true`, then build the UI with
-`VITE_ENABLE_INSPECTOR=true uv run build` when the Inspector is needed.
-
-Keep `GEMINI_API_KEY`, `OPENROUTER_API_KEY` and other credentials in `.env`.
-The UI stores only an environment-variable name such as `GEMINI_API_KEY`; API
-responses and `runtime/settings.json` never contain the secret value. Shell
-environment variables take precedence over `.env`.
-
-Ollama uses separate defaults for generation and embeddings. Ensure the model
-IDs selected in the UI exist locally (for example `llama3.2:3b` and
-`nomic-embed-text:latest`). The default Ollama base URL includes its REST prefix:
-`http://localhost:11434/api`.
-
-For frontend development:
+For frontend hot reload, use two terminals:
 
 ```bash
-uv run serve # terminal 1, backend
+# terminal 1: backend
+uv run serve
+
+# terminal 2: Vite frontend
 cd web
 npm install
 npm run dev
 ```
 
-The Vite development server runs at `http://127.0.0.1:5173` and proxies
-`/api` to the backend. `uv run serve` does not start Vite; it serves `web/dist`
-after the production build.
+Open <http://127.0.0.1:5173>. The Vite server proxies `/api` to the backend.
+`uv run serve` does not start Vite; it serves the production bundle from
+`web/dist` after `uv run build`.
 
-Validation commands:
+## Commands
+
+| Command | Purpose |
+| --- | --- |
+| `uv run doctor` | Check readiness and create runtime directories |
+| `uv run migrate` | Upgrade the canonical SQLite database |
+| `uv run build` | Build the Vue production bundle |
+| `uv run serve` | Start the API and built web application |
+| `uv run test` | Run Ruff, format checks, Pyright, Pytest, and Vue unit tests |
+| `uv run test --no-frontend` | Run backend validation without Vue unit tests |
+| `uv run backup integrity` | Run SQLite integrity check |
+| `uv run backup create --output <path>` | Create and verify a database backup |
+| `uv run backup restore --input <path> --database <path>` | Verify and restore a backup |
+| `uv run quality-report` | Report opt-in provider latency, token, and cost samples |
+
+Extra Pytest arguments go after `--`, for example:
 
 ```bash
-uv run test
-uv run test --no-frontend
-uv run test --fix
-uv run build
-uv run migrate
-uv run quality-report
+uv run test -- --maxfail=1 -k health
 ```
 
-`uv run test` runs Ruff, Pyright, Pytest and the Vue unit tests. Use
-`--no-frontend` to skip the Vue tests when only backend validation is needed.
-Extra Pytest arguments go after `--`, for example
-`uv run test -- --maxfail=1 -k health`.
+## Configuration and privacy
 
-`uv run quality-report` aggregates provider-real latency, token and estimated
-cost samples from opt-in telemetry. It reports zero samples honestly until
-`TELEMETRY_ENABLED=true` has been used for real turns.
+Copy `.env.example` to `.env` and keep provider credentials there. On first
+launch, provider targets, model IDs, execution mode, and routing are seeded into
+`runtime/settings.json`; the Settings / Providers screen can then edit the
+persisted configuration. Remove only that file to seed it again without
+deleting worlds or logs.
 
-`uv run migrate` upgrades the canonical database at `runtime/game.db`. Use
-`uv run migrate --database /path/to/game.db` for a test or alternate runtime.
-The separate `runtime/checkpoints.db` path is reserved for LangGraph execution
-state and is not a save-game database.
+The UI and `runtime/settings.json` store provider choices and environment
+variable names, never secret values. Shell environment variables take
+precedence over `.env`. Keep `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, and other
+credentials out of frontend code, prompts, SSE events, and logs.
 
-Each saved playthrough has an **Export** action; the **Data** screen provides
-portable story import, verified database backup/restore and the alpha feedback
-form. CLI equivalents and opt-in telemetry are documented in
-[docs/operations.md](docs/operations.md).
+Provider request, response, and error payloads are logged under
+`runtime/logs/YYYY-MM-DD/`. Credentials and URL query strings are redacted, but
+logs may still contain private story content. Review them before sharing and
+use `LOG_RETENTION_DAYS` to control daily-log retention.
+
+The Developer Inspector is disabled by default. Enable it for a session with
+`INTERACTIVE_NOVEL_DEBUG=true`, then build the UI with
+`VITE_ENABLE_INSPECTOR=true uv run build`.
+
+## Validation
+
+Apply safe Ruff fixes and formatting, then run the full validation pipeline:
+
+```bash
+uv run test --fix
+uv run test
+```
+
+After frontend changes, also run:
+
+```bash
+uv run build
+```
+
+## Documentation
+
+| Guide | Contents |
+| --- | --- |
+| [Operations](docs/operations.md) | Setup, backup/restore, providers, and telemetry |
+| [Architecture](docs/architecture.md) | Module ownership, data authority, and dependency direction |
+| [Domain model](docs/domain-model.md) | World, turn, event, knowledge, relationship, and branch contracts |
+| [Content policy](docs/content-policy.md) | Age, consent, privacy, and violence boundaries |

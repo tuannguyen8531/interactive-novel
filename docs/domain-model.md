@@ -1,110 +1,115 @@
-# Domain model và glossary
+# Domain model and glossary
 
-Đây là contract domain trước khi viết implementation. Tên field dưới đây là
-định hướng canonical model; DTO/API có thể đổi cách trình bày nhưng không được
-đổi nghĩa hoặc bỏ provenance/scope.
+This is the domain contract for the project. Field names below describe the
+canonical model; DTOs and APIs may present them differently but must not change
+their meaning or remove provenance and scope.
 
-## 1. Quy ước chung
+## 1. General conventions
 
-- Domain ID là UUID dạng TEXT, không dùng SQLite rowid làm identity.
-- Timestamp audit là UTC; thời gian trong truyện là `InWorldClock` độc lập.
-- Mọi record có `schema_version` khi schema có khả năng tiến hóa.
-- Branch/time/owner là scope bắt buộc cho query có nguy cơ lộ knowledge.
-- `provenance` tối thiểu gồm source type, source ID, turn/run ID và prompt/model
-  metadata nếu nguồn là AI.
+- Domain IDs are UUIDs stored as `TEXT`; SQLite row IDs are not identities.
+- Audit timestamps are UTC; story time is an independent `InWorldClock`.
+- Every record has a `schema_version` when its schema can evolve.
+- Branch, time, and owner are mandatory scopes for queries that could expose
+  knowledge.
+- `provenance` contains at least source type, source ID, turn/run ID, and
+  prompt/model metadata when the source is AI.
 
 ## 2. Glossary
 
-| Thuật ngữ | Nghĩa chuẩn |
+| Term | Canonical meaning |
 |---|---|
-| World | Vũ trụ tái sử dụng: premise, canon, locations, characters seed, policy |
-| Playthrough | Một lần chơi của một World, có player, clock, RNG và root branch |
-| Branch | Một timeline có parent/fork/head độc lập |
-| Revision | Số phiên bản canonical của một branch head |
-| Turn | Một action/input và kết quả được commit nguyên tử |
-| Event | Điều thực sự đã xảy ra, bất biến sau commit |
-| Canon | Tập điều engine xác định là đúng trong thế giới |
-| KnowledgeClaim | Proposition typed có subject/predicate/object/value và scope |
-| CanonFact | Assertion có thẩm quyền lên một KnowledgeClaim |
-| Observation | Proposition một observer tiếp nhận từ event/source |
-| Belief | Proposition một character tin, có thể sai |
-| ClaimLink | Quan hệ evidence giữa các claim |
-| StatePatch | Danh sách typed state operations trước Guard |
-| SceneSpec | Phần outcome/chi tiết được Guard duyệt cho Writer biểu đạt |
-| NarrativeThread | Tuyến xung đột/mục tiêu đang tiến triển |
-| NarrativeHook | Setup/payoff cue gắn với event/thread |
-| Derived artifact | Dữ liệu có thể xóa và rebuild 100% từ canonical data |
-| Logical role | Contract AI như Planner hoặc Writer |
-| Physical call | Một request model thực tế, có thể phục vụ nhiều role |
-| World time | Thời gian trong truyện theo integer minutes từ world epoch |
-| Consent | Quyền đồng thuận cho activity cụ thể; không phải relationship score |
-| Content boundary | Giới hạn chủ đề/rating do World hoặc Player cấu hình |
+| World | A reusable universe: premise, canon, locations, seeded characters, and policy |
+| Playthrough | One play session for a World, with a player, clock, RNG, and root branch |
+| Branch | A timeline with an independent parent, fork, and head |
+| Revision | The canonical version number of a branch head |
+| Turn | One action/input and its atomically committed result |
+| Event | Something that actually happened; immutable after commit |
+| Canon | The set of things the engine determines to be true in the world |
+| KnowledgeClaim | A typed proposition with subject, predicate, object/value, and scope |
+| CanonFact | An authoritative assertion about a KnowledgeClaim |
+| Observation | A proposition an observer received from an event or source |
+| Belief | A proposition a character believes, which may be wrong |
+| ClaimLink | An evidence relationship between claims |
+| StatePatch | A list of typed state operations before Guard approval |
+| SceneSpec | The outcome/details approved for the Writer to express |
+| NarrativeThread | A conflict or goal line currently in progress |
+| NarrativeHook | A setup/payoff cue attached to an event or thread |
+| Derived artifact | Data that can be deleted and rebuilt entirely from canonical data |
+| Logical role | An AI contract such as Planner or Writer |
+| Physical call | An actual model request that may serve several roles |
+| World time | Story time measured as integer minutes from the world epoch |
+| Consent | Permission for a specific activity; not a relationship score |
+| Content boundary | A topic/rating limit configured by the World or player |
 
-## 3. Aggregate và identity
+## 3. Aggregates and identity
 
 ### World
 
-World chứa premise, genre/tone, canon rules, locations, character templates,
-content policy, initial claims, initial threads/hooks và schema version. World
-không chứa current state của playthrough.
+A World contains the premise, genre/tone, canon rules, locations, character
+templates, content policy, initial claims, initial threads/hooks, and schema
+version. A World does not contain the current state of a playthrough.
 
 ### Playthrough
 
-Playthrough tham chiếu World, có player character, root branch, provider/config
-snapshot, `InWorldClock`, RNG seed/state và lifecycle active/completed/archived.
+A Playthrough references a World and has a player character, root branch,
+provider/config snapshot, `InWorldClock`, RNG seed/state, and an
+`active/completed/archived` lifecycle.
 
 ### Branch
 
-Branch có parent, fork turn/depth, head turn, head revision và lifecycle
-`active/abandoned`. Canonical query resolve ancestor đến fork point inclusive rồi
-mới áp local events; sibling/future sau fork không thuộc branch.
+A Branch has a parent, fork turn/depth, head turn, head revision, and an
+`active/abandoned` lifecycle. A canonical query resolves ancestors through the
+fork point inclusively and then applies local events; siblings and future events
+after the fork do not belong to the branch.
 
 ### Turn
 
-Turn giữ raw input, normalized input, base revision, parent turn, status
+A Turn stores raw input, normalized input, base revision, parent turn, status
 `queued/running/completed/failed/cancelled`, final narrative, approved patch,
-config/prompt versions, world-time interval, token/timing metadata và
-`turn_run_id`. `committing` là internal/SSE phase; status chỉ chuyển
-`completed` sau transaction thành công.
+config/prompt versions, world-time interval, token/timing metadata, and
+`turn_run_id`. `committing` is an internal/SSE phase; status becomes `completed`
+only after a successful transaction.
 
-## 4. Character và tâm lý
+## 4. Characters and psychology
 
-`CharacterProfile` ổn định: identity/aliases, age anchor, role/background,
+`CharacterProfile` is stable: identity/aliases, age anchor, role/background,
 appearance/voice, traits, values, boundaries, long-term goals, likes/dislikes,
-initial secrets.
+and initial secrets.
 
-`background` là hồ sơ công khai, ổn định, dùng để giữ nhất quán động cơ,
-giọng nói và cách nhân vật phản ứng; không chứa bí mật. Khi World Builder tạo
-draft, các chi tiết cần tác động lâu dài còn được đề xuất thành typed claims,
-goals, quan hệ có hướng, tension ba ngôi và narrative threads. Bí mật phải nằm
-trong private claim theo owner và không được đưa vào shared character context.
-Draft định dạng hiện hành bắt buộc mỗi character liên kết ít nhất một owned
-goal, một public background claim và một thread. Private NPC claims chỉ được
-Simulator/Context Validator dùng như internal motivation; Writer/Critic không
-nhận context này.
+`background` is a stable public profile used to keep motives, voice, and reactions
+consistent; it must not contain secrets. When the World Builder creates a draft,
+long-lived details are also proposed as typed claims, goals, directed
+relationships, triadic tension, and narrative threads. Secrets belong in
+owner-scoped private claims and must not be placed in shared character context.
+The current draft format requires every character to link at least one owned
+goal, one public background claim, and one thread. Private NPC claims are
+available to Simulator and Context Validator as internal motivation; Writer and
+Critic do not receive that context.
 
-`CharacterState` thay đổi: location, physical condition, emotional state,
-short-term goals, attention target, stress/fatigue, inventory reference và last
-active turn. Không sửa profile để lưu cảm xúc tạm thời.
+`CharacterState` changes over time: location, physical condition, emotional
+state, short-term goals, attention target, stress/fatigue, inventory reference,
+and last active turn. Do not modify the profile to store temporary emotion.
 
-`PsychologicalState` tối thiểu có valence, arousal, dominance/control, stress,
-fatigue, needs, active goals, appraisals và suppressed emotions. Simulator chỉ
-được dùng beliefs/relations/context mà role đó được authorize.
+`PsychologicalState` minimally contains valence, arousal, dominance/control,
+stress, fatigue, needs, active goals, appraisals, and suppressed emotions.
+Simulator may use only beliefs, relationships, and context authorized for its
+role.
 
-Player có profile/state như một entity bình thường, nhưng player intent là
-nguồn chính cho hành động và cảm xúc được biểu lộ; AI không tự ghi hidden
-thought trái input. Hidden player state chỉ được tạo bởi typed operation có
-policy rõ ràng.
+The player has a profile/state like any other entity, but player intent is the
+primary source for expressed actions and emotions; AI cannot write hidden
+thoughts that contradict the input. Hidden player state may only be created by a
+typed operation with an explicit policy.
 
-## 5. Event, claim, observation và belief
+## 5. Events, claims, observations, and beliefs
 
 ### Event
 
-Event bất biến có type, world time, location, actors, targets, witnesses,
-structured payload, salience, emotional intensity, cause references, turn và
-branch. Off-screen event có cùng contract, không có schema riêng lỏng hơn.
+An immutable Event has a type, world time, location, actors, targets, witnesses,
+structured payload, salience, emotional intensity, cause references, turn, and
+branch. An off-screen event uses the same contract and does not have a looser
+schema.
 
-### KnowledgeClaim và CanonFact
+### KnowledgeClaim and CanonFact
 
 ```text
 KnowledgeClaim:
@@ -129,43 +134,46 @@ CanonFact:
   superseded_by
 ```
 
-Predicate registry school-romance MVP hữu hạn và versioned:
+The school-romance MVP has a finite, versioned predicate registry:
 
-| Predicate | Subject/object hoặc value | Mục đích |
+| Predicate | Subject/object or value | Purpose |
 |---|---|---|
-| `located_at` | character/location | Canon vị trí trong world time |
-| `age_is` | character/integer | Tuổi tại valid time |
-| `romantic_interest` | character/character | Tình cảm có hướng |
+| `located_at` | character/location | Canonical location at a world time |
+| `age_is` | character/integer | Age at valid time |
+| `romantic_interest` | character/character | Directed romantic feeling |
 | `commitment_status` | character/character/enum | Commitment event/state |
-| `goal_active` | character/goal ID | Mục tiêu đang theo đuổi |
-| `secret_exists` | owner/secret ID | Secret typed, không phải text tự do |
-| `item_held` | character/item ID | Vật đang được giữ |
-| `physical_condition` | character/enum/value | Tình trạng thể chất |
-| `public_fact` | entity/typed value | Fact công khai được authorize |
-| `event_participation` | character/event ID | Actor/witness participation |
+| `goal_active` | character/goal ID | Goal currently being pursued |
+| `secret_exists` | owner/secret ID | Typed secret, not free text |
+| `item_held` | character/item ID | Item currently held |
+| `physical_condition` | character/enum/value | Physical condition |
+| `public_fact` | entity/typed value | Authorized public fact |
+| `event_participation` | character/event ID | Actor or witness participation |
 
-Các claim mới phải đăng ký schema và migration. Relationship delta, clock
-advance, thread transition và character state delta là typed `StateOperation`
-riêng; không dùng predicate registry để né policy.
+New claims require a registered schema and migration. Relationship deltas,
+clock advances, thread transitions, and character-state deltas are separate
+typed `StateOperation`s; the predicate registry must not be used to bypass
+policy.
 
-Fingerprint chuẩn hóa subject/predicate/object-or-value/polarity/qualifiers/
-valid-time/branch-scope với key ordering deterministic. Claim ID khác fact
-identity.
+The normalized fingerprint includes subject, predicate, object-or-value,
+polarity, qualifiers, valid time, and branch scope with deterministic key
+ordering. Claim ID is distinct from fact identity.
 
 ### Observation
 
-Observation gồm observer, source event/information, observed claim, method
-(`saw/heard/told/inferred`), confidence, distortion, timestamp và claim links.
+An Observation contains an observer, source event/information, observed claim,
+method (`saw/heard/told/inferred`), confidence, distortion, timestamp, and
+claim links.
 
 ### Belief
 
-Belief gồm believer, claimed proposition, stance (`supports/rejects/uncertain`),
-confidence, evidence/counter-evidence, source reliability và created/updated
-turn. Belief không thể tự assert CanonFact.
+A Belief contains a believer, claimed proposition, stance
+(`supports/rejects/uncertain`), confidence, evidence/counter-evidence, source
+reliability, and created/updated turn. A Belief cannot assert a CanonFact by
+itself.
 
-## 6. StatePatch và authority
+## 6. StatePatch and authority
 
-`StatePatch` là danh sách operation typed, ví dụ:
+`StatePatch` is a list of typed operations, for example:
 
 - `AdvanceClock(duration_minutes)`;
 - `SetCharacterLocation(character_id, location_id)`;
@@ -177,45 +185,50 @@ turn. Belief không thể tự assert CanonFact.
 - `TransitionThread(thread_id, status, progress_delta)`;
 - `MaterializeScheduledEvent(event)`.
 
-Simulator chỉ đề xuất operation. Guard kiểm tra IDs, range, branch/time,
-authorization, content policy, idempotency và state transition. Canonical Record
-Builder chỉ nhận patch đã được Guard duyệt; prose không phải input authority.
+Simulator only proposes operations. Guard checks IDs, ranges, branch/time,
+authorization, content policy, idempotency, and state transitions. The
+Canonical Record Builder accepts only Guard-approved patches; prose is not an
+authoritative input.
 
-## 7. Quan hệ và tension
+## 7. Relationships and tension
 
-Relationship là directed edge với các dimension trong
-`docs/adr/0014-relationship-scale.md`. Mọi change log before/proposed/validated/
-after, cause event, reason, LLM run và prompt version. Labels `friend`, `crush`,
-`lover`, `rival` là derived projection; `lover` cần commitment evidence.
+A Relationship is a directed edge with dimensions defined by the domain
+contract. Every change log records before/proposed/validated/after values, cause
+event, reason, LLM run, and prompt version. Labels such as `friend`, `crush`,
+`lover`, and `rival` are derived projections; `lover` requires commitment
+evidence.
 
-`EmotionalTension` dùng observer/rival/focus/trigger/intensity/appraisal/decay/
-visibility để biểu diễn jealousy và hiểu lầm ba ngôi.
+`EmotionalTension` uses observer/rival/focus/trigger/intensity/appraisal/decay/
+visibility to represent jealousy and triadic misunderstanding.
 
-## 8. Narrative thread/hook
+## 8. Narrative threads and hooks
 
-Thread có premise, participants, status (`seeded`, `active`, `escalating`,
-`resolved`, `abandoned`), stakes, progress, urgency, last advanced turn và resolution
-conditions. Hook có setup, expected payoff window, related memory/event,
-visibility và status. Memory retrieval không thay thread management.
+A Thread has a premise, participants, status (`seeded`, `active`, `escalating`,
+`resolved`, `abandoned`), stakes, progress, urgency, last advanced turn, and
+resolution conditions. A Hook has a setup, expected payoff window, related
+memory/event, visibility, and status. Memory retrieval does not replace thread
+management.
 
-## 9. Clock, RNG và policy visibility
+## 9. Clock, RNG, and policy visibility
 
-`InWorldClock` dùng integer minutes từ epoch; mỗi turn có start/duration/end,
-duration do Planner đề xuất và Guard clamp. Branch kế thừa clock tại fork rồi
-tiến độc lập. UTC timestamp chỉ là audit.
+`InWorldClock` uses integer minutes from an epoch; each turn has a
+start/duration/end, with duration proposed by Planner and clamped by Guard.
+Branches inherit the clock at the fork and then advance independently. UTC
+timestamps are audit data only.
 
-RNG được seed và lưu theo playthrough/branch; chỉ rule/check có khai báo mới
-được dùng. Replay phải dùng lại RNG state.
+RNG is seeded and stored per playthrough/branch; only declared rules or checks
+may use it. Replay must reuse the RNG state.
 
-Player mode chỉ thấy transcript, scene state được phép và relationship label mơ
-hồ; developer mode mới inspect claims, beliefs, evidence, vectors, hidden goals,
-retrieval trace và LLM metadata.
+Player mode shows the transcript, permitted scene state, and ambiguous
+relationship labels; developer mode can inspect claims, beliefs, evidence,
+vectors, hidden goals, retrieval traces, and LLM metadata.
 
 ## 10. Source-of-truth rules
 
-- CanonFact/current state/event là authority.
-- Observation/belief là perspective-specific authority về việc nhân vật đã
-  tiếp nhận hoặc tin gì, không phải truth của world.
-- Narrative summary, embedding, retrieval index và snapshot là derived.
-- LangGraph checkpoint là execution artifact.
-- Khi derived thiếu/stale, read path fallback canonical state/raw event.
+- CanonFact, current state, and event are authoritative.
+- Observation and Belief are perspective-specific authority about what a
+  character received or believes, not world truth.
+- Narrative summaries, embeddings, retrieval indexes, and snapshots are derived.
+- LangGraph checkpoints are execution artifacts.
+- When derived data is missing or stale, the read path falls back to canonical
+  state and raw events.

@@ -13,7 +13,7 @@ from typing import Any, NotRequired, TypedDict
 class TurnGraphState(TypedDict):
     """The durable hand-off between bounded turn nodes.
 
-    Values are deliberately named after the contracts in ``docs/plan.md``.
+    Values are deliberately named after the contracts in ``docs/architecture.md``.
     Pydantic/domain objects are allowed as values because the configured
     checkpointer serializes them, but no object here owns an open resource.
     """
