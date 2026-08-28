@@ -16,6 +16,7 @@ import {
   isOpeningTurn,
   turnMoveSuggestions
 } from '@/play/guidance'
+import { capitalizeStatus, displayTemplate, turnProgressPercent } from '@/play/progress'
 import type { CharacterView, MemoryView } from '@/api/types'
 
 const route = useRoute()
@@ -61,6 +62,8 @@ const actionPlaceholder = computed(() =>
       ? `Describe what ${playerCharacter.value.display_name} tries to do…`
       : 'Describe what you try to do…')
 )
+const jobStatusLabel = computed(() => capitalizeStatus(jobs.progress))
+const jobProgressPercent = computed(() => turnProgressPercent(jobs.events, jobs.current?.status, jobs.loading))
 
 function canForkFromTurn(turnBranchId: string): boolean {
   return !branches.activeBranch?.parent_branch_id || branches.activeBranch.id === turnBranchId
@@ -246,7 +249,7 @@ function playerTurnNumber(index: number): number {
 </script>
 
 <template>
-  <div v-if="loadingRoute || playthrough.loading" class="empty-state">Opening playthrough…</div>
+  <div v-if="loadingRoute || (playthrough.loading && !playthrough.playthrough)" class="empty-state">Opening playthrough…</div>
   <div v-else-if="playthrough.error" class="error-box" role="alert">
     <strong>Could not open this playthrough.</strong>
     <p>{{ playthrough.error }}</p>
@@ -256,11 +259,10 @@ function playerTurnNumber(index: number): number {
     <section class="scene-header">
       <div>
         <button class="back-link" type="button" @click="router.push('/')">← Library</button>
-        <p class="eyebrow">{{ playthrough.world.genre || 'Story' }}</p>
+        <p class="eyebrow">{{ displayTemplate(playthrough.world.genre) }}</p>
         <h1>{{ playthrough.world.name }}</h1>
         <p class="scene-meta">
-          {{ playthrough.world.tone || 'A new scene' }} · {{ formatWorldTime(playthrough.worldTime) }} ·
-          {{ activeBranchName }}
+          {{ formatWorldTime(playthrough.worldTime) }} · {{ activeBranchName }}
         </p>
       </div>
     </section>
@@ -280,7 +282,6 @@ function playerTurnNumber(index: number): number {
               {{ profileText('role') || 'Protagonist' }}
               <template v-if="profileText('age')"> · {{ profileText('age') }} years old</template>
             </p>
-            <p v-if="profileText('background')" class="role-background">{{ profileText('background') }}</p>
             <div v-if="profileList('traits').length" class="trait-list">
               <span v-for="trait in profileList('traits')" :key="trait">{{ trait }}</span>
             </div>
@@ -418,11 +419,20 @@ function playerTurnNumber(index: number): number {
           <div v-if="jobs.loading || jobs.current" class="job-status" aria-live="polite">
             <div class="job-status-line">
               <span class="status-dot" :class="{ running: jobs.active, done: jobs.terminal }" />
-              <strong>{{ jobs.progress }}</strong>
+              <strong>{{ jobStatusLabel }}</strong>
+              <span class="job-progress-value">{{ jobProgressPercent }}%</span>
               <button v-if="jobs.error" class="secondary small-button" type="button" @click="jobs.retry()">Retry</button>
             </div>
-            <div v-if="jobs.events.length" class="job-events">
-              <span v-for="event in jobs.events.slice(-4)" :key="event.id">{{ event.event_type.replaceAll('_', ' ') }}</span>
+            <div
+              class="job-progress"
+              role="progressbar"
+              aria-label="Story turn progress"
+              :aria-valuenow="jobProgressPercent"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-valuetext="jobStatusLabel"
+            >
+              <span :style="{ width: `${jobProgressPercent}%` }" />
             </div>
           </div>
           <div v-if="jobs.error" class="error-box" role="alert">
@@ -498,12 +508,19 @@ function playerTurnNumber(index: number): number {
               </div>
             </div>
 
-            <div v-if="selectedProfileText('age') || selectedProfileText('role')" class="character-facts">
+            <div
+              v-if="selectedProfileText('age') || selectedProfileText('gender') || selectedProfileText('role')"
+              class="character-facts"
+            >
               <div v-if="selectedProfileText('age')">
                 <span>Age</span>
                 <strong>{{ selectedProfileText('age') }}</strong>
               </div>
-              <div v-if="selectedProfileText('role')">
+              <div v-if="selectedProfileText('gender')">
+                <span>Gender</span>
+                <strong>{{ selectedProfileText('gender') }}</strong>
+              </div>
+              <div v-if="selectedProfileText('role')" class="wide-fact">
                 <span>Role</span>
                 <strong>{{ selectedProfileText('role') }}</strong>
               </div>
@@ -656,7 +673,6 @@ function playerTurnNumber(index: number): number {
   word-break: normal;
 }
 
-.role-background,
 .scene-guide p {
   margin: 0.5rem 0 0;
   color: var(--muted);
@@ -903,8 +919,7 @@ function playerTurnNumber(index: number): number {
 }
 
 .small-copy,
-.small-button,
-.job-events {
+.small-button {
   font-size: 0.78rem;
 }
 
@@ -935,18 +950,27 @@ function playerTurnNumber(index: number): number {
   flex: 1;
 }
 
-.job-events {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.65rem;
+.job-progress-value {
   color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 
-.job-events span {
-  padding: 0.25rem 0.45rem;
-  border-radius: 0.35rem;
-  background: #f1ece2;
+.job-progress {
+  height: 0.55rem;
+  margin-top: 0.65rem;
+  overflow: hidden;
+  border-radius: 99rem;
+  background: #e8e1d6;
+}
+
+.job-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #bd8341, var(--green));
+  transition: width 240ms ease;
 }
 
 .branch-panel,
@@ -1060,9 +1084,13 @@ function playerTurnNumber(index: number): number {
 
 .character-facts {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
   margin-top: 1rem;
+}
+
+.character-facts .wide-fact {
+  grid-column: 1 / -1;
 }
 
 .character-facts div {

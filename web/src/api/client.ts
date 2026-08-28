@@ -2,6 +2,7 @@ import type {
   ApiErrorBody,
   BackupRecord,
   BackupReport,
+  BinaryGender,
   BranchRecord,
   CharacterView,
   ConnectivityResult,
@@ -131,6 +132,7 @@ export const api = {
     tone?: string
     rating?: ContentRating
     violence_ceiling?: ViolenceCeiling
+    player_gender?: BinaryGender
   }): Promise<WorldSeed> => request<WorldSeed>('/api/world-drafts', jsonBody(payload)),
   validateWorldDraft: (draft: WorldSeed): Promise<WorldSeed> =>
     request<WorldSeed>('/api/world-drafts/validate', jsonBody({ draft })),

@@ -1,5 +1,6 @@
 export type ContentRating = 'teen_14_plus' | 'mature_16_plus' | 'adult_18_plus'
 export type ViolenceCeiling = 'none' | 'restrained' | 'detailed'
+export type BinaryGender = 'male' | 'female'
 
 export interface StoryTemplateDefaults {
   tone: string
@@ -56,7 +57,7 @@ export interface WorldCharacterSeed {
   name: string
   aliases: string[]
   age: number
-  gender: string
+  gender: BinaryGender
   role: string
   background: string
   voice: string

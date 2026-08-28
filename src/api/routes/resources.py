@@ -40,6 +40,7 @@ async def generate_world_draft(
         "tone": payload.tone,
         "rating": payload.rating,
         "violence_ceiling": payload.violence_ceiling,
+        "player_gender": payload.player_gender,
     }
     kwargs = {key: value for key, value in requested.items() if key in parameters and value is not None}
     draft = await generator(payload.prompt, **kwargs)

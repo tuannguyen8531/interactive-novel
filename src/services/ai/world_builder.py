@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Literal
 from uuid import uuid4
 
 from src.application.contracts.ai import AIPromptRole, RatingValue, ViolenceCeilingValue, WorldSeed
@@ -37,6 +38,7 @@ class ProviderWorldDraftGenerator:
         tone: str | None = None,
         rating: RatingValue | str | None = None,
         violence_ceiling: ViolenceCeilingValue | str | None = None,
+        player_gender: Literal["male", "female"] = "male",
     ) -> WorldSeed:
         definition = self._prompts.get(AIPromptRole.WORLD_BUILDER)
         template = self._templates.get(template_id)
@@ -58,6 +60,8 @@ class ProviderWorldDraftGenerator:
                 "rating": effective_rating.value,
                 "violence_ceiling": effective_ceiling.value,
                 "adult_explicit_opt_in": adult_explicit_opt_in,
+                "player_gender": player_gender,
+                "allowed_character_genders": ["male", "female"],
             },
             "narrative_profile": template.narrative_profile.as_dict(),
             "opening_guidance": list(template.opening_guidance),
@@ -111,12 +115,14 @@ class ProviderWorldDraftGenerator:
             }
         )
         opening_scene = result.opening_scene.model_copy(update={"tone": effective_tone})
+        player_character = result.player_character.model_copy(update={"gender": player_gender})
         return result.model_copy(
             update={
                 "template_id": template.id,
                 "genre": template.genre,
                 "tone": effective_tone,
                 "content_boundaries": boundaries,
+                "player_character": player_character,
                 "opening_scene": opening_scene,
             }
         )

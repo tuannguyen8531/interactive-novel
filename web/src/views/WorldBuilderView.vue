@@ -131,7 +131,14 @@ function cancel(): void {
           <strong>{{ selectedTemplate?.name ?? 'Story template' }}</strong>
           <p :title="selectedTemplate?.description">{{ selectedTemplate?.description ?? 'Choose a story template to shape the generated world.' }}</p>
         </div>
-        <div class="preset-row">
+        <div class="preset-row three-fields">
+          <label>
+            Player gender
+            <select v-model="store.playerGender">
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </label>
           <label>
             Content rating
             <select v-model="store.ratingPreset">
@@ -257,7 +264,10 @@ function cancel(): void {
             </label>
             <label>
               Gender
-              <input v-model="character.gender" maxlength="80" placeholder="e.g. female, male, non-binary" />
+              <select v-model="character.gender">
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
             </label>
             <label>
               Role
@@ -443,6 +453,10 @@ textarea {
   gap: 0.9rem;
 }
 
+.preset-row.three-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .preset-groups {
   display: grid;
   gap: 0.75rem;
@@ -616,6 +630,7 @@ textarea {
 
 @media (max-width: 560px) {
   .preset-row,
+  .preset-row.three-fields,
   .field-grid,
   .compact-editor {
     grid-template-columns: 1fr;

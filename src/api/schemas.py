@@ -51,6 +51,7 @@ class WorldDraftGenerateRequest(BaseModel):
     tone: str | None = Field(default=None, min_length=1, max_length=80)
     rating: RatingValue | None = None
     violence_ceiling: ViolenceCeilingValue | None = None
+    player_gender: Literal["male", "female"] = "male"
 
 
 class WorldDraftRequest(BaseModel):

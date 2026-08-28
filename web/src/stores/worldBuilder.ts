@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ApiError, api } from '@/api/client'
 import type {
+  BinaryGender,
   ContentRating,
   StoryTemplate,
   ViolenceCeiling,
@@ -86,6 +87,7 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     }
   ])
   const violencePreset = ref<ViolenceCeiling>('none')
+  const playerGender = ref<BinaryGender>('male')
   const stage = ref<WorldBuilderStage>('prompt')
   const draft = ref<WorldSeed | null>(null)
   const confirmation = ref<WorldConfirmation | null>(null)
@@ -208,7 +210,7 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
       name,
       aliases: [],
       age: draft.value.player_character.age,
-      gender: 'unspecified',
+      gender: 'male',
       role: 'supporting character',
       background: 'Describe this character’s history, current circumstances, motivations, important relationships, and a story-relevant hook.',
       voice: 'Natural speaking style',
@@ -294,7 +296,8 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
         template_id: templateId.value,
         tone: tonePreset.value.trim(),
         rating: ratingPreset.value,
-        violence_ceiling: violencePreset.value
+        violence_ceiling: violencePreset.value,
+        player_gender: playerGender.value
       })
       draft.value = generated
       confirmation.value = null
@@ -360,6 +363,7 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     templateId,
     templates,
     violencePreset,
+    playerGender,
     stage,
     draft,
     confirmation,

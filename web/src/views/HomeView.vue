@@ -5,6 +5,7 @@ import { useAppStore } from '@/stores/app'
 import { useLibraryStore } from '@/stores/library'
 import { api } from '@/api/client'
 import { FIXTURE_PLAYTHROUGH_ID } from '@/fixtures/fixture'
+import { formatWorldTime } from '@/play/guidance'
 import type { PlaythroughRecord, WorldRecord } from '@/api/types'
 
 const router = useRouter()
@@ -111,7 +112,7 @@ async function exportPlaythrough(playthrough: PlaythroughRecord, world: WorldRec
         <p v-if="worldPlaythroughs(world.id).length === 0" class="muted no-playthroughs">No playthroughs in this world.</p>
         <div v-else class="playthrough-list">
           <div v-for="playthrough in worldPlaythroughs(world.id)" :key="playthrough.id" class="playthrough-row">
-            <span class="muted">Clock {{ playthrough.world_clock_minutes }} minutes · {{ playthrough.lifecycle }}</span>
+            <span class="muted">{{ formatWorldTime(playthrough.world_clock_minutes) }} · {{ playthrough.lifecycle }}</span>
             <span class="playthrough-actions">
               <button class="secondary" type="button" @click="exportPlaythrough(playthrough, world)">Export</button>
               <button

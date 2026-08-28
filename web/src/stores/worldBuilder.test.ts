@@ -152,7 +152,8 @@ describe('world builder store', () => {
       template_id: 'school_romance',
       tone: 'warm, reflective',
       rating: 'adult_18_plus',
-      violence_ceiling: 'none'
+      violence_ceiling: 'none',
+      player_gender: 'male'
     })
   })
 
@@ -210,7 +211,7 @@ describe('world builder store', () => {
     const addedNpcId = store.draft!.npc_profiles[2].character_id
     expect(addedNpcId).toBe('new_character_3')
     expect(store.draft!.npc_profiles[2]).toMatchObject({
-      gender: 'unspecified',
+      gender: 'male',
       background: 'Describe this character’s history, current circumstances, motivations, important relationships, and a story-relevant hook.'
     })
     store.removeNpc(addedNpcId)

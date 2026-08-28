@@ -176,6 +176,17 @@ async def test_world_builder_authoritatively_applies_user_presets_over_ai_output
 
 
 @pytest.mark.asyncio
+async def test_world_builder_defaults_player_gender_to_male_and_applies_user_selection() -> None:
+    service = WorldDraftApplicationService(_factory(_State()), generator=_Generator(_seed()))
+
+    default_draft = await service.generate_world_draft("A school story.")
+    selected_draft = await service.generate_world_draft("A school story.", player_gender="female")
+
+    assert default_draft.player_character.gender == "male"
+    assert selected_draft.player_character.gender == "female"
+
+
+@pytest.mark.asyncio
 async def test_adult_rating_automatically_enables_explicit_opt_in() -> None:
     seed = _seed()
     player = seed.player_character.model_copy(update={"age": 18})

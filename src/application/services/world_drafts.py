@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, replace
 from inspect import signature
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from src.application.contracts.ai import RatingValue, SceneSpec, ViolenceCeilingValue, WorldSeed
@@ -71,6 +71,7 @@ class WorldDraftApplicationService:
         tone: str | None = None,
         rating: RatingValue | str | None = None,
         violence_ceiling: ViolenceCeilingValue | str | None = None,
+        player_gender: Literal["male", "female"] = "male",
     ) -> WorldSeed:
         if not prompt.strip():
             raise ApplicationValidationError("World draft prompt must not be empty.")
@@ -87,6 +88,7 @@ class WorldDraftApplicationService:
             "tone": effective_tone,
             "rating": effective_rating,
             "violence_ceiling": effective_ceiling,
+            "player_gender": player_gender,
         }
         kwargs = {key: value for key, value in requested.items() if key in parameters}
         generated = await generator_method(prompt.strip(), **kwargs)
@@ -103,6 +105,7 @@ class WorldDraftApplicationService:
                 "genre": template.genre,
                 "tone": effective_tone,
                 "content_boundaries": boundaries,
+                "player_character": generated.player_character.model_copy(update={"gender": player_gender}),
                 "opening_scene": generated.opening_scene.model_copy(update={"tone": effective_tone}),
             }
         )

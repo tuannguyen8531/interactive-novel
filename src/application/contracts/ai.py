@@ -680,7 +680,7 @@ class CharacterSeed(AIModel):
     name: str = Field(min_length=1)
     aliases: tuple[str, ...] = Field(default_factory=tuple)
     age: int = Field(ge=14)
-    gender: str = Field(default="unspecified", max_length=80)
+    gender: Literal["male", "female"] = "male"
     role: str = Field(min_length=1)
     background: str = Field(min_length=1, max_length=6000)
     voice: str = Field(min_length=1)
