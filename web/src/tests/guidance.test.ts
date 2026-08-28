@@ -74,6 +74,30 @@ describe('play guidance', () => {
     expect(result.suggestedActions[0].text).toContain('investigate')
   })
 
+  it('localizes opening move examples from the canonical world language', () => {
+    const world = { canon_rules: { story_language: 'vi' } } as unknown as WorldRecord
+    const player = { id: 'hero', state: { location_id: 'thu_vien' } } as unknown as CharacterView
+    const timeline = [
+      {
+        event_type: 'opening_scene',
+        location_id: 'thu_vien',
+        actor_ids: ['hero', 'minh'],
+        payload: { location: { name: 'Thư viện' }, scene_spec: { visible_actions: [] } }
+      } as unknown as TimelineEvent
+    ]
+    const characters = [
+      { id: 'hero', display_name: 'Lan' },
+      { id: 'minh', display_name: 'Minh' }
+    ] as CharacterView[]
+
+    expect(buildPlayGuidance(world, player, timeline, characters).suggestedActions).toEqual([
+      { kind: 'Act', text: 'Tôi bước đến chỗ Minh và ngỏ lời giúp đỡ.' },
+      { kind: 'Speak', text: '“Tiếp theo chúng ta nên làm gì?” tôi hỏi Minh.' },
+      { kind: 'Observe', text: 'Tôi dành một lúc quan sát Thư viện để tìm điều gì đó quan trọng.' },
+      { kind: 'Think', text: 'Tôi dừng lại suy nghĩ về chuyện vừa xảy ra trước khi quyết định phải làm gì.' }
+    ])
+  })
+
   it('recognizes builder setup as an opening scene rather than a player move', () => {
     const opening = { approved_patch: { source: 'world_builder_confirmation' } } as unknown as TurnRecord
     const action = { approved_patch: { source: 'turn_pipeline' } } as unknown as TurnRecord

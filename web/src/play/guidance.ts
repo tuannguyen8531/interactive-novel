@@ -1,4 +1,12 @@
-import type { BranchRecord, CharacterView, PlaythroughRecord, TimelineEvent, TurnRecord, WorldRecord } from '@/api/types'
+import type {
+  BranchRecord,
+  CharacterView,
+  PlaythroughRecord,
+  StoryLanguage,
+  TimelineEvent,
+  TurnRecord,
+  WorldRecord
+} from '@/api/types'
 
 export interface PlayGuidance {
   locationName: string | null
@@ -87,6 +95,7 @@ export function buildPlayGuidance(
 ): PlayGuidance {
   const openingEvent = timeline.find((event) => event.event_type === 'opening_scene')
   const seed = record(world.canon_rules.world_seed)
+  const storyLanguage = normalizeStoryLanguage(world.canon_rules.story_language ?? seed?.story_language)
   const openingScene = record(openingEvent?.payload.scene_spec) ?? record(seed?.opening_scene)
   const sceneCues = stringList(openingScene?.visible_actions)
   const locationId = stringValue(player?.state?.location_id) ?? openingEvent?.location_id ?? null
@@ -108,11 +117,42 @@ export function buildPlayGuidance(
   return {
     locationName,
     sceneCues: [...new Set(sceneCues)].slice(0, 4),
-    suggestedActions: playerMoveSuggestions(locationName, otherCharacter?.display_name ?? null)
+    suggestedActions: playerMoveSuggestions(locationName, otherCharacter?.display_name ?? null, storyLanguage)
   }
 }
 
-function playerMoveSuggestions(locationName: string | null, otherCharacterName: string | null): PlayerMoveSuggestion[] {
+function playerMoveSuggestions(
+  locationName: string | null,
+  otherCharacterName: string | null,
+  language: StoryLanguage
+): PlayerMoveSuggestion[] {
+  if (language === 'vi') {
+    return [
+      {
+        kind: 'Act',
+        text: otherCharacterName
+          ? `Tôi bước đến chỗ ${otherCharacterName} và ngỏ lời giúp đỡ.`
+          : 'Tôi bước lên phía trước và tìm hiểu chuyện gì đang xảy ra.'
+      },
+      {
+        kind: 'Speak',
+        text: otherCharacterName
+          ? `“Tiếp theo chúng ta nên làm gì?” tôi hỏi ${otherCharacterName}.`
+          : '“Có ai ở đây không?” tôi gọi lớn.'
+      },
+      {
+        kind: 'Observe',
+        text: locationName
+          ? `Tôi dành một lúc quan sát ${locationName} để tìm điều gì đó quan trọng.`
+          : 'Tôi dành một lúc quan sát xung quanh để tìm điều gì đó quan trọng.'
+      },
+      {
+        kind: 'Think',
+        text: 'Tôi dừng lại suy nghĩ về chuyện vừa xảy ra trước khi quyết định phải làm gì.'
+      }
+    ]
+  }
+
   return [
     {
       kind: 'Act',
@@ -137,6 +177,10 @@ function playerMoveSuggestions(locationName: string | null, otherCharacterName: 
       text: 'I pause and think about what just happened before deciding what to do.'
     }
   ]
+}
+
+function normalizeStoryLanguage(value: unknown): StoryLanguage {
+  return value === 'vi' ? 'vi' : 'en'
 }
 
 function titleCaseKind(value: unknown): PlayerMoveSuggestion['kind'] | null {
