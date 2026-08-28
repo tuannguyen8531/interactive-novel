@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { api } from '@/api/client'
 import type { ProviderSettings } from '@/api/types'
-import { useProviderStore } from './provider'
+import { useProviderStore } from '@/stores/provider'
 
 vi.mock('@/api/client', () => ({
   api: {

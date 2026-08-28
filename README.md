@@ -76,16 +76,16 @@ Validation commands:
 
 ```bash
 uv run test
-uv run test --frontend
+uv run test --no-frontend
 uv run test --fix
 uv run build
 uv run migrate
 uv run quality-report
 ```
 
-`uv run test` follows the backend validation flow used by `novel-ai-trans`:
-Ruff, Pyright and Pytest. Add `--frontend` to run the Vue unit tests in the
-same invocation. Extra Pytest arguments go after `--`, for example
+`uv run test` runs Ruff, Pyright, Pytest and the Vue unit tests. Use
+`--no-frontend` to skip the Vue tests when only backend validation is needed.
+Extra Pytest arguments go after `--`, for example
 `uv run test -- --maxfail=1 -k health`.
 
 `uv run quality-report` aggregates provider-real latency, token and estimated

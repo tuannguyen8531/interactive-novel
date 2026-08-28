@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { api } from '@/api/client'
 import { FIXTURE_PLAYTHROUGH_ID } from '@/fixtures/fixture'
 import type { BranchRecord, PlaythroughExport } from '@/api/types'
-import { usePlaythroughStore } from './playthrough'
+import { usePlaythroughStore } from '@/stores/playthrough'
 
 describe('backend playthrough branch workflows', () => {
   beforeEach(() => {

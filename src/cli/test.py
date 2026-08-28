@@ -36,17 +36,22 @@ def _run(label: str, command: list[str], working_directory: Path) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run ruff, pyright, pytest, and optionally the frontend unit tests."""
+    """Run the backend checks and frontend unit tests."""
     parser = argparse.ArgumentParser(
         prog="interactive-novel test",
-        description="Run ruff, pyright, and pytest checks.",
+        description="Run ruff, pyright, pytest, and frontend unit tests.",
     )
     parser.add_argument(
         "--fix",
         action="store_true",
         help="Apply safe ruff lint fixes and format files before validation.",
     )
-    parser.add_argument("--frontend", action="store_true", help="Run Vue unit tests after the Python checks.")
+    parser.add_argument(
+        "--frontend",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Run Vue unit tests after the Python checks (enabled by default).",
+    )
     parser.add_argument("--no-lint", action="store_true", help="Skip ruff lint check.")
     parser.add_argument("--no-format", action="store_true", help="Skip ruff format check.")
     parser.add_argument("--no-pyright", action="store_true", help="Skip pyright check.")

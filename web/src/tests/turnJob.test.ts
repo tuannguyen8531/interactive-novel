@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { api } from '@/api/client'
 import type { JobEvent, TurnJobView } from '@/api/types'
-import { useTurnJobStore, type TurnRequest } from './turnJob'
+import { useTurnJobStore, type TurnRequest } from '@/stores/turnJob'
 
 const sse = vi.hoisted(() => ({ open: vi.fn() }))
 

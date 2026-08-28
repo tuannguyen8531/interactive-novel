@@ -32,10 +32,11 @@ Kiểm tra dự án theo cùng quy ước với `novel-ai-trans`:
 
 ```bash
 uv run test
-uv run test --frontend
+uv run test --no-frontend
 ```
 
-Lệnh đầu chạy Ruff, Pyright và Pytest; cờ `--frontend` thêm Vue unit tests.
+Mặc định lệnh chạy Ruff, Pyright, Pytest và Vue unit tests; cờ
+`--no-frontend` chỉ bỏ qua Vue unit tests khi cần kiểm tra riêng backend.
 Nếu chạy trong sandbox và một API test không trả kết quả sau 30 giây, hãy dừng
 lệnh từ môi trường chạy; đây không phải giới hạn của `uv run test` khi chạy
 bên ngoài sandbox.

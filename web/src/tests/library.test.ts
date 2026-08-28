@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { api } from '@/api/client'
 import type { PlaythroughRecord, WorldRecord } from '@/api/types'
-import { useLibraryStore } from './library'
+import { useLibraryStore } from '@/stores/library'
 
 describe('library store', () => {
   beforeEach(() => {

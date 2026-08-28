@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { api } from '@/api/client'
-import { useAppStore } from './app'
+import { useAppStore } from '@/stores/app'
 
 vi.mock('@/api/client', () => ({
   api: { health: vi.fn() }

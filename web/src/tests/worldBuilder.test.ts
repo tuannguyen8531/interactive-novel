@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { api } from '@/api/client'
 import type { WorldConfirmation, WorldSeed } from '@/api/types'
-import { useWorldBuilderStore } from './worldBuilder'
+import { useWorldBuilderStore } from '@/stores/worldBuilder'
 
 function seed(): WorldSeed {
   return {

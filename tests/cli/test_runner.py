@@ -4,11 +4,13 @@ import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from src.cli import serve as serve_cli
 from src.cli import test as test_cli
 
 
-def test_frontend_flag_runs_vue_unit_tests_from_web_directory(monkeypatch) -> None:
+def test_frontend_unit_tests_run_by_default_from_web_directory(monkeypatch) -> None:
     commands: list[tuple[list[str], Path]] = []
 
     def fake_run(command, *, cwd, **kwargs):
@@ -19,12 +21,20 @@ def test_frontend_flag_runs_vue_unit_tests_from_web_directory(monkeypatch) -> No
     monkeypatch.setattr(test_cli.shutil, "which", lambda _: "/usr/bin/npm")
     monkeypatch.setattr(test_cli.subprocess, "run", fake_run)
 
-    result = test_cli.main(["--no-lint", "--no-format", "--no-pyright", "--no-pytest", "--frontend"])
+    result = test_cli.main(["--no-lint", "--no-format", "--no-pyright", "--no-pytest"])
 
     assert result == 0
     assert commands == [
         (["/usr/bin/npm", "run", "test:unit"], Path(__file__).resolve().parents[2] / "web"),
     ]
+
+
+def test_no_frontend_flag_skips_vue_unit_tests(monkeypatch) -> None:
+    monkeypatch.setattr(test_cli.subprocess, "run", lambda *args, **kwargs: pytest.fail("no command should run"))
+
+    result = test_cli.main(["--no-lint", "--no-format", "--no-pyright", "--no-pytest", "--no-frontend"])
+
+    assert result == 0
 
 
 def test_serve_prints_clickable_url_before_starting_uvicorn(monkeypatch, capsys) -> None:

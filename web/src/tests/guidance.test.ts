@@ -9,7 +9,7 @@ import {
   formatWorldTime,
   isOpeningTurn,
   turnMoveSuggestions
-} from './guidance'
+} from '@/play/guidance'
 
 describe('play guidance', () => {
   it('formats the in-world clock as a readable day and time', () => {

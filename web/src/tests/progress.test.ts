@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JobEvent } from '@/api/types'
-import { capitalizeStatus, displayTemplate, turnProgressPercent } from './progress'
+import { capitalizeStatus, displayTemplate, turnProgressPercent } from '@/play/progress'
 
 function event(phase: string, eventType: string): JobEvent {
   return {

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { appendFixtureTurn, createFixtureState, FIXTURE_PLAYTHROUGH_ID, restoreFixture, serializeFixture } from '@/fixtures/fixture'
-import { useBranchStore } from './branch'
-import { usePlaythroughStore } from './playthrough'
-import { useTurnJobStore } from './turnJob'
+import { useBranchStore } from '@/stores/branch'
+import { usePlaythroughStore } from '@/stores/playthrough'
+import { useTurnJobStore } from '@/stores/turnJob'
 
 describe('frontend fixture vertical slice', () => {
   beforeEach(() => {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { openSse } from './sse'
+import { openSse } from '@/api/sse'
 
 describe('SSE client', () => {
   afterEach(() => {
