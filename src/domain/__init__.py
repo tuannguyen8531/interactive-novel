@@ -29,6 +29,7 @@ from .knowledge import (
     PredicateDefinition,
     PredicateRegistry,
 )
+from .language import StoryLanguage
 from .narrative import HookStatus, NarrativeHook, NarrativeThread, ThreadStatus
 from .patch import (
     AddClaimLink,
@@ -112,6 +113,7 @@ __all__ = [
     "KnowledgeClaim",
     "MaterializeScheduledEvent",
     "ScheduleEvent",
+    "StoryLanguage",
     "MINUTES_PER_DAY",
     "MINUTES_PER_YEAR",
     "NarrativeHook",

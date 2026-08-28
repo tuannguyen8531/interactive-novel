@@ -18,7 +18,7 @@ their meaning or remove provenance and scope.
 
 | Term | Canonical meaning |
 |---|---|
-| World | A reusable universe: premise, canon, locations, seeded characters, and policy |
+| World | A reusable universe: premise, canon, locations, seeded characters, policy, and story language |
 | Playthrough | One play session for a World, with a player, clock, RNG, and root branch |
 | Branch | A timeline with an independent parent, fork, and head |
 | Revision | The canonical version number of a branch head |
@@ -47,7 +47,10 @@ their meaning or remove provenance and scope.
 
 A World contains the premise, genre/tone, canon rules, locations, character
 templates, content policy, initial claims, initial threads/hooks, and schema
-version. A World does not contain the current state of a playthrough.
+version. Its canonical `story_language` (`en` or `vi`) is copied from the
+confirmed WorldSeed and governs player-facing narrative, names, dialogue, and
+suggested actions for every subsequent turn. A World does not contain the
+current state of a playthrough.
 
 ### Playthrough
 

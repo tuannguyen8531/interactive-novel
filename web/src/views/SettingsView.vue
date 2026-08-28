@@ -130,25 +130,37 @@ function fallbackSummary(role: string): string {
     <form class="card settings-card full-row" @submit.prevent="save">
       <p class="eyebrow">Execution</p>
       <h2>Runtime policy</h2>
-      <div class="execution-layout">
-        <label>
-          Mode
+      <p class="muted small-copy runtime-description">
+        Set the defaults used when a new story world is generated. Existing worlds keep their own language.
+      </p>
+      <div class="runtime-options">
+        <label class="runtime-field">
+          <span class="field-label">Mode</span>
           <select v-model="settings.mode">
             <option value="quality">Quality</option>
             <option value="fast">Fast</option>
           </select>
+          <span class="muted small-copy">Quality uses the full multi-step story pipeline.</span>
         </label>
-        <div>
-          <label class="checkbox-row">
-            <input v-model="settings.allowCloud" type="checkbox" />
-            <span>Allow cloud provider routing</span>
-          </label>
-          <p class="muted small-copy">Cloud targets remain disabled until this option is explicitly enabled.</p>
-        </div>
-        <div class="save-row">
-          <button type="submit" :disabled="settings.loading || !settings.providerSettings">Save all settings</button>
-          <span v-if="saved" class="saved-label">Saved</span>
-        </div>
+        <label class="runtime-field">
+          <span class="field-label">Story language</span>
+          <select v-model="settings.storyLanguage">
+            <option value="en">English</option>
+            <option value="vi">Vietnamese</option>
+          </select>
+          <span class="muted small-copy">Default language for newly generated stories.</span>
+        </label>
+        <label class="runtime-toggle">
+          <input v-model="settings.allowCloud" type="checkbox" />
+          <span class="runtime-toggle-copy">
+            <strong>Allow cloud provider routing</strong>
+            <span class="muted small-copy">Cloud targets remain disabled until this option is explicitly enabled.</span>
+          </span>
+        </label>
+      </div>
+      <div class="runtime-actions">
+        <button type="submit" :disabled="settings.loading || !settings.providerSettings">Save all settings</button>
+        <span v-if="saved" class="saved-label">Saved</span>
       </div>
     </form>
 
@@ -379,18 +391,63 @@ input {
   font-size: 0.85rem;
 }
 
-.execution-layout {
+.runtime-description {
+  max-width: 48rem;
+  margin: -0.75rem 0 1.25rem;
+}
+
+.runtime-options {
   display: grid;
-  grid-template-columns: minmax(12rem, 0.7fr) minmax(18rem, 1.3fr) auto;
-  gap: 1.25rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.runtime-field,
+.runtime-toggle {
+  min-width: 0;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: #fff;
+}
+
+.runtime-field {
+  align-content: start;
+}
+
+.runtime-field .small-copy,
+.runtime-toggle .small-copy {
+  display: block;
+  font-weight: 400;
+}
+
+.runtime-toggle {
+  display: flex;
+  gap: 0.75rem;
   align-items: start;
 }
 
-.save-row {
+.runtime-toggle input {
+  width: auto;
+  margin-top: 0.2rem;
+  accent-color: var(--accent);
+}
+
+.runtime-toggle-copy {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  color: var(--ink);
+}
+
+.runtime-actions {
   display: flex;
   gap: 0.75rem;
   align-items: center;
-  align-self: center;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
 }
 
 .add-target-panel {
@@ -637,7 +694,7 @@ input {
     margin-top: 1rem;
   }
 
-  .execution-layout,
+  .runtime-options,
   .field-grid,
   .route-row {
     grid-template-columns: 1fr;

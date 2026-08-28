@@ -15,6 +15,7 @@ from src.application.contracts.providers import (
 )
 from src.application.errors import ApplicationValidationError
 from src.application.ports.providers import ProviderGateway, ProviderSettingsStore
+from src.domain.language import StoryLanguage
 
 
 class InMemoryProviderSettingsStore:
@@ -100,6 +101,7 @@ def _config_from_snapshot(snapshot: Mapping[str, Any]) -> ProviderRoutingConfig:
             role_routes=routes,
             mode=ExecutionMode(str(snapshot.get("mode", ExecutionMode.QUALITY))),
             allow_cloud=bool(snapshot.get("allow_cloud", False)),
+            story_language=StoryLanguage(str(snapshot.get("story_language", StoryLanguage.ENGLISH.value))),
             schema_version=int(snapshot.get("schema_version", 1)),
         )
     except (KeyError, TypeError, ValueError) as error:

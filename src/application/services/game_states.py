@@ -14,6 +14,7 @@ from src.domain.characters import Character, CharacterProfile
 from src.domain.content import ContentPolicy
 from src.domain.events import Belief, Event
 from src.domain.knowledge import CanonFact, KnowledgeClaim
+from src.domain.language import StoryLanguage
 from src.domain.narrative import NarrativeThread
 from src.domain.relationships import RelationshipVector
 from src.domain.state import GameState
@@ -69,6 +70,7 @@ class GameStateApplicationService:
                 "genre": world.genre,
                 "tone": world.tone,
                 "premise": world.premise,
+                "story_language": _story_language(world.canon_rules, seed),
                 "narrative_profile": dict(world.canon_rules.get("narrative_profile", {})),
             },
         }
@@ -118,6 +120,16 @@ def _world_seed(canon_rules: Mapping[str, Any]) -> WorldSeed | None:
     if not isinstance(value, Mapping):
         return None
     return WorldSeed.model_validate(value)
+
+
+def _story_language(canon_rules: Mapping[str, Any], seed: WorldSeed | None) -> str:
+    """Return the canonical world language, accepting pre-language worlds."""
+
+    candidate: Any = seed.story_language if seed is not None else canon_rules.get("story_language")
+    try:
+        return StoryLanguage(str(candidate or StoryLanguage.ENGLISH.value)).value
+    except ValueError:
+        return StoryLanguage.ENGLISH.value
 
 
 def _character(record: Any) -> Character:

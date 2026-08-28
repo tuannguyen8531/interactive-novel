@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/client'
-import type { ConnectivityResult, OllamaAccount, ProviderSettings, ProviderTarget } from '@/api/types'
+import type { ConnectivityResult, OllamaAccount, ProviderSettings, ProviderTarget, StoryLanguage } from '@/api/types'
 
 export const PROVIDER_ROLES = [
   'planner',
@@ -33,6 +33,7 @@ export const useProviderStore = defineStore('provider', () => {
     error.value = null
     try {
       settings.value = await api.getProviderSettings()
+      if (settings.value) settings.value.story_language ??= 'en'
       ensureRoutes()
     } catch (cause) {
       error.value = errorText(cause)
@@ -41,7 +42,7 @@ export const useProviderStore = defineStore('provider', () => {
     }
   }
 
-  async function save(mode: 'quality' | 'fast', allowCloud: boolean): Promise<void> {
+  async function save(mode: 'quality' | 'fast', allowCloud: boolean, storyLanguage?: StoryLanguage): Promise<void> {
     if (!settings.value) return
     ensureRoutes()
     normalizeRoutes()
@@ -66,7 +67,8 @@ export const useProviderStore = defineStore('provider', () => {
         ),
         role_routes: settings.value.role_routes,
         mode,
-        allow_cloud: allowCloud
+        allow_cloud: allowCloud,
+        story_language: storyLanguage ?? settings.value.story_language ?? 'en'
       })
     } catch (cause) {
       error.value = errorText(cause)

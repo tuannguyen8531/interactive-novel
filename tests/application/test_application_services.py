@@ -46,6 +46,7 @@ from src.application.services.queries import CharacterQueryApplicationService
 from src.application.services.turns import TurnApplicationService
 from src.application.services.world_drafts import WorldDraftApplicationService
 from src.application.services.worlds import WorldApplicationService
+from src.domain.language import StoryLanguage
 from src.domain.state import GameState
 from src.services.provider_settings import JsonProviderSettingsStore
 
@@ -510,6 +511,7 @@ async def test_provider_settings_store_secret_free_snapshot_and_connection_check
             )
         },
         role_routes={LogicalRole.PLANNER: ProviderRoute("local")},
+        story_language=StoryLanguage.VIETNAMESE,
     )
 
     snapshot = await service.update_provider_settings(config)
@@ -517,6 +519,7 @@ async def test_provider_settings_store_secret_free_snapshot_and_connection_check
     connectivity = await service.test_provider_connection()
 
     assert snapshot.as_dict()["targets"]["local"]["model"] == "fixture-model"
+    assert snapshot.as_dict()["story_language"] == "vi"
     assert saved is not None
     assert "do-not-store" not in str(saved)
     assert gateway.config == config

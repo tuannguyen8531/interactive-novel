@@ -98,6 +98,10 @@ file is replaced atomically, and new workers start afterward.
   SSE events, or logs.
 - Player input is bounded, normalized, and labeled untrusted; prompt-injection
   flags do not turn it into a system or developer instruction.
+- `STORY_LANGUAGE` seeds the Story language setting on first launch. The
+  Settings / Providers screen can change the default for newly generated worlds;
+  each confirmed world stores its own language so existing stories remain
+  stable. Supported values are `en` and `vi`.
 
 ## Alpha feedback loop
 

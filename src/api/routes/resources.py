@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from inspect import signature
+from typing import cast
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
@@ -22,6 +24,7 @@ from src.api.schemas import (
     WorldDraftRequest,
 )
 from src.api.serialization import public_json
+from src.domain.language import StoryLanguage
 from src.templates import StoryTemplateRegistry
 
 router = APIRouter(tags=["resources"])
@@ -35,16 +38,41 @@ async def generate_world_draft(
 ):
     generator = services.world_drafts.generate_world_draft
     parameters = signature(generator).parameters
+    story_language = payload.story_language
+    if story_language is None:
+        story_language = await _configured_story_language(services)
     requested = {
         "template_id": payload.template_id,
         "tone": payload.tone,
         "rating": payload.rating,
         "violence_ceiling": payload.violence_ceiling,
         "player_gender": payload.player_gender,
+        "story_language": story_language,
     }
     kwargs = {key: value for key, value in requested.items() if key in parameters and value is not None}
     draft = await generator(payload.prompt, **kwargs)
     return public_json(draft)
+
+
+async def _configured_story_language(services: ApplicationContainer) -> StoryLanguage:
+    """Read the persisted default without making lightweight test containers mandatory."""
+
+    settings_service = getattr(services, "provider_settings", None)
+    getter = getattr(settings_service, "get_provider_settings", None)
+    if not callable(getter):
+        return StoryLanguage.ENGLISH
+    try:
+        snapshot = await cast(Callable[[], Awaitable[object]], getter)()
+    except Exception:
+        # Draft generation remains usable when an optional settings store is
+        # unavailable; the explicit request or English default still applies.
+        return StoryLanguage.ENGLISH
+    if isinstance(snapshot, dict):
+        try:
+            return StoryLanguage(str(snapshot.get("story_language", StoryLanguage.ENGLISH.value)))
+        except ValueError:
+            return StoryLanguage.ENGLISH
+    return StoryLanguage.ENGLISH
 
 
 @router.get("/story-templates")

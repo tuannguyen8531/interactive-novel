@@ -23,7 +23,8 @@ import type {
   WorldConfirmation,
   WorldRecord,
   WorldSeed,
-  StoryTemplate
+  StoryTemplate,
+  StoryLanguage
 } from './types'
 import type { HealthResponse } from './types'
 
@@ -133,6 +134,7 @@ export const api = {
     rating?: ContentRating
     violence_ceiling?: ViolenceCeiling
     player_gender?: BinaryGender
+    story_language?: StoryLanguage
   }): Promise<WorldSeed> => request<WorldSeed>('/api/world-drafts', jsonBody(payload)),
   validateWorldDraft: (draft: WorldSeed): Promise<WorldSeed> =>
     request<WorldSeed>('/api/world-drafts/validate', jsonBody({ draft })),

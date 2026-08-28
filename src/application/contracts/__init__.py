@@ -14,6 +14,7 @@ from .ai import (
     SceneSpec,
     SimulationResult,
     StatePatchProposal,
+    StoryLanguage,
     TurnPlan,
     WorldSeed,
 )
@@ -99,6 +100,7 @@ __all__ = [
     "SceneSpec",
     "SimulationResult",
     "StatePatchProposal",
+    "StoryLanguage",
     "TurnPlan",
     "RelationshipTrend",
     "ThreadHealth",

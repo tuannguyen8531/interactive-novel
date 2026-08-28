@@ -45,6 +45,7 @@ from src.domain.content import SceneSpec as DomainSceneSpec
 from src.domain.errors import GuardRejected
 from src.domain.events import Belief, Observation
 from src.domain.knowledge import ClaimLink, ClaimLinkKind, KnowledgeClaim
+from src.domain.language import StoryLanguage
 from src.domain.narrative import ThreadStatus
 from src.domain.patch import (
     AddClaimLink,
@@ -228,6 +229,8 @@ class TurnGraphNodes:
         context_manifest = manifest.as_context()
         context_manifest["authoritative_ids"] = _authoritative_ids(game_state, owner_id=state.get("actor_id"))
         context_manifest["world_profile"] = dict(game_state.metadata.get("world_profile", {}))
+        context_manifest["story_language"] = _story_language(game_state).value
+        context_manifest["world_profile"]["story_language"] = _story_language(game_state).value
         context_manifest["character_profiles"] = _public_character_profiles(game_state, relevant_character_ids)
         context_manifest["story_threads"] = _relevant_story_threads(game_state, relevant_character_ids)
         context_manifest["character_relationships"] = _relevant_relationships(game_state, relevant_character_ids)
@@ -759,6 +762,14 @@ class TurnGraphNodes:
 
 def _role_context(state: TurnGraphState, **extra: Any) -> dict[str, Any]:
     context = dict(state.get("context_manifest", {}))
+    world_profile = context.get("world_profile")
+    configured_language = context.get("story_language")
+    if configured_language is None and isinstance(world_profile, Mapping):
+        configured_language = world_profile.get("story_language")
+    try:
+        context["story_language"] = StoryLanguage(str(configured_language or StoryLanguage.ENGLISH.value)).value
+    except ValueError:
+        context["story_language"] = StoryLanguage.ENGLISH.value
     normalized_input = str(state.get("normalized_input", state["raw_input"]))
     safety = state.get("input_safety", {})
     context["normalized_input"] = normalized_input
@@ -767,6 +778,20 @@ def _role_context(state: TurnGraphState, **extra: Any) -> dict[str, Any]:
     context["targeted_evidence"] = list(state.get("targeted_evidence", ()))
     context.update(extra)
     return context
+
+
+def _story_language(game_state: Any) -> StoryLanguage:
+    """Read the canonical world language with a safe legacy fallback."""
+
+    metadata = getattr(game_state, "metadata", {})
+    world_profile = metadata.get("world_profile", {}) if isinstance(metadata, Mapping) else {}
+    candidate = world_profile.get("story_language") if isinstance(world_profile, Mapping) else None
+    if candidate is None and isinstance(metadata, Mapping):
+        candidate = metadata.get("story_language")
+    try:
+        return StoryLanguage(str(candidate or StoryLanguage.ENGLISH.value))
+    except ValueError:
+        return StoryLanguage.ENGLISH
 
 
 def _claim_extraction_context(value: Any) -> dict[str, Any] | None:

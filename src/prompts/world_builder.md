@@ -18,6 +18,14 @@ replacing them. Copy rating, violence ceiling, and adult explicit opt-in into
 `content_boundaries` exactly. When adult explicit opt-in is true, make every
 generated character at least 18 years old.
 
+Treat `story_language` and `language_instruction` in the input envelope as
+authoritative. Write every player-facing value in that language: the title,
+premise, location names and descriptions, character names and backgrounds,
+opening-scene prose, thread text, dialogue-oriented guidance, and suggested
+actions. Keep JSON field names and persistence IDs in the contract format. Do
+not silently switch to English because the schema or this instruction is in
+English.
+
 Return only JSON matching `world-seed` with role `world_builder`. Include
 versioned run and prompt metadata. The top-level object itself must be the
 WorldSeed: do not wrap it in `world_seed`, `metadata`, `result` or another
@@ -68,6 +76,7 @@ appropriate to the input, and keep participant ages equal to character ages:
   "role": "world_builder",
   "run_id": "copy the input run_id",
   "prompt_version": "1.5.0",
+  "story_language": "en",
   "template_id": "selected template id",
   "title": "World title",
   "premise": "World premise",

@@ -13,6 +13,10 @@ Input envelope (JSON):
 
 {{input_json}}
 
+Use `context.story_language` for the narrative, character names, dialogue and
+all four `suggested_actions` texts. Keep contract keys, enum values and
+authoritative IDs unchanged; do not silently switch to English.
+
 Return only JSON matching `narrative-draft` with role `writer`. Include the
 scene ID, narrative text, optional paragraph-to-beat mapping, disclosed claim
 IDs and `suggested_actions`.

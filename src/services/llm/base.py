@@ -358,7 +358,10 @@ class BaseProvider(ABC):
                 structured_request,
                 system_prompt=(
                     "Return only valid JSON matching the requested schema. Resolve every listed validation failure, "
-                    "not merely the first one. Do not include Markdown fences or commentary."
+                    "not merely the first one. Do not include Markdown fences or commentary. "
+                    f"Preserve all player-facing prose in the configured story language "
+                    f"({request.metadata.get('story_language', 'en')}); do not translate it to another language. "
+                    "Keep contract keys, enum values and authoritative IDs unchanged."
                 ),
                 user_prompt=(
                     f"Repair this invalid structured response for schema {schema.name}.\n\n"

@@ -14,6 +14,7 @@ from src.application.contracts.persistence import BranchRecord, TurnRecord, utc_
 from src.application.errors import ApplicationValidationError
 from src.application.ports.persistence import UowFactory
 from src.application.services.world_drafts import WorldDraftApplicationService
+from src.domain.language import StoryLanguage
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "ai" / "role_outputs.json"
 WORLD_BUILDER_PROMPT = Path(__file__).parents[2] / "src" / "prompts" / "world_builder.md"
@@ -173,6 +174,15 @@ async def test_world_builder_authoritatively_applies_user_presets_over_ai_output
     assert draft.content_boundaries.rating.value == "mature_16_plus"
     assert draft.content_boundaries.violence_ceiling.value == "detailed"
     assert draft.content_boundaries.adult_explicit_opt_in is False
+
+
+@pytest.mark.asyncio
+async def test_world_builder_persists_selected_story_language_in_draft() -> None:
+    service = WorldDraftApplicationService(_factory(_State()), generator=_Generator(_seed()))
+
+    draft = await service.generate_world_draft("Một câu chuyện học đường.", story_language="vi")
+
+    assert draft.story_language is StoryLanguage.VIETNAMESE
 
 
 @pytest.mark.asyncio

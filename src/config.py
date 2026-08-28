@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.domain.language import StoryLanguage
 from src.paths import PROJECT_ROOT
 
 ENV_FILE = PROJECT_ROOT / ".env"
@@ -59,6 +60,7 @@ class Settings(BaseSettings):
     fallback_provider: Literal["", "ollama", "gemini", "openrouter"] = ""
     execution_mode: Literal["quality", "fast"] = "quality"
     allow_cloud_routing: bool = False
+    story_language: StoryLanguage = StoryLanguage.ENGLISH
     ollama_base_url: str = "http://localhost:11434/api"
     ollama_model: str = "llama3.2:3b"
     ollama_embedding_model: str = "nomic-embed-text:latest"

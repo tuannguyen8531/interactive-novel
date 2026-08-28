@@ -8,6 +8,7 @@ import pytest
 
 from src.application.contracts.ai import AIPromptRole, WorldSeed
 from src.application.contracts.providers import ProviderResponse, StructuredResponse
+from src.domain.language import StoryLanguage
 from src.services.ai.world_builder import ProviderWorldDraftGenerator
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "ai" / "role_outputs.json"
@@ -60,3 +61,19 @@ async def test_provider_world_builder_applies_selected_story_template() -> None:
     assert result.template_id == "mystery"
     assert '"template": "mystery"' in provider.request.user_prompt
     assert "clue-driven" in provider.request.user_prompt
+
+
+@pytest.mark.asyncio
+async def test_provider_world_builder_carries_story_language_into_prompt_and_seed() -> None:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]
+    provider = _Provider(payload)
+    generator = ProviderWorldDraftGenerator(provider)  # type: ignore[arg-type]
+
+    result = await generator.generate_world_draft(
+        "Một câu chuyện tình cảm ở trường học.",
+        story_language=StoryLanguage.VIETNAMESE,
+    )
+
+    assert result.story_language is StoryLanguage.VIETNAMESE
+    assert '"story_language": "vi"' in provider.request.user_prompt
+    assert "player-facing story content in natural Vietnamese" in provider.request.user_prompt

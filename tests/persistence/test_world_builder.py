@@ -16,6 +16,7 @@ from src.application.services.game_states import GameStateApplicationService
 from src.application.services.world_drafts import WorldDraftApplicationService
 from src.application.services.worlds import WorldApplicationService
 from src.domain.codec import patch_to_payload
+from src.domain.language import StoryLanguage
 from src.domain.patch import AdvanceClock, StatePatch
 from src.services.persistence.models import (
     Base,
@@ -99,6 +100,17 @@ async def test_confirmed_world_builder_seed_round_trips_all_opening_artifacts(da
     assert stored_relationships == 1
     assert character_states == len(payload["opening_scene"]["participants"])
     assert claims == canon_facts == len(payload["initial_claims"]) + len(payload["opening_scene"]["participants"])
+
+
+async def test_confirmed_vietnamese_world_keeps_language_and_localized_opening(database) -> None:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]
+    seed = WorldSeed.model_validate(payload).model_copy(update={"story_language": StoryLanguage.VIETNAMESE})
+    confirmation = await WorldDraftApplicationService(make_uow_factory(database)).confirm_world_bundle(seed)
+
+    assert confirmation.world.canon_rules["story_language"] == "vi"
+    assert confirmation.opening_turn.final_narrative is not None
+    assert "bắt đầu tại" in confirmation.opening_turn.final_narrative
+    assert "Có mặt:" in confirmation.opening_turn.final_narrative
 
 
 async def test_game_state_hydrates_seed_replays_turn_and_builds_snapshot(database) -> None:

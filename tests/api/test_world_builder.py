@@ -91,6 +91,17 @@ class _FailingWorldDraftService:
         )
 
 
+class _LanguageAwareWorldDraftService:
+    def __init__(self, seed: WorldSeed) -> None:
+        self.seed = seed
+        self.story_language: str | None = None
+
+    async def generate_world_draft(self, prompt: str, *, story_language: str = "en") -> WorldSeed:
+        assert prompt
+        self.story_language = story_language
+        return self.seed
+
+
 @pytest.mark.asyncio
 async def test_world_builder_endpoints_generate_review_and_confirm_without_raw_db_access() -> None:
     payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]
@@ -156,3 +167,24 @@ async def test_world_builder_provider_contract_failure_returns_safe_gateway_erro
             },
         }
     }
+
+
+@pytest.mark.asyncio
+async def test_world_builder_uses_story_language_from_persisted_settings() -> None:
+    seed = WorldSeed.model_validate(json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"])
+    world_drafts = _LanguageAwareWorldDraftService(seed)
+
+    class _Settings:
+        async def get_provider_settings(self) -> dict[str, object]:
+            return {"story_language": "vi"}
+
+    app = create_app(
+        Settings(app_name="world-builder-language-api-test"),
+        services=SimpleNamespace(world_drafts=world_drafts, provider_settings=_Settings()),  # type: ignore[arg-type]
+    )
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/api/world-drafts", json={"prompt": "Một truyện tình cảm."})
+
+    assert response.status_code == 200
+    assert world_drafts.story_language == "vi"

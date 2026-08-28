@@ -42,6 +42,7 @@ async def update_provider_settings(
         },
         mode=ExecutionMode(payload.mode),
         allow_cloud=payload.allow_cloud,
+        story_language=payload.story_language,
     )
     snapshot = await services.provider_settings.update_provider_settings(config)
     return public_json(snapshot)

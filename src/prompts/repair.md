@@ -8,6 +8,10 @@ Schema: {{schema_name}}
 Diagnostics (JSON):
 {{diagnostics}}
 
+Preserve any configured story language identified by the invalid output or
+diagnostics in all player-facing prose while repairing the structure. Keep JSON
+field names, enum values and IDs unchanged.
+
 Invalid output (JSON or text):
 {{invalid_output}}
 

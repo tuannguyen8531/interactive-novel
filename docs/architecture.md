@@ -74,6 +74,10 @@ embedding, and logging ports declared by inward-facing layers.
 Every canonical record carries `playthrough_id`, `branch_id`, a revision or
 turn, and appropriate provenance. The API never returns ORM records directly.
 
+The confirmed WorldSeed also persists its `story_language` (`en` or `vi`) in
+the World canon. Settings choose the default for new drafts; turn context
+reads the World value so changing the default never changes an existing story.
+
 ## 4. Turn flow and authority boundary
 
 ```text
@@ -121,10 +125,11 @@ coverage and cross-reference errors into one diagnostic set so a single
 structured-output repair can fix the complete payload instead of failing one
 invariant at a time.
 
-Writer receives `SceneSpec`, authorized evidence, and bounded public character
-profiles; it does not receive the whole database, internal relationship or
-tension scores, and it does not return a state patch. Critic cannot change the
-outcome or state. Guard is the final deterministic gate before commit.
+Writer receives `SceneSpec`, authorized evidence, bounded public character
+profiles, and the canonical story language; it does not receive the whole
+database, internal relationship or tension scores, and it does not return a
+state patch. Critic cannot change the outcome or state. Guard is the final
+deterministic gate before commit.
 
 ## 5. Canonical transaction
 

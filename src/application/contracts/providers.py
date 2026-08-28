@@ -13,6 +13,8 @@ from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
+from src.domain.language import StoryLanguage
+
 
 class ProviderName(StrEnum):
     OLLAMA = "ollama"
@@ -338,12 +340,14 @@ class ProviderConfigSnapshot:
     allow_cloud: bool
     targets: Mapping[str, Mapping[str, Any]]
     role_routes: Mapping[str, Mapping[str, Any]]
+    story_language: StoryLanguage = StoryLanguage.ENGLISH
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
             "mode": self.mode.value,
             "allow_cloud": self.allow_cloud,
+            "story_language": StoryLanguage(self.story_language).value,
             "targets": {key: dict(value) for key, value in self.targets.items()},
             "role_routes": {key: dict(value) for key, value in self.role_routes.items()},
         }
@@ -356,6 +360,7 @@ class ProviderRoutingConfig:
     mode: ExecutionMode = ExecutionMode.QUALITY
     allow_cloud: bool = False
     schema_version: int = 1
+    story_language: StoryLanguage = StoryLanguage.ENGLISH
 
     def __post_init__(self) -> None:
         normalized_targets = dict(self.targets)
@@ -370,12 +375,14 @@ class ProviderRoutingConfig:
                     raise ValueError(f"Provider route {role} references unknown target {target_name}.")
         object.__setattr__(self, "targets", normalized_targets)
         object.__setattr__(self, "role_routes", normalized_routes)
+        object.__setattr__(self, "story_language", StoryLanguage(self.story_language))
 
     def snapshot(self) -> ProviderConfigSnapshot:
         return ProviderConfigSnapshot(
             schema_version=self.schema_version,
             mode=self.mode,
             allow_cloud=self.allow_cloud,
+            story_language=self.story_language,
             targets={name: target.snapshot() for name, target in self.targets.items()},
             role_routes={
                 role: {
@@ -426,6 +433,7 @@ __all__ = [
     "StreamChunk",
     "StructuredOutputError",
     "StructuredResponse",
+    "StoryLanguage",
     "StructuredSchema",
     "TokenUsage",
 ]

@@ -1,6 +1,7 @@
 export type ContentRating = 'teen_14_plus' | 'mature_16_plus' | 'adult_18_plus'
 export type ViolenceCeiling = 'none' | 'restrained' | 'detailed'
 export type BinaryGender = 'male' | 'female'
+export type StoryLanguage = 'en' | 'vi'
 
 export interface StoryTemplateDefaults {
   tone: string
@@ -121,6 +122,7 @@ export interface WorldSeed {
   physical_call_id: string | null
   config_snapshot_id?: string | null
   template_id?: string
+  story_language?: StoryLanguage
   title: string
   premise: string
   genre: string
@@ -340,6 +342,7 @@ export interface ProviderSettings {
   schema_version: number
   mode: 'quality' | 'fast'
   allow_cloud: boolean
+  story_language?: StoryLanguage
   targets: Record<string, ProviderTarget>
   role_routes: Record<string, ProviderRoute>
 }

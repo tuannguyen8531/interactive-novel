@@ -20,6 +20,10 @@ Input envelope (JSON):
 
 {{input_json}}
 
+Use `context.story_language` for all descriptive values in this result so the
+Writer can preserve one story language. Keep contract keys, enum values and
+authoritative IDs unchanged.
+
 Return only JSON matching `simulation-result` with role `simulator`. Every
 authoritative proposal must be a registered `KnowledgeClaimProposal` or a
 typed `StatePatchProposal` operation. Include uncertainty when evidence is

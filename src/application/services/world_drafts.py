@@ -32,6 +32,7 @@ from src.application.ports.worlds import WorldDraftGenerator
 from src.application.world_seed import normalize_npc_character_ids, opening_location_claim_id
 from src.domain.characters import CharacterState
 from src.domain.knowledge import KnowledgeClaim
+from src.domain.language import StoryLanguage
 from src.domain.values import TimeRange
 from src.services.ai.contracts import AIContractValidationError
 from src.services.ai.validators import validate_semantics
@@ -72,6 +73,7 @@ class WorldDraftApplicationService:
         rating: RatingValue | str | None = None,
         violence_ceiling: ViolenceCeilingValue | str | None = None,
         player_gender: Literal["male", "female"] = "male",
+        story_language: StoryLanguage | str = StoryLanguage.ENGLISH,
     ) -> WorldSeed:
         if not prompt.strip():
             raise ApplicationValidationError("World draft prompt must not be empty.")
@@ -81,6 +83,7 @@ class WorldDraftApplicationService:
         effective_tone = tone.strip() if tone is not None else template.defaults.tone
         effective_rating = RatingValue(rating or template.defaults.rating.value)
         effective_ceiling = ViolenceCeilingValue(violence_ceiling or template.defaults.violence_ceiling.value)
+        effective_language = StoryLanguage(story_language)
         generator_method: Any = self._generator.generate_world_draft
         parameters = signature(generator_method).parameters
         requested = {
@@ -89,6 +92,7 @@ class WorldDraftApplicationService:
             "rating": effective_rating,
             "violence_ceiling": effective_ceiling,
             "player_gender": player_gender,
+            "story_language": effective_language,
         }
         kwargs = {key: value for key, value in requested.items() if key in parameters}
         generated = await generator_method(prompt.strip(), **kwargs)
@@ -104,6 +108,7 @@ class WorldDraftApplicationService:
                 "template_id": template.id,
                 "genre": template.genre,
                 "tone": effective_tone,
+                "story_language": effective_language,
                 "content_boundaries": boundaries,
                 "player_character": generated.player_character.model_copy(update={"gender": player_gender}),
                 "opening_scene": generated.opening_scene.model_copy(update={"tone": effective_tone}),
@@ -219,6 +224,7 @@ def _build_world_records(
             "world_seed": seed.model_dump(mode="json"),
             "world_builder": {"confirmed": True, "template": seed.template_id},
             "narrative_profile": template.narrative_profile.as_dict(),
+            "story_language": seed.story_language.value,
         },
         content_policy=seed.content_boundaries.model_dump(mode="json"),
     )
@@ -375,10 +381,11 @@ def _build_opening_bundle(
         emotional_intensity=0.2,
         provenance={"source_type": "world_seed", "source_id": seed.run_id, "run_id": seed.run_id},
     )
-    narrative = (
-        f"{seed.title} begins in {location.name}. {seed.premise}\n\n"
-        f"Present: {', '.join(known_names[item] for item in participants)}."
-    )
+    participant_names = ", ".join(known_names[item] for item in participants)
+    if seed.story_language is StoryLanguage.VIETNAMESE:
+        narrative = f"{seed.title} bắt đầu tại {location.name}. {seed.premise}\n\nCó mặt: {participant_names}."
+    else:
+        narrative = f"{seed.title} begins in {location.name}. {seed.premise}\n\nPresent: {participant_names}."
     opening_state = asdict(CharacterState(location_id=location.location_id, last_active_world_time=world_time))
     character_states = tuple(
         CharacterStateRecord(

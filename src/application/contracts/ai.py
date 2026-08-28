@@ -13,6 +13,8 @@ from typing import Annotated, Any, ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from src.domain.language import StoryLanguage
+
 
 class AIPromptRole(StrEnum):
     WORLD_BUILDER = "world_builder"
@@ -738,6 +740,7 @@ class WorldSeed(VersionedOutput):
     expected_schema_version: ClassVar[str] = "world-seed"
     expected_role: ClassVar[AIPromptRole] = AIPromptRole.WORLD_BUILDER
     template_id: str = Field(default="school_romance", min_length=1, max_length=80)
+    story_language: StoryLanguage = StoryLanguage.ENGLISH
     title: str = Field(min_length=1)
     premise: str = Field(min_length=1)
     genre: str = Field(min_length=1)
@@ -810,6 +813,7 @@ __all__ = [
     "SimulationResult",
     "StateOperation",
     "StatePatchProposal",
+    "StoryLanguage",
     "TargetedEvidenceManifest",
     "TokenUsageSnapshot",
     "ThreadAction",

@@ -15,6 +15,9 @@ Input envelope (JSON):
 
 {{input_json}}
 
+Use `context.story_language` for diagnostic descriptions and corrections. Do
+not translate or alter contract keys, enum values, IDs or quoted evidence.
+
 Return only JSON matching `consistency-report` with role `context_validator`.
 If evidence is not sufficient, return `insufficient_evidence`; do not return
 PASS merely because the initial context omitted a contradiction. List evidence

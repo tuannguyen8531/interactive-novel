@@ -5,7 +5,7 @@
     "input_contract": "role-input",
     "output_schema_version": "world-seed",
     "required_variables": ["input_json"],
-    "changelog": "Require exact declared character/location subjects for initial claims and keep global world rules out of entity-scoped claims."
+    "changelog": "Require exact declared character/location subjects for initial claims, keep global world rules out of entity-scoped claims, and preserve the configured story language in all player-facing seed content."
   },
   "planner": {
     "template": "planner.md",
@@ -13,7 +13,7 @@
     "input_contract": "role-input",
     "output_schema_version": "turn-plan",
     "required_variables": ["input_json"],
-    "changelog": "Use bounded public character profiles as stable planning context."
+    "changelog": "Use bounded public character profiles as stable planning context and preserve the configured story language in writer-facing prose."
   },
   "simulator": {
     "template": "simulator.md",
@@ -21,7 +21,7 @@
     "input_contract": "role-input",
     "output_schema_version": "simulation-result",
     "required_variables": ["input_json"],
-    "changelog": "Use owner-scoped private NPC canon internally without disclosing it to the player or prose roles."
+    "changelog": "Use owner-scoped private NPC canon internally without disclosing it to the player or prose roles, while preserving the configured story language in descriptive output."
   },
   "context_validator": {
     "template": "context_validator.md",
@@ -29,7 +29,7 @@
     "input_contract": "role-input",
     "output_schema_version": "consistency-report",
     "required_variables": ["input_json"],
-    "changelog": "Validate public characterization and prevent owner-scoped private NPC canon from leaking through simulation."
+    "changelog": "Validate public characterization and prevent owner-scoped private NPC canon from leaking through simulation, while preserving the configured story language in diagnostics."
   },
   "writer": {
     "template": "writer.md",
@@ -37,7 +37,7 @@
     "input_contract": "role-input",
     "output_schema_version": "narrative-draft",
     "required_variables": ["input_json"],
-    "changelog": "Render relevant backgrounds through consistent behavior and voice without exposition dumps."
+    "changelog": "Render relevant backgrounds through consistent behavior and voice without exposition dumps, while preserving the configured story language in narrative and suggested actions."
   },
   "critic": {
     "template": "critic.md",
@@ -45,6 +45,6 @@
     "input_contract": "role-input",
     "output_schema_version": "critique-result",
     "required_variables": ["input_json"],
-    "changelog": "Check narrative characterization against relevant public profiles without requiring exposition."
+    "changelog": "Check narrative characterization against relevant public profiles without requiring exposition, and keep critique feedback in the configured story language."
   }
 }

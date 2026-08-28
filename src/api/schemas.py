@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.application.contracts.ai import RatingValue, ViolenceCeilingValue, WorldSeed
 from src.application.contracts.persistence import JSONValue
+from src.domain.language import StoryLanguage
 
 
 class HealthResponse(BaseModel):
@@ -52,6 +53,7 @@ class WorldDraftGenerateRequest(BaseModel):
     rating: RatingValue | None = None
     violence_ceiling: ViolenceCeilingValue | None = None
     player_gender: Literal["male", "female"] = "male"
+    story_language: StoryLanguage | None = None
 
 
 class WorldDraftRequest(BaseModel):
@@ -145,6 +147,7 @@ class ProviderSettingsRequest(BaseModel):
     role_routes: dict[str, ProviderRouteRequest]
     mode: Literal["quality", "fast"] = "quality"
     allow_cloud: bool = False
+    story_language: StoryLanguage = StoryLanguage.ENGLISH
 
     @model_validator(mode="after")
     def validate_routing(self) -> ProviderSettingsRequest:

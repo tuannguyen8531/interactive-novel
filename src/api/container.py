@@ -201,6 +201,7 @@ def _default_provider_config(settings: Settings) -> ProviderRoutingConfig:
         role_routes=roles,
         mode=ExecutionMode(settings.execution_mode),
         allow_cloud=settings.allow_cloud_routing,
+        story_language=settings.story_language,
     )
 
 

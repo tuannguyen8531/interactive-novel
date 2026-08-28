@@ -112,6 +112,12 @@ launch, provider targets, model IDs, execution mode, and routing are seeded into
 persisted configuration. Remove only that file to seed it again without
 deleting worlds or logs.
 
+The same screen exposes **Story language** (`English` or `Vietnamese`). It is a
+default for newly generated worlds; the selected language is copied into each
+world seed and carried through planning, writing, suggested actions and future
+turns. Existing worlds keep their own language when the default changes. Set
+`STORY_LANGUAGE=vi` in `.env` to seed Vietnamese on first launch.
+
 The UI and `runtime/settings.json` store provider choices and environment
 variable names, never secret values. Shell environment variables take
 precedence over `.env`. Keep `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, and other

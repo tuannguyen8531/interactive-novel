@@ -7,6 +7,11 @@ Input envelope (JSON):
 
 {{input_json}}
 
+Use `context.story_language` as the language for every player-facing or
+writer-facing prose value you produce, including interpreted intent, beat
+descriptions, stakes, outcomes and safety notes. Keep contract keys, enum
+values and IDs unchanged.
+
 Return only JSON matching `turn-plan` with role `planner`. Include candidate
 beats, involved characters, stakes, required checks, possible outcomes and
 safety constraints. Do not return untyped state mutations or treat prose as a
