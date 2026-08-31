@@ -239,8 +239,11 @@ class TurnGraphNodes:
             context_manifest["content_policy"] = {
                 "rating": game_state.policy.rating.value,
                 "violence_ceiling": game_state.policy.violence_ceiling.value,
-                "adult_explicit_opt_in": game_state.policy.adult_explicit_opt_in,
-                "topic_boundaries": {key: value.value for key, value in game_state.policy.topic_boundaries.items()},
+                "consent": {
+                    "required": game_state.policy.consent.required,
+                    "explicit_affirmative": game_state.policy.consent.explicit_affirmative,
+                    "withdrawal_supported": game_state.policy.consent.withdrawal_supported,
+                },
             }
         return {"context_manifest": context_manifest}
 

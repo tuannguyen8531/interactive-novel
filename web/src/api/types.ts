@@ -48,9 +48,7 @@ export interface WorldRecord {
 
 export interface WorldContentBoundaries {
   rating: ContentRating | string
-  topic_boundaries: Record<string, 'allow' | 'opt_in' | 'excluded' | string>
   violence_ceiling: ViolenceCeiling | string
-  adult_explicit_opt_in: boolean
 }
 
 export interface WorldCharacterSeed {

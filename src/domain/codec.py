@@ -255,7 +255,7 @@ def state_from_payload(payload: Mapping[str, Any]) -> GameState:
     }
     policy = payload.get("policy")
     if policy is not None:
-        state.policy = ContentPolicy.from_mapping(policy, player_overrides=policy.get("player_overrides"))
+        state.policy = ContentPolicy.from_mapping(policy)
     state.metadata = dict(payload.get("metadata", {}))
     return state
 

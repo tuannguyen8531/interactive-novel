@@ -17,9 +17,7 @@ function seed(): WorldSeed {
     tone: 'gentle',
     content_boundaries: {
       rating: 'teen_14_plus',
-      topic_boundaries: { adult_explicit: 'excluded' },
-      violence_ceiling: 'none',
-      adult_explicit_opt_in: false
+      violence_ceiling: 'none'
     },
     locations: [{ location_id: 'library', name: 'Library', description: 'A quiet room.' }],
     player_character: {
@@ -141,7 +139,7 @@ describe('world builder store', () => {
     expect(confirmSpy).not.toHaveBeenCalled()
   })
 
-  it('sends typed presets and lets the backend derive adult explicit opt-in', async () => {
+  it('sends typed presets for an adult world', async () => {
     vi.spyOn(api, 'generateWorldDraft').mockResolvedValue(seed())
     const store = useWorldBuilderStore()
     store.ratingPreset = 'adult_18_plus'

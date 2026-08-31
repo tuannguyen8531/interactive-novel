@@ -70,12 +70,6 @@ class ConsentStateValue(StrEnum):
     WITHDRAWN = "withdrawn"
 
 
-class TopicBoundaryValue(StrEnum):
-    ALLOW = "allow"
-    OPT_IN = "opt_in"
-    EXCLUDED = "excluded"
-
-
 class RatingValue(StrEnum):
     TEEN_14_PLUS = "teen_14_plus"
     MATURE_16_PLUS = "mature_16_plus"
@@ -661,9 +655,7 @@ class CritiqueResult(VersionedOutput):
 
 class ContentBoundaryProposal(AIModel):
     rating: RatingValue
-    topic_boundaries: dict[str, TopicBoundaryValue] = Field(default_factory=dict)
     violence_ceiling: ViolenceCeilingValue
-    adult_explicit_opt_in: bool = False
 
     @field_validator("violence_ceiling", mode="before")
     @classmethod

@@ -120,12 +120,6 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     violencePreset.value = selected.defaults.violence_ceiling
   }
 
-  function syncDraftRating(): void {
-    if (!draft.value) return
-    draft.value.content_boundaries.adult_explicit_opt_in =
-      draft.value.content_boundaries.rating === 'adult_18_plus'
-  }
-
   function syncCharacterAge(characterId: string): void {
     if (!draft.value) return
     const character = [draft.value.player_character, ...draft.value.npc_profiles].find(
@@ -279,9 +273,6 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     if (draft.value.opening_scene.guard_approved) {
       warnings.push('The opening scene needs to be checked again before the story can begin.')
     }
-    if (draft.value.content_boundaries.adult_explicit_opt_in && [draft.value.player_character, ...draft.value.npc_profiles].some((item) => item.age < 18)) {
-      warnings.push('Adult explicit content cannot be enabled with a minor character.')
-    }
     if (draft.value.locations.length === 0) warnings.push('At least one starting location is required.')
     return warnings
   })
@@ -380,7 +371,6 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     contentWarnings,
     loadTemplates,
     applySelectedTemplateDefaults,
-    syncDraftRating,
     syncCharacterAge,
     syncNpcIdentity,
     addNpc,

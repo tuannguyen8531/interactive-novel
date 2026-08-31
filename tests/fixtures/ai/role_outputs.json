@@ -11,9 +11,7 @@
     "tone": "gentle",
     "content_boundaries": {
       "rating": "teen_14_plus",
-      "topic_boundaries": {"adult_explicit": "excluded"},
-      "violence_ceiling": "restrained",
-      "adult_explicit_opt_in": false
+      "violence_ceiling": "restrained"
     },
     "locations": [
       {"location_id": "library", "name": "Library", "description": "A quiet room near the courtyard."},

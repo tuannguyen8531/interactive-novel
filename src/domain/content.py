@@ -16,12 +16,6 @@ class Rating(StrEnum):
     ADULT_18_PLUS = "adult_18_plus"
 
 
-class TopicBoundary(StrEnum):
-    ALLOW = "allow"
-    OPT_IN = "opt_in"
-    EXCLUDED = "excluded"
-
-
 class ViolenceCeiling(StrEnum):
     NONE = "none"
     RESTRAINED = "restrained"
@@ -84,119 +78,37 @@ KNOWN_CONTENT_TAGS = {
 
 @dataclass(frozen=True, slots=True)
 class ConsentRequirements:
-    required: bool = True
+    required: bool = False
     explicit_affirmative: bool = True
     withdrawal_supported: bool = True
-
-
-@dataclass(frozen=True, slots=True)
-class ContentPolicyOverride:
-    """Player constraints may tighten, never relax, a world policy."""
-
-    adult_explicit_opt_in: bool = False
-    topic_boundaries: Mapping[str, TopicBoundary] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "topic_boundaries",
-            {str(tag): TopicBoundary(value) for tag, value in self.topic_boundaries.items()},
-        )
-
-    @classmethod
-    def from_mapping(cls, mapping: Mapping[str, Any] | None) -> ContentPolicyOverride | None:
-        if mapping is None:
-            return None
-        return cls(
-            adult_explicit_opt_in=bool(mapping.get("adult_explicit_opt_in", False)),
-            topic_boundaries={str(tag): TopicBoundary(value) for tag, value in mapping.get("topic_boundaries", {}).items()},
-        )
 
 
 @dataclass(frozen=True, slots=True)
 class ContentPolicy:
     schema_version: str = "content"
     rating: Rating = Rating.TEEN_14_PLUS
-    topic_boundaries: Mapping[str, TopicBoundary] = field(default_factory=dict)
     violence_ceiling: ViolenceCeiling = ViolenceCeiling.RESTRAINED
-    adult_explicit_opt_in: bool = False
     consent: ConsentRequirements = field(default_factory=ConsentRequirements)
-    player_overrides: ContentPolicyOverride | None = None
 
     def __post_init__(self) -> None:
         if not self.schema_version.strip():
             raise DomainValidationError("invalid_content_policy", "Content policy schema version cannot be empty.")
         object.__setattr__(self, "rating", Rating(self.rating))
         object.__setattr__(self, "violence_ceiling", ViolenceCeiling(self.violence_ceiling))
-        object.__setattr__(
-            self,
-            "topic_boundaries",
-            {str(tag): TopicBoundary(value) for tag, value in self.topic_boundaries.items()},
-        )
 
     @classmethod
-    def from_mapping(
-        cls,
-        mapping: Mapping[str, Any],
-        *,
-        player_overrides: Mapping[str, Any] | ContentPolicyOverride | None = None,
-    ) -> ContentPolicy:
-        override = (
-            player_overrides
-            if isinstance(player_overrides, ContentPolicyOverride)
-            else ContentPolicyOverride.from_mapping(player_overrides)
-        )
+    def from_mapping(cls, mapping: Mapping[str, Any]) -> ContentPolicy:
         consent = mapping.get("consent", {})
         return cls(
             schema_version=str(mapping.get("schema_version", "content")),
             rating=Rating(mapping.get("rating", Rating.TEEN_14_PLUS)),
-            topic_boundaries={str(tag): TopicBoundary(value) for tag, value in mapping.get("topic_boundaries", {}).items()},
             violence_ceiling=ViolenceCeiling(mapping.get("violence_ceiling", ViolenceCeiling.RESTRAINED)),
-            adult_explicit_opt_in=bool(mapping.get("adult_explicit_opt_in", False)),
             consent=ConsentRequirements(
-                required=bool(consent.get("required", True)),
+                required=bool(consent.get("required", False)),
                 explicit_affirmative=bool(consent.get("explicit_affirmative", True)),
                 withdrawal_supported=bool(consent.get("withdrawal_supported", True)),
             ),
-            player_overrides=override,
         )
-
-    def with_player_override(self, override: ContentPolicyOverride | None) -> ContentPolicy:
-        return replace(self, player_overrides=override)
-
-    def world_boundary(self, tag: str) -> TopicBoundary:
-        if tag in self.topic_boundaries:
-            return self.topic_boundaries[tag]
-        parent = tag.partition(":")[0]
-        return self.topic_boundaries.get(parent, TopicBoundary.ALLOW)
-
-    def player_boundary(self, tag: str) -> TopicBoundary:
-        if self.player_overrides is None:
-            return TopicBoundary.ALLOW
-        if tag in self.player_overrides.topic_boundaries:
-            return self.player_overrides.topic_boundaries[tag]
-        parent = tag.partition(":")[0]
-        return self.player_overrides.topic_boundaries.get(parent, TopicBoundary.ALLOW)
-
-    def effective_boundary(self, tag: str) -> tuple[TopicBoundary, str | None]:
-        world = self.world_boundary(tag)
-        player = self.player_boundary(tag)
-        if player == TopicBoundary.EXCLUDED:
-            return player, "player_topic_excluded"
-        if world == TopicBoundary.EXCLUDED:
-            return world, "topic_excluded"
-        if (
-            player == TopicBoundary.OPT_IN
-            and self.player_overrides is not None
-            and not self.player_overrides.adult_explicit_opt_in
-        ):
-            return player, "player_opt_in_required"
-        return world if world != TopicBoundary.ALLOW else player, None
-
-    @property
-    def effective_adult_explicit_opt_in(self) -> bool:
-        player = self.player_overrides
-        return self.adult_explicit_opt_in and (player is None or player.adult_explicit_opt_in)
 
 
 @dataclass(frozen=True, slots=True)
@@ -331,7 +243,12 @@ def evaluate_scene(policy: ContentPolicy, scene: SceneSpec) -> PolicyDecision:
     if adult_minor_romance:
         return _decision(policy, scene, ContentDecision.DENY, "adult_minor_romance_not_allowed")
 
-    explicit = "adult_explicit" in tags or "sexualized_nudity" in tags
+    explicit = bool(tags & {"adult_explicit", "sexualized_nudity", "fetishization"})
+    sexual_violence = bool(tags & {"sexual_violence", "non_consensual_sexual", "violence_sexual"})
+    if sexual_violence and any(age < 18 for age in ages):
+        return _decision(policy, scene, ContentDecision.DENY, "sexual_violence_participant_under_18")
+    if tags & {"non_graphic_intimacy", "sexual_reference_fade_to_black"} and any(age < 16 for age in ages):
+        return _decision(policy, scene, ContentDecision.DENY, "age_14_15_non_sexual")
     if explicit and any(age < 16 for age in ages):
         return _decision(policy, scene, ContentDecision.DENY, "explicit_participant_under_18")
     if explicit and any(16 <= age < 18 for age in ages):
@@ -349,6 +266,7 @@ def evaluate_scene(policy: ContentPolicy, scene: SceneSpec) -> PolicyDecision:
         "violence",
         "violence:torture",
         "sexual_violence",
+        "non_consensual_sexual",
         "violence_non_graphic",
         "violence_gore",
         "violence_torture_detail",
@@ -368,18 +286,12 @@ def evaluate_scene(policy: ContentPolicy, scene: SceneSpec) -> PolicyDecision:
         if detail == ViolenceCeiling.NONE or detail_rank[detail] > detail_rank[policy.violence_ceiling]:
             return _decision(policy, scene, ContentDecision.DENY, "violence_over_ceiling")
 
-    for tag in scene.tags:
-        boundary, reason = policy.effective_boundary(tag)
-        if boundary == TopicBoundary.EXCLUDED and reason is not None:
-            return _decision(policy, scene, ContentDecision.DENY, reason)
+    if sexual_violence and policy.rating != Rating.ADULT_18_PLUS:
+        return _decision(policy, scene, ContentDecision.DENY, "rating_not_allowed")
 
     if explicit:
         if policy.rating != Rating.ADULT_18_PLUS:
             return _decision(policy, scene, ContentDecision.DENY, "rating_not_allowed")
-        if not policy.adult_explicit_opt_in:
-            return _decision(policy, scene, ContentDecision.DENY, "world_explicit_not_opted_in")
-        if policy.player_overrides is not None and not policy.player_overrides.adult_explicit_opt_in:
-            return _decision(policy, scene, ContentDecision.DENY, "player_explicit_not_opted_in")
         if policy.consent.required:
             expected_keys = {f"{participant_id}:explicit" for participant_id in scene.participants}
             states = {key: scene.consent.get(key, ConsentState.NOT_DISCUSSED) for key in expected_keys}
@@ -399,11 +311,9 @@ __all__ = [
     "ConsentState",
     "ContentDecision",
     "ContentPolicy",
-    "ContentPolicyOverride",
     "PolicyDecision",
     "Rating",
     "SceneSpec",
-    "TopicBoundary",
     "ViolenceCeiling",
     "evaluate_scene",
 ]

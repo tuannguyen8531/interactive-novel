@@ -48,7 +48,6 @@ class ProviderWorldDraftGenerator:
         effective_rating = RatingValue(rating or template.defaults.rating.value)
         effective_ceiling = ViolenceCeilingValue(violence_ceiling or template.defaults.violence_ceiling.value)
         effective_language = StoryLanguage(story_language)
-        adult_explicit_opt_in = effective_rating == RatingValue.ADULT_18_PLUS
         run_id = str(uuid4())
         physical_call_id = str(uuid4())
         input_envelope = {
@@ -64,7 +63,6 @@ class ProviderWorldDraftGenerator:
                 "tone": effective_tone,
                 "rating": effective_rating.value,
                 "violence_ceiling": effective_ceiling.value,
-                "adult_explicit_opt_in": adult_explicit_opt_in,
                 "player_gender": player_gender,
                 "allowed_character_genders": ["male", "female"],
             },
@@ -118,7 +116,6 @@ class ProviderWorldDraftGenerator:
             update={
                 "rating": effective_rating,
                 "violence_ceiling": effective_ceiling,
-                "adult_explicit_opt_in": adult_explicit_opt_in,
             }
         )
         opening_scene = result.opening_scene.model_copy(update={"tone": effective_tone})

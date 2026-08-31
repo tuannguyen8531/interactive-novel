@@ -43,7 +43,7 @@ const ratingLabel = computed(() => {
 const ratingDescription = computed(() => {
   if (store.ratingPreset === 'teen_14_plus') return 'Keeps themes suitable for ages 14 and up.'
   if (store.ratingPreset === 'mature_16_plus') return 'Allows heavier emotional and relationship themes.'
-  return 'Allows adult themes and enables explicit-content opt-in.'
+  return 'Allows adult themes and explicit adult content.'
 })
 const violenceLabel = computed(() => {
   if (store.violencePreset === 'none') return 'No violence'
@@ -326,7 +326,7 @@ function cancel(): void {
         <h2>Content settings</h2>
         <label>
           Rating
-          <select v-model="store.draft.content_boundaries.rating" @change="store.syncDraftRating">
+          <select v-model="store.draft.content_boundaries.rating">
             <option value="teen_14_plus">Teen 14+</option>
             <option value="mature_16_plus">Mature 16+</option>
             <option value="adult_18_plus">Adult 18+</option>
@@ -340,11 +340,7 @@ function cancel(): void {
             <option value="detailed">Detailed</option>
           </select>
         </label>
-        <label class="checkbox-row">
-          <input v-model="store.draft.content_boundaries.adult_explicit_opt_in" type="checkbox" />
-          Allow explicit adult content (18+ participants only)
-        </label>
-        <p class="muted small-copy">Adult explicit scenes still require every participant to be 18+, player opt-in and valid consent.</p>
+        <p class="muted small-copy">Adult 18+ permits explicit adult content by default. Scene age and the selected violence ceiling still apply.</p>
       </section>
 
       <section class="card">
