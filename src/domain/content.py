@@ -250,10 +250,10 @@ def evaluate_scene(policy: ContentPolicy, scene: SceneSpec) -> PolicyDecision:
     if tags & {"non_graphic_intimacy", "sexual_reference_fade_to_black"} and any(age < 16 for age in ages):
         return _decision(policy, scene, ContentDecision.DENY, "age_14_15_non_sexual")
     if explicit and any(age < 16 for age in ages):
-        return _decision(policy, scene, ContentDecision.DENY, "explicit_participant_under_18")
+        return _decision(policy, scene, ContentDecision.DENY, "age_14_15_explicit_not_allowed")
     if explicit and any(16 <= age < 18 for age in ages):
         if policy.rating == Rating.ADULT_18_PLUS:
-            return _decision(policy, scene, ContentDecision.DENY, "explicit_participant_under_18")
+            return _decision(policy, scene, ContentDecision.DENY, "age_16_17_explicit_not_allowed")
         return _decision(
             policy,
             scene,

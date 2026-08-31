@@ -53,7 +53,7 @@ def test_content_policy_fixture_is_deterministic(case: dict[str, Any]) -> None:
             later_scene,
         )
         assert later_decision.decision == ContentDecision.ALLOW
-        assert first.reason_codes == ("explicit_participant_under_18",)
+        assert first.reason_codes == ("age_16_17_explicit_not_allowed",)
 
 
 def test_guard_rejects_denied_scene_with_stable_code() -> None:

@@ -86,7 +86,7 @@
         "tags": ["adult_explicit"],
         "consent": {}
       },
-      "expected": {"decision": "deny", "reason_codes": ["explicit_participant_under_18"]}
+      "expected": {"decision": "deny", "reason_codes": ["age_14_15_explicit_not_allowed"]}
     },
     {
       "id": "mature-16-explicit-downgraded",
@@ -102,6 +102,17 @@
         "reason_codes": ["age_16_17_non_explicit"],
         "safe_tags": ["non_graphic_intimacy"]
       }
+    },
+    {
+      "id": "mature-emotional-theme-allowed-by-rating",
+      "world_policy": "mature_world",
+      "participants": {"a": 16, "b": 17},
+      "scene": {
+        "world_time": 10,
+        "tags": ["mature_emotional_theme"],
+        "consent": {}
+      },
+      "expected": {"decision": "allow", "reason_codes": []}
     },
     {
       "id": "mature-17-fade-to-black",
@@ -231,7 +242,7 @@
       },
       "expected": {
         "decision": "deny",
-        "reason_codes": ["explicit_participant_under_18"],
+        "reason_codes": ["age_16_17_explicit_not_allowed"],
         "history_unchanged": true
       }
     }

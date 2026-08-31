@@ -40,7 +40,7 @@ from src.application.contracts.providers import (
     ProviderCancelledError,
 )
 from src.application.contracts.retrieval import InitialContextRequest, RetrievalScope
-from src.domain.content import ConsentState, ViolenceCeiling
+from src.domain.content import ConsentState, Rating, ViolenceCeiling
 from src.domain.content import SceneSpec as DomainSceneSpec
 from src.domain.errors import GuardRejected
 from src.domain.events import Belief, Observation
@@ -238,6 +238,7 @@ class TurnGraphNodes:
         if game_state.policy is not None:
             context_manifest["content_policy"] = {
                 "rating": game_state.policy.rating.value,
+                "adult_explicit_permitted": game_state.policy.rating == Rating.ADULT_18_PLUS,
                 "violence_ceiling": game_state.policy.violence_ceiling.value,
                 "consent": {
                     "required": game_state.policy.consent.required,
