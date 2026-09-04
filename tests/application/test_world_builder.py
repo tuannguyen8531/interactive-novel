@@ -173,7 +173,6 @@ async def test_world_builder_authoritatively_applies_user_presets_over_ai_output
     assert draft.tone == draft.opening_scene.tone == "intimate, ominous"
     assert draft.content_boundaries.rating.value == "mature_16_plus"
     assert draft.content_boundaries.violence_ceiling.value == "detailed"
-    assert draft.content_boundaries.adult_explicit_opt_in is False
 
 
 @pytest.mark.asyncio
@@ -197,7 +196,7 @@ async def test_world_builder_defaults_player_gender_to_male_and_applies_user_sel
 
 
 @pytest.mark.asyncio
-async def test_adult_rating_automatically_enables_explicit_opt_in() -> None:
+async def test_adult_rating_enables_explicit_content() -> None:
     seed = _seed()
     player = seed.player_character.model_copy(update={"age": 18})
     npcs = tuple(item.model_copy(update={"age": 18}) for item in seed.npc_profiles)
@@ -209,7 +208,6 @@ async def test_adult_rating_automatically_enables_explicit_opt_in() -> None:
     draft = await service.generate_world_draft("An adult romance.", rating="adult_18_plus")
 
     assert draft.content_boundaries.rating.value == "adult_18_plus"
-    assert draft.content_boundaries.adult_explicit_opt_in is True
 
 
 @pytest.mark.asyncio

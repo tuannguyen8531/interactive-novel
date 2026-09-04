@@ -1,19 +1,19 @@
 {
   "world_builder": {
     "template": "world_builder.md",
-    "semantic_version": "1.6.0",
+    "semantic_version": "1.7.0",
     "input_contract": "role-input",
     "output_schema_version": "world-seed",
     "required_variables": ["input_json"],
-    "changelog": "Require exact declared character/location subjects for initial claims, keep global world rules out of entity-scoped claims, and preserve the configured story language in all player-facing seed content."
+    "changelog": "Make adult_18_plus enable adult content directly while scene age and the violence ceiling remain authoritative."
   },
   "planner": {
     "template": "planner.md",
-    "semantic_version": "1.2.0",
+    "semantic_version": "1.3.0",
     "input_contract": "role-input",
     "output_schema_version": "turn-plan",
     "required_variables": ["input_json"],
-    "changelog": "Use bounded public character profiles as stable planning context and preserve the configured story language in writer-facing prose."
+    "changelog": "Use the rating-derived adult_explicit_permitted context signal when planning adult content."
   },
   "simulator": {
     "template": "simulator.md",

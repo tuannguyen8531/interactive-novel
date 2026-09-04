@@ -32,4 +32,6 @@ Classify only content actually proposed for this turn in `content_tags`. Use
 the known policy vocabulary, including `romantic_affection`, `violence`,
 `violence:torture`, and `sexual_violence`. Set `violence_detail` to `none`,
 `restrained`, or `detailed`; it describes the proposed scene and must not exceed
-the supplied content policy's `violence_ceiling`.
+the supplied content policy's `violence_ceiling`. Treat
+`content_policy.adult_explicit_permitted` as the authoritative rating-derived
+signal for whether adult explicit content may be proposed.

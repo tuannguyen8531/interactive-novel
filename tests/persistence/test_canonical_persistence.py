@@ -37,7 +37,7 @@ from src.application.services.playthroughs import PlaythroughApplicationService
 from src.application.services.replay import ReplayApplicationService
 from src.application.services.worlds import WorldApplicationService
 from src.domain.codec import patch_to_payload, state_from_payload, state_to_payload
-from src.domain.content import ConsentRecord, ConsentState, ContentPolicy, TopicBoundary
+from src.domain.content import ConsentRecord, ConsentState, ContentPolicy
 from src.domain.patch import AdvanceClock, StatePatch
 from src.domain.state import GameState
 from src.services.persistence.canonical import InjectedCommitFailure
@@ -769,14 +769,12 @@ async def test_replay_snapshot_fallback_and_derived_failure_leave_canon_intact(d
         assert await uow.canonical.reconcile_derived_jobs() == 1
 
 
-def test_snapshot_codec_round_trips_consent_and_player_policy() -> None:
+def test_snapshot_codec_round_trips_consent_and_content_policy() -> None:
     policy = ContentPolicy.from_mapping(
         {
             "schema_version": "content",
             "rating": "teen_14_plus",
-            "topic_boundaries": {"dating": TopicBoundary.OPT_IN},
-        },
-        player_overrides={"adult_explicit_opt_in": True, "topic_boundaries": {"dating": TopicBoundary.EXCLUDED}},
+        }
     )
     state = GameState.empty(policy=policy)
     state.consents[("scene-1", "char-yuki", "dating")] = ConsentRecord(

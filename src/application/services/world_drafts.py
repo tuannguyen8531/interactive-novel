@@ -100,7 +100,6 @@ class WorldDraftApplicationService:
             update={
                 "rating": effective_rating,
                 "violence_ceiling": effective_ceiling,
-                "adult_explicit_opt_in": effective_rating == RatingValue.ADULT_18_PLUS,
             }
         )
         generated = generated.model_copy(

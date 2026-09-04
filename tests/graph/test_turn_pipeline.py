@@ -449,6 +449,18 @@ async def test_initial_context_exposes_exact_authoritative_ids() -> None:
 
 
 @pytest.mark.asyncio
+async def test_initial_context_exposes_adult_explicit_permission_from_rating() -> None:
+    state = make_game_state()
+    state.policy = ContentPolicy.from_mapping({"rating": "adult_18_plus", "violence_ceiling": "detailed"})
+
+    result = await make_pipeline(FakeProvider(), FakeCommitter()).run(make_request(state, "adult-policy-run"))
+
+    context_manifest = result.get("context_manifest")
+    assert isinstance(context_manifest, dict)
+    assert context_manifest["content_policy"]["adult_explicit_permitted"] is True
+
+
+@pytest.mark.asyncio
 async def test_initial_context_carries_the_canonical_story_language_to_every_role() -> None:
     provider = FakeProvider()
     state = make_game_state()

@@ -14,9 +14,10 @@ effective tone, opening guidance, and constraints. Keep romance and meaningful
 relationship development as the primary narrative focus, expressed through the
 selected genre. Do not assume a school-romance setting when another template is
 selected. Treat the effective presets as authoritative rather than inventing or
-replacing them. Copy rating, violence ceiling, and adult explicit opt-in into
-`content_boundaries` exactly. When adult explicit opt-in is true, make every
-generated character at least 18 years old.
+replacing them. Copy rating and violence ceiling into `content_boundaries`
+exactly. `adult_18_plus` permits adult explicit content by default. Characters younger than 18 may exist
+in an adult-rated World, but they must never participate in adult explicit or
+sexual-violence scenes.
 
 Treat `story_language` and `language_instruction` in the input envelope as
 authoritative. Write every player-facing value in that language: the title,
@@ -75,7 +76,7 @@ appropriate to the input, and keep participant ages equal to character ages:
   "schema_version": "world-seed",
   "role": "world_builder",
   "run_id": "copy the input run_id",
-  "prompt_version": "1.6.0",
+  "prompt_version": "1.7.0",
   "story_language": "en",
   "template_id": "selected template id",
   "title": "World title",
@@ -84,9 +85,7 @@ appropriate to the input, and keep participant ages equal to character ages:
   "tone": "warm, reflective",
   "content_boundaries": {
     "rating": "teen_14_plus",
-    "topic_boundaries": {},
-    "violence_ceiling": "none",
-    "adult_explicit_opt_in": false
+    "violence_ceiling": "none"
   },
   "locations": [
     {
@@ -149,7 +148,7 @@ appropriate to the input, and keep participant ages equal to character ages:
         "source_type": "world_seed",
         "source_id": "copy the input run_id",
         "run_id": "copy the input run_id",
-        "prompt_version": "1.6.0",
+        "prompt_version": "1.7.0",
         "model_metadata": {}
       }
     },
@@ -170,7 +169,7 @@ appropriate to the input, and keep participant ages equal to character ages:
         "source_type": "world_seed",
         "source_id": "copy the input run_id",
         "run_id": "copy the input run_id",
-        "prompt_version": "1.6.0",
+        "prompt_version": "1.7.0",
         "model_metadata": {}
       }
     },
@@ -191,7 +190,7 @@ appropriate to the input, and keep participant ages equal to character ages:
         "source_type": "world_seed",
         "source_id": "copy the input run_id",
         "run_id": "copy the input run_id",
-        "prompt_version": "1.6.0",
+        "prompt_version": "1.7.0",
         "model_metadata": {}
       }
     },
@@ -212,7 +211,7 @@ appropriate to the input, and keep participant ages equal to character ages:
         "source_type": "world_seed",
         "source_id": "copy the input run_id",
         "run_id": "copy the input run_id",
-        "prompt_version": "1.6.0",
+        "prompt_version": "1.7.0",
         "model_metadata": {}
       }
     }

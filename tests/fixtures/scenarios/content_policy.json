@@ -1,116 +1,101 @@
 {
-  "schema_version": "1.0",
-  "fixture_version": "2026-08-13",
+  "schema_version": "2.0",
+  "fixture_version": "2026-08-31",
   "policy_presets": {
     "teen_world": {
-      "schema_version": "content",
+      "schema_version": "content-2",
       "rating": "teen_14_plus",
-      "violence_ceiling": "restrained",
-      "adult_explicit_opt_in": false,
-      "topic_boundaries": {
-        "grooming": "excluded",
-        "exploitation": "excluded",
-        "non_consensual_sexual": "excluded",
-        "adult_explicit": "excluded",
-        "sexualized_nudity": "excluded",
-        "fetishization": "excluded"
-      },
+      "violence_ceiling": "detailed",
       "consent": {
-        "required": true,
+        "required": false,
         "explicit_affirmative": true,
         "withdrawal_supported": true
       }
     },
     "mature_world": {
-      "schema_version": "content",
+      "schema_version": "content-2",
       "rating": "mature_16_plus",
-      "violence_ceiling": "restrained",
-      "adult_explicit_opt_in": false,
-      "topic_boundaries": {
-        "grooming": "excluded",
-        "exploitation": "excluded",
-        "non_consensual_sexual": "excluded",
-        "adult_explicit": "opt_in",
-        "sexualized_nudity": "excluded",
-        "fetishization": "excluded"
-      },
+      "violence_ceiling": "detailed",
       "consent": {
-        "required": true,
+        "required": false,
         "explicit_affirmative": true,
         "withdrawal_supported": true
       }
     },
-    "adult_world_opted_in": {
-      "schema_version": "content",
+    "adult_world_open": {
+      "schema_version": "content-2",
       "rating": "adult_18_plus",
-      "violence_ceiling": "restrained",
-      "adult_explicit_opt_in": true,
-      "topic_boundaries": {
-        "grooming": "excluded",
-        "exploitation": "excluded",
-        "non_consensual_sexual": "excluded",
-        "adult_explicit": "opt_in",
-        "sexualized_nudity": "opt_in",
-        "fetishization": "excluded"
-      },
+      "violence_ceiling": "detailed",
+      "consent": {
+        "required": false,
+        "explicit_affirmative": true,
+        "withdrawal_supported": true
+      }
+    },
+    "adult_world_consent_required": {
+      "schema_version": "content-2",
+      "rating": "adult_18_plus",
+      "violence_ceiling": "detailed",
       "consent": {
         "required": true,
         "explicit_affirmative": true,
         "withdrawal_supported": true
-      }
-    }
-  },
-  "player_presets": {
-    "default": {
-      "adult_explicit_opt_in": false,
-      "topic_boundaries": {}
-    },
-    "adult_opted_in": {
-      "adult_explicit_opt_in": true,
-      "topic_boundaries": {"adult_explicit": "opt_in"}
-    },
-    "no_mature_themes": {
-      "adult_explicit_opt_in": false,
-      "topic_boundaries": {
-        "mature_emotional_theme": "excluded",
-        "sexual_reference_fade_to_black": "excluded"
       }
     }
   },
   "cases": [
     {
+      "id": "under-14-participant-denied",
+      "world_policy": "teen_world",
+      "participants": {"a": 13},
+      "scene": {
+        "world_time": 10,
+        "tags": ["romantic_affection"],
+        "consent": {}
+      },
+      "expected": {"decision": "deny", "reason_codes": ["participant_age_below_policy_minimum"]}
+    },
+    {
       "id": "teen-14-kiss-allowed",
       "world_policy": "teen_world",
-      "player_policy": "default",
-      "participants": {"a": 14, "b": 14},
+      "participants": {"a": 14, "b": 15},
       "scene": {
         "world_time": 10,
         "tags": ["romantic_affection", "kiss"],
-        "consent": {"a:kissing": "granted", "b:kissing": "granted"}
+        "consent": {}
       },
       "expected": {"decision": "allow", "reason_codes": []}
     },
     {
+      "id": "teen-15-intimacy-denied",
+      "world_policy": "teen_world",
+      "participants": {"a": 15, "b": 15},
+      "scene": {
+        "world_time": 10,
+        "tags": ["non_graphic_intimacy"],
+        "consent": {}
+      },
+      "expected": {"decision": "deny", "reason_codes": ["age_14_15_non_sexual"]}
+    },
+    {
       "id": "teen-14-explicit-denied",
       "world_policy": "teen_world",
-      "player_policy": "default",
       "participants": {"a": 14, "b": 15},
       "scene": {
         "world_time": 10,
         "tags": ["adult_explicit"],
-        "consent": {"a:explicit": "granted", "b:explicit": "granted"}
+        "consent": {}
       },
-      "expected": {"decision": "deny", "reason_codes": ["explicit_participant_under_18"]}
+      "expected": {"decision": "deny", "reason_codes": ["age_14_15_explicit_not_allowed"]}
     },
     {
       "id": "mature-16-explicit-downgraded",
       "world_policy": "mature_world",
-      "player_policy": "default",
       "participants": {"a": 16, "b": 17},
       "scene": {
         "world_time": 10,
         "tags": ["adult_explicit"],
-        "consent": {"a:explicit": "granted", "b:explicit": "granted"}
+        "consent": {}
       },
       "expected": {
         "decision": "downgrade",
@@ -119,45 +104,52 @@
       }
     },
     {
+      "id": "mature-emotional-theme-allowed-by-rating",
+      "world_policy": "mature_world",
+      "participants": {"a": 16, "b": 17},
+      "scene": {
+        "world_time": 10,
+        "tags": ["mature_emotional_theme"],
+        "consent": {}
+      },
+      "expected": {"decision": "allow", "reason_codes": []}
+    },
+    {
       "id": "mature-17-fade-to-black",
       "world_policy": "mature_world",
-      "player_policy": "default",
       "participants": {"a": 17, "b": 17},
       "scene": {
         "world_time": 10,
         "tags": ["mature_emotional_theme", "sexual_reference_fade_to_black"],
-        "consent": {"a:intimacy": "granted", "b:intimacy": "granted"}
+        "consent": {}
       },
       "expected": {"decision": "allow", "reason_codes": []}
     },
     {
-      "id": "adult-world-not-player-opted-in",
-      "world_policy": "adult_world_opted_in",
-      "player_policy": "default",
-      "participants": {"a": 18, "b": 19},
+      "id": "mature-grooming-as-harm-allowed",
+      "world_policy": "mature_world",
+      "participants": {"a": 16, "b": 18},
       "scene": {
         "world_time": 10,
-        "tags": ["adult_explicit"],
-        "consent": {"a:explicit": "granted", "b:explicit": "granted"}
-      },
-      "expected": {"decision": "deny", "reason_codes": ["player_explicit_not_opted_in"]}
-    },
-    {
-      "id": "adult-explicit-all-gates-pass",
-      "world_policy": "adult_world_opted_in",
-      "player_policy": "adult_opted_in",
-      "participants": {"a": 18, "b": 19},
-      "scene": {
-        "world_time": 10,
-        "tags": ["adult_explicit"],
-        "consent": {"a:explicit": "granted", "b:explicit": "granted"}
+        "tags": ["grooming", "psychological_harm"],
+        "consent": {}
       },
       "expected": {"decision": "allow", "reason_codes": []}
     },
     {
-      "id": "adult-missing-consent",
-      "world_policy": "adult_world_opted_in",
-      "player_policy": "adult_opted_in",
+      "id": "adult-explicit-default-policy-allows-missing-consent",
+      "world_policy": "adult_world_open",
+      "participants": {"a": 18, "b": 19},
+      "scene": {
+        "world_time": 10,
+        "tags": ["adult_explicit"],
+        "consent": {}
+      },
+      "expected": {"decision": "allow", "reason_codes": []}
+    },
+    {
+      "id": "adult-required-consent-missing",
+      "world_policy": "adult_world_consent_required",
       "participants": {"a": 18, "b": 18},
       "scene": {
         "world_time": 10,
@@ -167,9 +159,8 @@
       "expected": {"decision": "deny", "reason_codes": ["consent_missing_or_invalid"]}
     },
     {
-      "id": "adult-withdrawn-consent",
-      "world_policy": "adult_world_opted_in",
-      "player_policy": "adult_opted_in",
+      "id": "adult-required-consent-withdrawn",
+      "world_policy": "adult_world_consent_required",
       "participants": {"a": 18, "b": 18},
       "scene": {
         "world_time": 12,
@@ -179,50 +170,69 @@
       "expected": {"decision": "deny", "reason_codes": ["consent_withdrawn"]}
     },
     {
-      "id": "adult-excluded-topic",
-      "world_policy": "adult_world_opted_in",
-      "player_policy": "adult_opted_in",
+      "id": "adult-fetishization-allowed",
+      "world_policy": "adult_world_open",
       "participants": {"a": 18, "b": 20},
       "scene": {
         "world_time": 10,
         "tags": ["adult_explicit", "fetishization"],
-        "consent": {"a:explicit": "granted", "b:explicit": "granted"}
+        "consent": {}
       },
-      "expected": {"decision": "deny", "reason_codes": ["topic_excluded"]}
+      "expected": {"decision": "allow", "reason_codes": []}
     },
     {
-      "id": "adult-gore-over-ceiling",
-      "world_policy": "adult_world_opted_in",
-      "player_policy": "adult_opted_in",
+      "id": "adult-sexual-violence-detailed-allowed",
+      "world_policy": "adult_world_open",
+      "participants": {"a": 20, "b": 22},
+      "scene": {
+        "world_time": 10,
+        "tags": ["sexual_violence", "psychological_harm"],
+        "violence_detail": "detailed",
+        "consent": {}
+      },
+      "expected": {"decision": "allow", "reason_codes": []}
+    },
+    {
+      "id": "adult-exploitation-and-complex-relationship-allowed",
+      "world_policy": "adult_world_open",
+      "participants": {"a": 20, "b": 22},
+      "scene": {
+        "world_time": 10,
+        "tags": ["exploitation", "complex_relationship"],
+        "consent": {}
+      },
+      "expected": {"decision": "allow", "reason_codes": []}
+    },
+    {
+      "id": "adult-gore-with-detailed-ceiling-allowed",
+      "world_policy": "adult_world_open",
       "participants": {"a": 18, "b": 20},
       "scene": {
         "world_time": 10,
         "tags": ["violence_gore"],
         "consent": {}
       },
-      "expected": {"decision": "deny", "reason_codes": ["violence_over_ceiling"]}
+      "expected": {"decision": "allow", "reason_codes": []}
     },
     {
       "id": "adult-minor-positive-romance-denied",
-      "world_policy": "adult_world_opted_in",
-      "player_policy": "adult_opted_in",
+      "world_policy": "adult_world_open",
       "participants": {"adult": 20, "minor": 17},
       "scene": {
         "world_time": 10,
         "tags": ["dating", "romantic_affection"],
-        "consent": {"adult:dating": "granted", "minor:dating": "granted"}
+        "consent": {}
       },
       "expected": {"decision": "deny", "reason_codes": ["adult_minor_romance_not_allowed"]}
     },
     {
       "id": "timeskip-does-not-rewrite-history",
-      "world_policy": "adult_world_opted_in",
-      "player_policy": "adult_opted_in",
+      "world_policy": "adult_world_open",
       "participants": {"a": 17, "b": 17},
       "scene": {
         "world_time": 100,
         "tags": ["adult_explicit"],
-        "consent": {"a:explicit": "granted", "b:explicit": "granted"}
+        "consent": {}
       },
       "history": {
         "timeskip_to_world_time": 20000,
@@ -232,21 +242,9 @@
       },
       "expected": {
         "decision": "deny",
-        "reason_codes": ["explicit_participant_under_18"],
+        "reason_codes": ["age_16_17_explicit_not_allowed"],
         "history_unchanged": true
       }
-    },
-    {
-      "id": "player-tightens-boundary",
-      "world_policy": "mature_world",
-      "player_policy": "no_mature_themes",
-      "participants": {"a": 17, "b": 17},
-      "scene": {
-        "world_time": 10,
-        "tags": ["mature_emotional_theme"],
-        "consent": {}
-      },
-      "expected": {"decision": "deny", "reason_codes": ["player_topic_excluded"]}
     }
   ]
 }

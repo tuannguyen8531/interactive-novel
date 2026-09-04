@@ -136,12 +136,6 @@ def _validate_world_seed(seed: WorldSeed) -> None:
                 "character_age_mismatch",
                 "opening scene participant age must match the character seed",
             )
-    if seed.content_boundaries.adult_explicit_opt_in and any(item.age < 18 for item in character_seeds):
-        _raise(
-            "content_boundaries.adult_explicit_opt_in",
-            "adult_content_with_minor",
-            "adult explicit content cannot be enabled while a character is under 18",
-        )
     for index, character in enumerate(character_seeds):
         if requires_structured_background and not character.goal_ids:
             _raise(
