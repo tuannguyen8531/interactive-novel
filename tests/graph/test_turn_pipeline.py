@@ -394,6 +394,74 @@ async def test_guard_rejection_repairs_once_before_commit() -> None:
 
 
 @pytest.mark.asyncio
+async def test_turn_can_register_story_location_before_moving_characters() -> None:
+    plan = copy.deepcopy(ROLE_OUTPUTS["planner"])
+    plan["candidate_beats"] = [
+        {
+            "beat_id": "reach-rooftop",
+            "description": "The player and Alice reach the quiet school rooftop.",
+            "actor_ids": ["player", "alice"],
+            "location_id": "school_rooftop",
+            "required": True,
+        }
+    ]
+    simulation = copy.deepcopy(ROLE_OUTPUTS["simulator"])
+    simulation["claim_proposals"] = []
+    simulation["knowledge_requirements"] = []
+    simulation["state_patch"]["operations"] = [
+        {
+            "operation_type": "register_location",
+            "location_id": "school_rooftop",
+            "name": "School Rooftop",
+            "description": "A quiet rooftop overlooking the school grounds.",
+        },
+        {"operation_type": "set_character_location", "character_id": "player", "location_id": "school_rooftop"},
+        {"operation_type": "set_character_location", "character_id": "alice", "location_id": "school_rooftop"},
+        {"operation_type": "advance_clock", "duration_minutes": 5},
+    ]
+    committer = FakeCommitter()
+
+    result = await make_pipeline(
+        FakeProvider(sequences={"planner": (plan,), "simulator": (simulation,)}),
+        committer,
+    ).run(make_request(make_game_state(), "dynamic-location-run"))
+
+    assert result["status"] == "completed"
+    assert result["retry_counters"].get("repair", 0) == 0
+    approved_patch = result.get("approved_patch")
+    assert isinstance(approved_patch, dict)
+    assert approved_patch["operations"][0] == {
+        "operation_type": "register_location",
+        "payload": {
+            "location": {
+                "location_id": "school_rooftop",
+                "name": "School Rooftop",
+                "description": "A quiet rooftop overlooking the school grounds.",
+            }
+        },
+    }
+    assert len(committer.bundles) == 1
+
+
+@pytest.mark.asyncio
+async def test_plan_location_must_be_existing_or_registered_by_simulation() -> None:
+    plan = copy.deepcopy(ROLE_OUTPUTS["planner"])
+    plan["candidate_beats"][0]["location_id"] = "school_rooftop"
+    simulation = copy.deepcopy(ROLE_OUTPUTS["simulator"])
+    provider = FakeProvider(sequences={"planner": (plan,), "simulator": (simulation, simulation)})
+    committer = FakeCommitter()
+
+    result = await make_pipeline(provider, committer).run(make_request(make_game_state(), "unregistered-plan-location-run"))
+
+    assert result["status"] == "failed"
+    assert result["retry_counters"]["repair"] == 1
+    guard_error = result.get("guard_error")
+    assert isinstance(guard_error, dict)
+    assert guard_error["code"] == "unknown_plan_location"
+    assert committer.bundles == []
+
+
+@pytest.mark.asyncio
 async def test_invalid_model_mutations_after_repair_are_dropped_without_blocking_turn() -> None:
     invalid = copy.deepcopy(ROLE_OUTPUTS["simulator"])
     invalid["claim_proposals"][0]["subject_id"] = "colorful-posters"
@@ -446,6 +514,10 @@ async def test_initial_context_exposes_exact_authoritative_ids() -> None:
     assert identifiers["character_ids"] == ["alice", "player"]
     assert identifiers["location_ids"] == ["courtyard", "library"]
     assert identifiers["event_ids"] == []
+    assert context_manifest["location_catalog"] == [
+        {"location_id": "courtyard", "name": "courtyard", "description": ""},
+        {"location_id": "library", "name": "library", "description": ""},
+    ]
 
 
 @pytest.mark.asyncio

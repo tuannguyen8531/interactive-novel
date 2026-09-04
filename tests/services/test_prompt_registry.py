@@ -59,12 +59,14 @@ def test_repair_prompt_contains_role_schema_and_diagnostics() -> None:
 def test_simulator_prompt_requires_authoritative_ids_and_clock_progress() -> None:
     prompt = PromptRegistry().get(AIPromptRole.SIMULATOR)
 
-    assert prompt.semantic_version == "1.5.0"
+    assert prompt.semantic_version == "1.6.0"
     assert "context.authoritative_ids" in prompt.content
     assert "character_profiles" in prompt.content
     assert "exactly one" in prompt.content
     assert "clock-only" in prompt.content
     assert "do not return `state_patch: null`" in prompt.content
+    assert "register_location" in prompt.content
+    assert "context.location_catalog" in prompt.content
 
 
 def test_runtime_prompts_use_public_character_profiles_for_consistency() -> None:

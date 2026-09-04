@@ -28,6 +28,7 @@ from .knowledge import (
     PredicateRegistry,
 )
 from .language import StoryLanguage
+from .locations import Location
 from .narrative import HookStatus, NarrativeHook, NarrativeThread, ThreadStatus
 from .patch import (
     AddClaimLink,
@@ -42,6 +43,7 @@ from .patch import (
     AssertCanonFact,
     ConsentTransition,
     MaterializeScheduledEvent,
+    RegisterLocation,
     RelationshipDelta,
     ScheduleEvent,
     SetCharacterCondition,
@@ -108,6 +110,7 @@ __all__ = [
     "HookStatus",
     "InWorldClock",
     "KnowledgeClaim",
+    "Location",
     "MaterializeScheduledEvent",
     "ScheduleEvent",
     "StoryLanguage",
@@ -123,6 +126,7 @@ __all__ = [
     "PsychologicalState",
     "Provenance",
     "Rating",
+    "RegisterLocation",
     "RelationshipChange",
     "RelationshipDelta",
     "RelationshipDimension",

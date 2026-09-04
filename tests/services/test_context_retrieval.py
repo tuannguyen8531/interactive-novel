@@ -9,6 +9,7 @@ from src.application.contracts.ai import (
     AIProvenance,
     KnowledgeClaimProposal,
     NPCReaction,
+    RegisterLocationOperation,
     SetCharacterLocationOperation,
     SimulationResult,
     StatePatchProposal,
@@ -446,6 +447,54 @@ def test_claim_extractor_skips_new_claim_checks_and_idempotent_locations_for_liv
     assert result.proposed_claims == (claim,)
     assert simulation.state_patch is not None
     assert result.proposed_mutations == simulation.state_patch.operations
+    assert result.knowledge_requirements == ()
+    assert result.validation_queries == ()
+
+
+def test_claim_extractor_skips_prior_evidence_for_a_just_registered_location() -> None:
+    provenance = AIProvenance(
+        source_type="simulation",
+        source_id="sim-run",
+        run_id="sim-run",
+        prompt_version="simulator@1.0.0",
+    )
+    simulation = SimulationResult(
+        schema_version="simulation-result",
+        role=AIPromptRole.SIMULATOR,
+        run_id="sim-run",
+        prompt_version="simulator@1.0.0",
+        npc_reactions=(
+            NPCReaction(
+                character_id="yuki",
+                immediate_reaction="walks upstairs",
+                agency_goal="get some air",
+                resistance_or_agreement="agrees",
+                confidence=0.8,
+            ),
+        ),
+        proposed_outcome="Yuki reaches the newly introduced rooftop.",
+        state_patch=StatePatchProposal(
+            patch_id="patch-new-location",
+            branch_id="root",
+            base_world_time=0,
+            operations=(
+                RegisterLocationOperation(
+                    location_id="school_rooftop",
+                    name="School Rooftop",
+                    description="A quiet rooftop overlooking the school grounds.",
+                ),
+                SetCharacterLocationOperation(character_id="yuki", location_id="school_rooftop"),
+            ),
+            provenance=provenance,
+        ),
+    )
+
+    result = ClaimExtractor().extract(
+        simulation,
+        include_implicit_claim_requirements=False,
+        current_locations={"yuki": "library"},
+    )
+
     assert result.knowledge_requirements == ()
     assert result.validation_queries == ()
 

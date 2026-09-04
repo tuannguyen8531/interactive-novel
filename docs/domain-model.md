@@ -52,6 +52,14 @@ confirmed WorldSeed and governs player-facing narrative, names, dialogue, and
 suggested actions for every subsequent turn. A World does not contain the
 current state of a playthrough.
 
+The confirmed WorldSeed supplies the initial location catalog, but it is not a
+closed map. A turn may canonically introduce an immediately needed place with
+`RegisterLocation(location)` and then move characters there in the same
+ordered patch. Dynamically registered locations carry a stable lowercase
+snake-case ID, story-language name, and description. They are branch-scoped by
+the patch history and become available to later turns through the canonical
+location catalog; merely mentioning a place in prose does not register it.
+
 ### Playthrough
 
 A Playthrough references a World and has a player character, root branch,
@@ -179,6 +187,7 @@ itself.
 `StatePatch` is a list of typed operations, for example:
 
 - `AdvanceClock(duration_minutes)`;
+- `RegisterLocation(location)`;
 - `SetCharacterLocation(character_id, location_id)`;
 - `SetCharacterCondition(character_id, condition)`;
 - `UpdatePsychology(character_id, typed_delta)`;
@@ -191,7 +200,8 @@ itself.
 Simulator only proposes operations. Guard checks IDs, ranges, branch/time,
 authorization, content policy, idempotency, and state transitions. The
 Canonical Record Builder accepts only Guard-approved patches; prose is not an
-authoritative input.
+authoritative input. `RegisterLocation` must precede any operation that uses
+the new ID, and duplicate or malformed location registrations are rejected.
 
 ## 7. Relationships and tension
 

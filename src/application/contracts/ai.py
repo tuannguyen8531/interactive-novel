@@ -429,6 +429,13 @@ class AdvanceClockOperation(AIModel):
     duration_minutes: int = Field(gt=0)
 
 
+class RegisterLocationOperation(AIModel):
+    operation_type: Literal["register_location"] = "register_location"
+    location_id: str = Field(min_length=1, max_length=80, pattern=r"^[a-z0-9]+(?:_[a-z0-9]+)*$")
+    name: str = Field(min_length=1, max_length=160)
+    description: str = Field(min_length=1, max_length=2000)
+
+
 class SetCharacterLocationOperation(AIModel):
     operation_type: Literal["set_character_location"] = "set_character_location"
     character_id: str = Field(min_length=1)
@@ -525,6 +532,7 @@ class ConsentTransitionOperation(AIModel):
 
 StateOperation = Annotated[
     AdvanceClockOperation
+    | RegisterLocationOperation
     | SetCharacterLocationOperation
     | SetCharacterConditionOperation
     | UpdatePsychologyOperation
@@ -795,6 +803,7 @@ __all__ = [
     "PlayerMoveSuggestion",
     "ParseStatus",
     "RatingValue",
+    "RegisterLocationOperation",
     "RelationshipDimensionValue",
     "RelationshipSeed",
     "RequiredCheck",

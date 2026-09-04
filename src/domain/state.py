@@ -11,6 +11,7 @@ from .clock import InWorldClock
 from .content import ConsentRecord, ContentPolicy
 from .events import Belief, Event, Evidence, Observation, ScheduledEvent
 from .knowledge import CanonFact, ClaimLink, KnowledgeClaim
+from .locations import Location
 from .narrative import NarrativeHook, NarrativeThread
 from .relationships import RelationshipChange, RelationshipVector
 
@@ -26,6 +27,7 @@ class GameState:
     branch_ancestry: tuple[str, ...] = ()
     characters: dict[str, Character] = field(default_factory=dict)
     locations: set[str] = field(default_factory=set)
+    location_details: dict[str, Location] = field(default_factory=dict)
     relationships: dict[tuple[str, str], RelationshipVector] = field(default_factory=dict)
     relationship_changes: list[RelationshipChange] = field(default_factory=list)
     claims: dict[str, KnowledgeClaim] = field(default_factory=dict)

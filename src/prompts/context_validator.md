@@ -28,3 +28,11 @@ dependency for this proposal. In that case, evaluate the plan and simulation
 against the authorized initial context; do not treat the empty list itself as
 insufficient evidence. A targeted manifest explicitly marked
 `insufficient_evidence` is blocking.
+
+Check location continuity explicitly. Every location used by a realized beat,
+outcome, or character movement must either be present in
+`context.location_catalog` or be registered by an earlier `register_location`
+operation in the proposed patch. Any character described as arriving at or
+occupying a different place must have a matching `set_character_location`
+operation. Reject prose/state mismatches; registering a place alone does not
+move a character there.

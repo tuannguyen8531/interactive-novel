@@ -9,27 +9,27 @@
   },
   "planner": {
     "template": "planner.md",
-    "semantic_version": "1.3.0",
+    "semantic_version": "1.4.0",
     "input_contract": "role-input",
     "output_schema_version": "turn-plan",
     "required_variables": ["input_json"],
-    "changelog": "Use the rating-derived adult_explicit_permitted context signal when planning adult content."
+    "changelog": "Plan against the canonical location catalog and use stable IDs for places introduced by the current story."
   },
   "simulator": {
     "template": "simulator.md",
-    "semantic_version": "1.5.0",
+    "semantic_version": "1.6.0",
     "input_contract": "role-input",
     "output_schema_version": "simulation-result",
     "required_variables": ["input_json"],
-    "changelog": "Use owner-scoped private NPC canon internally without disclosing it to the player or prose roles, while preserving the configured story language in descriptive output."
+    "changelog": "Register an immediately needed story location before moving characters there, while reusing the canonical location catalog."
   },
   "context_validator": {
     "template": "context_validator.md",
-    "semantic_version": "1.4.0",
+    "semantic_version": "1.5.0",
     "input_contract": "role-input",
     "output_schema_version": "consistency-report",
     "required_variables": ["input_json"],
-    "changelog": "Validate public characterization and prevent owner-scoped private NPC canon from leaking through simulation, while preserving the configured story language in diagnostics."
+    "changelog": "Validate location registration, movement ordering, and continuity between plans, simulation, and canonical state patches."
   },
   "writer": {
     "template": "writer.md",

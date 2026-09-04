@@ -24,6 +24,7 @@ from src.application.contracts.ai import (
     DiagnosticSeverity,
     KnowledgeClaimProposal,
     NarrativeDraft,
+    RegisterLocationOperation,
     SetCharacterConditionOperation,
     SetCharacterLocationOperation,
     SimulationResult,
@@ -46,6 +47,7 @@ from src.domain.errors import GuardRejected
 from src.domain.events import Belief, Observation
 from src.domain.knowledge import ClaimLink, ClaimLinkKind, KnowledgeClaim
 from src.domain.language import StoryLanguage
+from src.domain.locations import Location
 from src.domain.narrative import ThreadStatus
 from src.domain.patch import (
     AddClaimLink,
@@ -55,6 +57,7 @@ from src.domain.patch import (
     ApplyRelationshipDelta,
     AssertCanonFact,
     ConsentTransition,
+    RegisterLocation,
     SetCharacterCondition,
     SetCharacterLocation,
     StatePatch,
@@ -228,6 +231,18 @@ class TurnGraphNodes:
             )
         context_manifest = manifest.as_context()
         context_manifest["authoritative_ids"] = _authoritative_ids(game_state, owner_id=state.get("actor_id"))
+        context_manifest["location_catalog"] = [
+            {
+                "location_id": location_id,
+                "name": game_state.location_details[location_id].name
+                if location_id in game_state.location_details
+                else location_id,
+                "description": game_state.location_details[location_id].description
+                if location_id in game_state.location_details
+                else "",
+            }
+            for location_id in sorted(game_state.locations)
+        ]
         context_manifest["world_profile"] = dict(game_state.metadata.get("world_profile", {}))
         context_manifest["story_language"] = _story_language(game_state).value
         context_manifest["world_profile"]["story_language"] = _story_language(game_state).value
@@ -467,6 +482,9 @@ class TurnGraphNodes:
                 current_world_time=self.runtime.request.game_state.world_time,
                 default_duration_minutes=self.runtime.guard.clock_policy.default_action_duration_minutes,
             )
+            plan = state.get("plan")
+            if isinstance(plan, TurnPlan):
+                _validate_plan_location_references(self.runtime.request.game_state, plan, patch)
             self.runtime.guard.validate_patch(self.runtime.request.game_state, patch)
         except GuardRejected as error:
             diagnostic = {"code": error.code, "message": error.message, "details": dict(error.details)}
@@ -490,7 +508,20 @@ class TurnGraphNodes:
     ) -> dict[str, Any]:
         repair_count = state.get("retry_counters", {}).get("repair", 0)
         final_attempt = repair_count >= self.runtime.max_repair_attempts
-        recovery = "drop_invalid_mutations" if final_attempt else "repair"
+        location_errors = {
+            "duplicate_location",
+            "invalid_location",
+            "invalid_location_description",
+            "invalid_location_name",
+            "unknown_location",
+            "unknown_plan_location",
+        }
+        if not final_attempt:
+            recovery = "repair"
+        elif diagnostic["code"] in location_errors:
+            recovery = "fail"
+        else:
+            recovery = "drop_invalid_mutations"
         log_error(
             "Turn state Guard rejected a model proposal",
             str(diagnostic["message"]),
@@ -508,6 +539,20 @@ class TurnGraphNodes:
                 "guard_error": diagnostic,
                 "approved_patch": None,
                 "status": "running",
+            }
+
+        if diagnostic["code"] in location_errors:
+            return {
+                "guard_approved": False,
+                "guard_error": diagnostic,
+                "approved_patch": None,
+                "status": "failed",
+                "errors": _append_error(
+                    state,
+                    "guard_state",
+                    str(diagnostic["code"]),
+                    str(diagnostic["message"]),
+                ),
             }
 
         # Model-proposed mutations are optional. After the bounded repair has
@@ -1027,6 +1072,28 @@ def _authoritative_ids(game_state: Any, *, owner_id: str | None = None) -> dict[
     }
 
 
+def _validate_plan_location_references(game_state: Any, plan: TurnPlan, patch: StatePatch) -> None:
+    """Require every place exposed to the Writer to be canonically registered."""
+
+    known_locations = set(game_state.locations)
+    known_locations.update(
+        operation.location.location_id for operation in patch.operations if isinstance(operation, RegisterLocation)
+    )
+    unknown_locations = sorted(
+        {
+            beat.location_id
+            for beat in plan.candidate_beats
+            if beat.location_id is not None and beat.location_id not in known_locations
+        }
+    )
+    if unknown_locations:
+        raise GuardRejected(
+            "unknown_plan_location",
+            f"Plan references unregistered locations: {', '.join(unknown_locations)}.",
+            details={"location_ids": unknown_locations},
+        )
+
+
 def domain_patch_from_simulation(simulation: SimulationResult, *, branch_id: str) -> StatePatch:
     """Convert only typed AI operations/claims into domain operations."""
 
@@ -1108,6 +1175,14 @@ def _domain_claim(proposal: KnowledgeClaimProposal) -> KnowledgeClaim:
 def _domain_operation(operation: Any, provenance: AIProvenance) -> Any:
     if isinstance(operation, AdvanceClockOperation):
         return AdvanceClock(operation.duration_minutes)
+    if isinstance(operation, RegisterLocationOperation):
+        return RegisterLocation(
+            Location(
+                location_id=operation.location_id,
+                name=operation.name,
+                description=operation.description,
+            )
+        )
     if isinstance(operation, SetCharacterLocationOperation):
         return SetCharacterLocation(operation.character_id, operation.location_id)
     if isinstance(operation, SetCharacterConditionOperation):

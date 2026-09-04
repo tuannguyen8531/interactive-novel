@@ -6,17 +6,20 @@ import pytest
 
 from src.domain.characters import Character, CharacterProfile
 from src.domain.clock import ClockPolicy
+from src.domain.codec import patch_from_payload, patch_to_payload, state_from_payload, state_to_payload
 from src.domain.engine import DomainEngine
 from src.domain.errors import GuardRejected
 from src.domain.events import Event
 from src.domain.guard import DomainGuard
 from src.domain.knowledge import KnowledgeClaim
+from src.domain.locations import Location
 from src.domain.patch import (
     AddEvent,
     AddKnowledgeClaim,
     AdvanceClock,
     ApplyRelationshipDelta,
     AssertCanonFact,
+    RegisterLocation,
     SetCharacterLocation,
     StatePatch,
     UpdatePsychology,
@@ -103,6 +106,68 @@ def test_invalid_transition_and_branch_are_rejected_before_mutation() -> None:
     with pytest.raises(GuardRejected) as branch_error:
         DomainGuard().validate_patch(state, wrong_branch)
     assert branch_error.value.code == "branch_scope_mismatch"
+
+
+def test_story_can_register_a_location_and_move_there_in_one_patch() -> None:
+    state = _state()
+    rooftop = Location(
+        location_id="school_rooftop",
+        name="School Rooftop",
+        description="An open rooftop overlooking the school grounds.",
+    )
+    patch = StatePatch(
+        (RegisterLocation(rooftop), SetCharacterLocation("yuki", rooftop.location_id), AdvanceClock(3)),
+        branch_id="root",
+        base_world_time=0,
+    )
+
+    applied = DomainEngine().apply(state, patch)
+
+    assert rooftop.location_id in applied.after.locations
+    assert applied.after.location_details[rooftop.location_id] == rooftop
+    assert applied.after.characters["yuki"].state.location_id == rooftop.location_id
+
+    restored_patch = patch_from_payload(patch_to_payload(patch))
+    restored_state = state_from_payload(state_to_payload(applied.after))
+    assert restored_patch.operations[0] == RegisterLocation(rooftop)
+    assert restored_state.location_details[rooftop.location_id] == rooftop
+
+
+def test_location_must_be_registered_before_a_character_moves_there() -> None:
+    state = _state()
+    rooftop = Location("school_rooftop", "School Rooftop", "An open rooftop.")
+    patch = StatePatch(
+        (SetCharacterLocation("yuki", rooftop.location_id), RegisterLocation(rooftop)),
+        branch_id="root",
+        base_world_time=0,
+    )
+
+    with pytest.raises(GuardRejected) as error:
+        DomainGuard().validate_patch(state, patch)
+
+    assert error.value.code == "unknown_location"
+
+
+def test_guard_rejects_duplicate_or_malformed_location_registration() -> None:
+    state = _state()
+    duplicate = StatePatch(
+        (RegisterLocation(Location("clubroom", "Clubroom", "The existing clubroom.")),),
+        branch_id="root",
+        base_world_time=0,
+    )
+    malformed = StatePatch(
+        (RegisterLocation(Location("Sân Thượng", "Sân thượng", "Một sân thượng thoáng gió.")),),
+        branch_id="root",
+        base_world_time=0,
+    )
+
+    with pytest.raises(GuardRejected) as duplicate_error:
+        DomainGuard().validate_patch(state, duplicate)
+    with pytest.raises(GuardRejected) as malformed_error:
+        DomainGuard().validate_patch(state, malformed)
+
+    assert duplicate_error.value.code == "duplicate_location"
+    assert malformed_error.value.code == "invalid_location"
 
 
 def test_guard_limits_total_clock_movement_across_operations() -> None:

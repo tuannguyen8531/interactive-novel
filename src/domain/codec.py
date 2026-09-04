@@ -15,6 +15,7 @@ from .characters import Character, CharacterProfile, CharacterState
 from .content import ConsentRecord, ConsentState, ContentPolicy
 from .events import Belief, Event, Evidence, Observation, ScheduledEvent
 from .knowledge import CanonFact, ClaimLink, KnowledgeClaim
+from .locations import Location
 from .narrative import NarrativeHook, NarrativeThread
 from .patch import (
     AddClaimLink,
@@ -29,6 +30,7 @@ from .patch import (
     AssertCanonFact,
     ConsentTransition,
     MaterializeScheduledEvent,
+    RegisterLocation,
     ScheduleEvent,
     SetCharacterCondition,
     SetCharacterLocation,
@@ -141,6 +143,7 @@ def patch_from_payload(payload: Mapping[str, Any]) -> StatePatch:
     operations: list[object] = []
     constructors = {
         "advance_clock": lambda data: AdvanceClock(**data),
+        "register_location": lambda data: RegisterLocation(Location(**data["location"])),
         "set_character_location": lambda data: SetCharacterLocation(**data),
         "set_character_condition": lambda data: SetCharacterCondition(**data),
         "update_psychology": lambda data: UpdatePsychology(**data),
@@ -184,6 +187,9 @@ def state_to_payload(state: GameState) -> dict[str, Any]:
         "branch_ancestry": list(state.branch_ancestry),
         "characters": {character_id: _jsonable(character) for character_id, character in state.characters.items()},
         "locations": sorted(state.locations),
+        "location_details": {
+            location_id: _jsonable(location) for location_id, location in sorted(state.location_details.items())
+        },
         "relationships": [
             {"source_id": source_id, "target_id": target_id, "values": _jsonable(vector.values)}
             for (source_id, target_id), vector in state.relationships.items()
@@ -227,6 +233,10 @@ def state_from_payload(payload: Mapping[str, Any]) -> GameState:
     state.branch_ancestry = tuple(payload.get("branch_ancestry", [state.branch_id]))
     state.characters = characters
     state.locations = set(payload.get("locations", []))
+    state.location_details = {
+        str(location_id): Location(**dict(value)) for location_id, value in payload.get("location_details", {}).items()
+    }
+    state.locations.update(state.location_details)
     state.relationships = {
         (str(item["source_id"]), str(item["target_id"])): RelationshipVector(item.get("values", {}))
         for item in payload.get("relationships", [])

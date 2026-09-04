@@ -15,6 +15,7 @@ from src.domain.content import ContentPolicy
 from src.domain.events import Belief, Event
 from src.domain.knowledge import CanonFact, KnowledgeClaim
 from src.domain.language import StoryLanguage
+from src.domain.locations import Location
 from src.domain.narrative import NarrativeThread
 from src.domain.relationships import RelationshipVector
 from src.domain.state import GameState
@@ -175,6 +176,16 @@ def _apply_world_seed(state: GameState, seed: WorldSeed) -> None:
     }
     state.metadata["emotional_tensions"] = [item.model_dump(mode="json") for item in seed.tensions]
     state.locations.update(location.location_id for location in seed.locations)
+    state.location_details.update(
+        {
+            location.location_id: Location(
+                location_id=location.location_id,
+                name=location.name,
+                description=location.description,
+            )
+            for location in seed.locations
+        }
+    )
     opening_location_id = seed.locations[0].location_id
     for character_id in seed.opening_scene.participants:
         character = state.characters.get(character_id)

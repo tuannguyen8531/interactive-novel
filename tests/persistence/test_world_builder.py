@@ -153,6 +153,8 @@ async def test_game_state_hydrates_seed_replays_turn_and_builds_snapshot(databas
         opening.characters[character_id].state.location_id == seed.locations[0].location_id
         for character_id in seed.opening_scene.participants
     )
+    assert opening.location_details[seed.locations[0].location_id].name == seed.locations[0].name
+    assert opening.location_details[seed.locations[0].location_id].description == seed.locations[0].description
 
     duration = 5
     patch = StatePatch.from_operations(

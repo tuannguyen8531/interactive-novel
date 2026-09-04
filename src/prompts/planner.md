@@ -17,6 +17,15 @@ beats, involved characters, stakes, required checks, possible outcomes and
 safety constraints. Do not return untyped state mutations or treat prose as a
 canon fact.
 
+Use `context.location_catalog` and exact existing location IDs when they fit.
+If the player's current action genuinely introduces a new place, candidate
+beats may give it one stable lowercase snake-case ASCII ID derived from its
+story-language name; the Simulator must register that place before anyone can
+move there. `candidate_beats[].location_id` means the place where that beat
+actually occurs, not merely its point of departure. Do not describe a
+character as having reached a destination unless the selected outcome can
+canonically update that character's location.
+
 Use the supplied `world_profile` as a persistent creative directive. This is a
 relationship-driven story: prefer beats that reveal attraction, trust,
 vulnerability, jealousy, intimacy, or meaningful relationship change when they

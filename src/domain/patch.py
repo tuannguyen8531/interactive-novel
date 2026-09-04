@@ -10,6 +10,7 @@ from typing import Any, ClassVar
 from .content import ConsentState
 from .events import Belief, Event, Evidence, Observation, ScheduledEvent
 from .knowledge import ClaimLink, KnowledgeClaim
+from .locations import Location
 from .narrative import HookStatus, NarrativeHook, NarrativeThread, ThreadStatus
 from .values import Provenance
 
@@ -29,6 +30,14 @@ class StateOperation:
 class AdvanceClock(StateOperation):
     duration_minutes: int
     operation_type: ClassVar[str] = "advance_clock"
+
+
+@dataclass(frozen=True, slots=True)
+class RegisterLocation(StateOperation):
+    """Register a place introduced by the current story before it is used."""
+
+    location: Location
+    operation_type: ClassVar[str] = "register_location"
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,6 +216,7 @@ __all__ = [
     "MaterializeScheduledEvent",
     "ScheduleEvent",
     "RelationshipDelta",
+    "RegisterLocation",
     "SetCharacterCondition",
     "SetCharacterLocation",
     "StateOperation",

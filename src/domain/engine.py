@@ -24,6 +24,7 @@ from .patch import (
     AssertCanonFact,
     ConsentTransition,
     MaterializeScheduledEvent,
+    RegisterLocation,
     ScheduleEvent,
     SetCharacterCondition,
     SetCharacterLocation,
@@ -190,6 +191,10 @@ class DomainEngine:
     def _apply_operation(self, state: GameState, patch: StatePatch, operation_index: int, operation: object) -> None:
         if isinstance(operation, AdvanceClock):
             state.clock = self.runtime.clock_factory(state.world_time + operation.duration_minutes)
+        elif isinstance(operation, RegisterLocation):
+            location = operation.location
+            state.locations.add(location.location_id)
+            state.location_details[location.location_id] = location
         elif isinstance(operation, SetCharacterLocation):
             character = state.characters[operation.character_id]
             state.characters[operation.character_id] = character.with_state(location_id=operation.location_id)

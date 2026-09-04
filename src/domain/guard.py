@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, NoReturn
 
@@ -24,6 +25,7 @@ from .patch import (
     AssertCanonFact,
     ConsentTransition,
     MaterializeScheduledEvent,
+    RegisterLocation,
     ScheduleEvent,
     SetCharacterCondition,
     SetCharacterLocation,
@@ -130,6 +132,25 @@ class DomainGuard:
                                 "received": elapsed_minutes,
                             },
                         )
+                elif isinstance(operation, RegisterLocation):
+                    location = operation.location
+                    location_id = location.location_id.strip()
+                    if not location_id:
+                        _fail("invalid_location", "Location ID cannot be empty.")
+                    if len(location_id) > 80:
+                        _fail("invalid_location", "Location ID cannot exceed 80 characters.")
+                    if re.fullmatch(r"[a-z0-9]+(?:_[a-z0-9]+)*", location_id) is None:
+                        _fail("invalid_location", "Location ID must be a lowercase snake-case identifier.")
+                    if location_id in known_locations:
+                        _fail("duplicate_location", f"Location already exists: {location_id}.")
+                    if not location.name.strip() or len(location.name) > 160:
+                        _fail("invalid_location_name", "Location name must contain 1 to 160 characters.")
+                    if not location.description.strip() or len(location.description) > 2_000:
+                        _fail(
+                            "invalid_location_description",
+                            "Location description must contain 1 to 2000 characters.",
+                        )
+                    known_locations.add(location_id)
                 elif isinstance(operation, (SetCharacterLocation, SetCharacterCondition, UpdatePsychology)):
                     if operation.character_id not in known_characters:
                         _fail("unknown_character", f"Unknown character: {operation.character_id}.")

@@ -11,6 +11,7 @@ from src.application.contracts.ai import (
     AssertCanonFactOperation,
     KnowledgeClaimProposal,
     KnowledgeRequirement,
+    RegisterLocationOperation,
     SetCharacterLocationOperation,
     SimulationResult,
     StatePatchProposal,
@@ -129,8 +130,14 @@ class ClaimExtractor:
         if patch is None:
             return ()
         requirements: list[KnowledgeRequirement] = []
+        registered_locations: set[str] = set()
         for index, operation in enumerate(patch.operations):
+            if isinstance(operation, RegisterLocationOperation):
+                registered_locations.add(operation.location_id)
+                continue
             if not isinstance(operation, SetCharacterLocationOperation):
+                continue
+            if operation.location_id in registered_locations:
                 continue
             if current_locations is not None and current_locations.get(operation.character_id) == operation.location_id:
                 continue

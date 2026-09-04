@@ -29,8 +29,9 @@ authoritative proposal must be a registered `KnowledgeClaimProposal` or a
 typed `StatePatchProposal` operation. Include uncertainty when evidence is
 missing. Never promote a belief or narrative sentence into canon implicitly.
 
-Use only exact IDs listed in `context.authoritative_ids` for authoritative
-references. In particular:
+Use only exact IDs listed in `context.authoritative_ids` for existing
+authoritative references. A location introduced by the `register_location`
+operation described below is the sole exception. In particular:
 
 - claim subjects for character predicates must be existing `character_ids`;
 - `located_at` objects must be existing `location_ids`;
@@ -38,6 +39,18 @@ references. In particular:
   be existing `event_ids` (scene IDs and beat IDs are not event IDs);
 - goal, item and secret objects must already exist in their corresponding ID
   lists; do not invent an ID from descriptive prose.
+
+The current canonical places, including their stable names and descriptions,
+are listed in `context.location_catalog`. When the current player action or
+accepted outcome genuinely introduces a place that is not in that catalog,
+register only that immediately needed place with a `register_location`
+operation. Give it a stable lowercase snake-case ASCII `location_id` derived
+from the story-language name, plus a concise story-language name and
+description. Put `register_location` before every `set_character_location`
+that uses the new ID in the same patch. Reuse an existing exact ID whenever it
+fits; do not register speculative, merely mentioned, duplicate, or temporary
+locations. A character reaches the new place only when the same patch also
+contains the corresponding `set_character_location` operation.
 
 Every completed player action consumes in-world time. Return exactly one
 `advance_clock` operation with an integer `duration_minutes` from 1 to 1440.
