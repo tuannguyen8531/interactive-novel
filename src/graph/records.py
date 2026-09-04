@@ -15,6 +15,7 @@ from src.application.contracts.persistence import (
     ClaimLinkRecord,
     EventRecord,
     KnowledgeClaimRecord,
+    NarrativeThreadRecord,
     ObservationRecord,
     RelationshipRecord,
 )
@@ -248,6 +249,35 @@ def build_canonical_bundle(state: TurnGraphState, game_state: GameState) -> Cano
         if (source_id, target_id) in after.relationships
     )
 
+    changed_thread_ids = {
+        thread_id
+        for thread_id in set(before.threads) | set(after.threads)
+        if before.threads.get(thread_id) != after.threads.get(thread_id)
+    }
+    threads = tuple(
+        NarrativeThreadRecord(
+            thread_id=after.threads[thread_id].thread_id,
+            playthrough_id=state["playthrough_id"],
+            branch_id=state["branch_id"],
+            turn_id=turn_id,
+            status=after.threads[thread_id].status.value,
+            progress=after.threads[thread_id].progress,
+            urgency=after.threads[thread_id].urgency,
+            payload={
+                "premise": after.threads[thread_id].premise,
+                "stakes": after.threads[thread_id].stakes,
+                "participant_ids": list(after.threads[thread_id].participant_ids),
+                "resolution_conditions": list(after.threads[thread_id].resolution_conditions),
+                "world_time": after.threads[thread_id].last_advanced_world_time
+                if after.threads[thread_id].last_advanced_world_time is not None
+                else after.world_time,
+                "source": "state_patch",
+            },
+        )
+        for thread_id in sorted(changed_thread_ids)
+        if thread_id in after.threads
+    )
+
     narrative = str(state.get("final_narrative", "")).strip()
     if not narrative:
         raise ValueError("final_narrative is required before canonical record construction")
@@ -280,6 +310,7 @@ def build_canonical_bundle(state: TurnGraphState, game_state: GameState) -> Cano
         observations=observations,
         beliefs=beliefs,
         relationships=relationships,
+        threads=threads,
     )
 
 

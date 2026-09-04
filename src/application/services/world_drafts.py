@@ -337,6 +337,7 @@ def _build_opening_bundle(
             progress=0.0,
             urgency=0.5,
             payload={
+                "thread_id": thread.thread_id,
                 "premise": thread.premise,
                 "stakes": thread.stakes,
                 "participant_ids": list(thread.participant_ids),

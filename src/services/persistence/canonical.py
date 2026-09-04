@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from copy import deepcopy
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +47,12 @@ from .models import (
     SnapshotModel,
     TurnModel,
 )
+
+
+def _thread_projection_id(playthrough_id: str, branch_id: str, thread_id: str) -> str:
+    """Keep projection row identity separate from the story's thread ID."""
+
+    return str(uuid5(NAMESPACE_URL, f"interactive-novel:thread:{playthrough_id}:{branch_id}:{thread_id}"))
 
 
 class InjectedCommitFailure(RuntimeError):
@@ -652,19 +658,41 @@ class SqlAlchemyCanonicalRepository:
                     payload=dict(record.payload),
                 )
             )
+        scoped_thread_models = (
+            (
+                await self._session.scalars(
+                    select(NarrativeThreadModel).where(
+                        NarrativeThreadModel.playthrough_id == bundle.playthrough_id,
+                        NarrativeThreadModel.branch_id == bundle.branch_id,
+                    )
+                )
+            ).all()
+            if bundle.threads
+            else []
+        )
+        threads_by_semantic_id = {str(item.payload.get("thread_id", item.id)): item for item in scoped_thread_models}
         for record in bundle.threads:
-            self._session.add(
-                NarrativeThreadModel(
-                    id=record.thread_id,
+            model = threads_by_semantic_id.get(record.thread_id)
+            payload = {**dict(record.payload), "thread_id": record.thread_id}
+            if model is None:
+                model = NarrativeThreadModel(
+                    id=_thread_projection_id(bundle.playthrough_id, bundle.branch_id, record.thread_id),
                     playthrough_id=bundle.playthrough_id,
                     branch_id=bundle.branch_id,
                     turn_id=bundle.turn_id,
                     status=record.status,
                     progress=record.progress,
                     urgency=record.urgency,
-                    payload=dict(record.payload),
+                    payload=payload,
                 )
-            )
+                self._session.add(model)
+                threads_by_semantic_id[record.thread_id] = model
+            else:
+                model.turn_id = bundle.turn_id
+                model.status = record.status
+                model.progress = record.progress
+                model.urgency = record.urgency
+                model.payload = payload
         for record in bundle.hooks:
             self._session.add(
                 NarrativeHookModel(

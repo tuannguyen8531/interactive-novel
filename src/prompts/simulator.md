@@ -52,6 +52,12 @@ fits; do not register speculative, merely mentioned, duplicate, or temporary
 locations. A character reaches the new place only when the same patch also
 contains the corresponding `set_character_location` operation.
 
+For narrative threads, use `transition_thread` with the exact existing
+`thread_id`. A thread already in `active` or `escalating` status may keep that
+same status when a non-zero `progress_delta` records meaningful progress.
+Change `status` only for a real lifecycle transition; do not emit a same-status
+operation with a zero delta, and never advance a resolved or abandoned thread.
+
 Every completed player action consumes in-world time. Return exactly one
 `advance_clock` operation with an integer `duration_minutes` from 1 to 1440.
 Estimate only the time visibly justified by this turn:

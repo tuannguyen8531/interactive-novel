@@ -45,6 +45,18 @@ def test_thread_lifecycle_rejects_terminal_revival() -> None:
         thread.transition(ThreadStatus.ACTIVE, world_time=6)
 
 
+def test_active_thread_can_advance_without_changing_lifecycle_status() -> None:
+    thread = NarrativeThread("thread-1", "Build trust", "root").transition(ThreadStatus.ACTIVE, world_time=0)
+
+    advanced = thread.transition(ThreadStatus.ACTIVE, progress_delta=0.05, world_time=5)
+
+    assert advanced.status == ThreadStatus.ACTIVE
+    assert advanced.progress == pytest.approx(0.05)
+    assert advanced.last_advanced_world_time == 5
+    with pytest.raises(DomainValidationError):
+        advanced.transition(ThreadStatus.ACTIVE, progress_delta=0.0, world_time=6)
+
+
 def test_property_referential_integrity_rejects_unknown_event_participants() -> None:
     state = GameState.empty(branch_id="root")
     state.characters["alice"] = Character(CharacterProfile("alice", "Alice", 18))

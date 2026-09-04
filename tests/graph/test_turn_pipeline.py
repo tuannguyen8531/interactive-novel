@@ -33,7 +33,7 @@ from src.domain.characters import Character, CharacterProfile, CharacterState
 from src.domain.content import ContentPolicy
 from src.domain.guard import DomainGuard
 from src.domain.knowledge import KnowledgeClaim
-from src.domain.narrative import NarrativeThread
+from src.domain.narrative import NarrativeThread, ThreadStatus
 from src.domain.relationships import RelationshipVector
 from src.domain.state import GameState
 from src.graph import TurnPipeline, TurnPipelineDependencies, TurnPipelineRequest
@@ -360,6 +360,46 @@ async def test_pipeline_uses_stored_embeddings_and_records_retrieval_trace() -> 
 
 
 @pytest.mark.asyncio
+async def test_initial_context_replaces_stale_thread_projection_with_canonical_state() -> None:
+    state = make_game_state()
+    state.threads["thread-trust"] = NarrativeThread(
+        thread_id="thread-trust",
+        premise="Trust develops slowly.",
+        branch_scope="root",
+        participant_ids=("player", "alice"),
+        status=ThreadStatus.ACTIVE,
+        progress=0.05,
+        last_advanced_world_time=3,
+    )
+    source = CandidateSource()
+    source.candidates = (
+        MemoryCandidate(
+            source_id="thread-trust",
+            kind=MemoryKind.THREAD,
+            playthrough_id="playthrough-1",
+            branch_id="root",
+            world_time=0,
+            text="thread thread-trust is seeded",
+            thread_ids=("thread-trust",),
+            entity_ids=("player", "alice"),
+            payload={"status": "seeded", "progress": 0.0},
+        ),
+    )
+
+    result = await make_pipeline(FakeProvider(), FakeCommitter(), candidate_source=source).run(
+        make_request(state, "thread-context-run")
+    )
+
+    context_manifest = result.get("context_manifest")
+    assert context_manifest is not None
+    thread_entry = next(entry for entry in context_manifest["entries"] if entry["source_id"] == "thread-trust")
+    assert thread_entry["text"] == "thread thread-trust is active at progress 0.05"
+    assert thread_entry["world_time"] == 3
+    assert thread_entry["payload"]["status"] == "active"
+    assert thread_entry["payload"]["progress"] == pytest.approx(0.05)
+
+
+@pytest.mark.asyncio
 async def test_fast_fused_planner_simulator_matches_quality_artifacts() -> None:
     quality_provider = FakeProvider()
     quality_committer = FakeCommitter()
@@ -391,6 +431,46 @@ async def test_guard_rejection_repairs_once_before_commit() -> None:
     assert result["status"] == "completed"
     assert result["retry_counters"]["repair"] == 1
     assert len(committer.bundles) == 1
+
+
+@pytest.mark.asyncio
+async def test_active_story_thread_progress_is_committed_without_status_change() -> None:
+    state = make_game_state()
+    state.threads["thread-trust"] = NarrativeThread(
+        thread_id="thread-trust",
+        premise="The player and Alice gradually learn to trust each other.",
+        branch_scope="root",
+        participant_ids=("player", "alice"),
+        status=ThreadStatus.ACTIVE,
+        progress=0.05,
+    )
+    simulation = copy.deepcopy(ROLE_OUTPUTS["simulator"])
+    simulation["claim_proposals"] = []
+    simulation["knowledge_requirements"] = []
+    simulation["state_patch"]["operations"] = [
+        {
+            "operation_type": "transition_thread",
+            "thread_id": "thread-trust",
+            "status": "active",
+            "progress_delta": 0.05,
+        },
+        {"operation_type": "advance_clock", "duration_minutes": 5},
+    ]
+    committer = FakeCommitter()
+
+    result = await make_pipeline(
+        FakeProvider(sequences={"simulator": (simulation,)}),
+        committer,
+    ).run(make_request(state, "thread-progress-run"))
+
+    assert result["status"] == "completed"
+    assert result["retry_counters"].get("repair", 0) == 0
+    assert len(committer.bundles) == 1
+    assert len(committer.bundles[0].threads) == 1
+    thread = committer.bundles[0].threads[0]
+    assert thread.thread_id == "thread-trust"
+    assert thread.status == "active"
+    assert thread.progress == pytest.approx(0.1)
 
 
 @pytest.mark.asyncio

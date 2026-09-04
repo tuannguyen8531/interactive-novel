@@ -17,19 +17,19 @@
   },
   "simulator": {
     "template": "simulator.md",
-    "semantic_version": "1.6.0",
+    "semantic_version": "1.7.0",
     "input_contract": "role-input",
     "output_schema_version": "simulation-result",
     "required_variables": ["input_json"],
-    "changelog": "Register an immediately needed story location before moving characters there, while reusing the canonical location catalog."
+    "changelog": "Advance active or escalating narrative-thread progress without requiring a false lifecycle status change."
   },
   "context_validator": {
     "template": "context_validator.md",
-    "semantic_version": "1.5.0",
+    "semantic_version": "1.6.0",
     "input_contract": "role-input",
     "output_schema_version": "consistency-report",
     "required_variables": ["input_json"],
-    "changelog": "Validate location registration, movement ordering, and continuity between plans, simulation, and canonical state patches."
+    "changelog": "Validate same-status narrative-thread progress separately from real lifecycle transitions."
   },
   "writer": {
     "template": "writer.md",

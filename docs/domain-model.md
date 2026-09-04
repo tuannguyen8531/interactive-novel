@@ -202,6 +202,9 @@ authorization, content policy, idempotency, and state transitions. The
 Canonical Record Builder accepts only Guard-approved patches; prose is not an
 authoritative input. `RegisterLocation` must precede any operation that uses
 the new ID, and duplicate or malformed location registrations are rejected.
+An `active` or `escalating` narrative thread may apply a non-zero progress
+delta while retaining its current lifecycle status; a zero-delta same-status
+transition and every terminal-thread revival remain invalid.
 
 ## 7. Relationships and tension
 

@@ -456,6 +456,63 @@ async def test_canonical_commit_writes_all_artifacts_and_is_idempotent(database:
         await service.commit_turn(conflicting)
 
 
+async def test_narrative_thread_projection_is_updated_in_place(database: Database) -> None:
+    uow_factory, _, playthrough_id, root = await _setup(database)
+    service = CanonicalTurnApplicationService(uow_factory)
+    initial_thread = NarrativeThreadRecord(
+        thread_id="thread-trust",
+        playthrough_id=playthrough_id,
+        branch_id=root.id,
+        turn_id="turn-thread-1",
+        status="active",
+        progress=0.05,
+        urgency=0.4,
+        payload={"premise": "Trust grows slowly."},
+    )
+    first = replace(
+        _bundle(
+            playthrough_id=playthrough_id,
+            branch_id=root.id,
+            turn_id="turn-thread-1",
+            turn_run_id="run-thread-1",
+            base_revision=0,
+            world_time_start=0,
+        ),
+        threads=(initial_thread,),
+    )
+    await service.commit_turn(first)
+
+    second = replace(
+        _bundle(
+            playthrough_id=playthrough_id,
+            branch_id=root.id,
+            turn_id="turn-thread-2",
+            turn_run_id="run-thread-2",
+            base_revision=1,
+            world_time_start=1,
+            parent_turn_id="turn-thread-1",
+        ),
+        threads=(replace(initial_thread, turn_id="turn-thread-2", progress=0.1),),
+    )
+    await service.commit_turn(second)
+
+    async with database.session_factory() as session:
+        models = (
+            await session.scalars(
+                select(NarrativeThreadModel).where(
+                    NarrativeThreadModel.playthrough_id == playthrough_id,
+                    NarrativeThreadModel.branch_id == root.id,
+                )
+            )
+        ).all()
+
+    assert len(models) == 1
+    assert models[0].turn_id == "turn-thread-2"
+    assert models[0].status == "active"
+    assert models[0].progress == pytest.approx(0.1)
+    assert models[0].payload["thread_id"] == "thread-trust"
+
+
 @pytest.mark.parametrize(
     "failure_step",
     ("head_revision", "turn", "events", "knowledge", "observations", "relationships", "narrative", "outbox", "head_update"),

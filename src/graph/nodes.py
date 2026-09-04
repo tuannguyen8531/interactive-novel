@@ -230,6 +230,7 @@ class TurnGraphNodes:
                 provider=self.runtime.provider,
             )
         context_manifest = manifest.as_context()
+        context_manifest["entries"] = _synchronize_thread_context_entries(context_manifest.get("entries", []), game_state)
         context_manifest["authoritative_ids"] = _authoritative_ids(game_state, owner_id=state.get("actor_id"))
         context_manifest["location_catalog"] = [
             {
@@ -1016,6 +1017,40 @@ def _relevant_story_threads(game_state: Any, character_ids: tuple[str, ...]) -> 
         for _, thread in sorted(game_state.threads.items())
         if not thread.participant_ids or relevant.intersection(thread.participant_ids)
     ][:8]
+
+
+def _synchronize_thread_context_entries(entries: Any, game_state: Any) -> list[Any]:
+    """Prevent a stale derived thread projection from contradicting canonical state."""
+
+    if not isinstance(entries, list):
+        return []
+    synchronized: list[Any] = []
+    for entry in entries:
+        if not isinstance(entry, Mapping) or str(entry.get("kind")) != "thread":
+            synchronized.append(entry)
+            continue
+        payload = entry.get("payload", {})
+        payload = dict(payload) if isinstance(payload, Mapping) else {}
+        thread_id = str(payload.get("thread_id") or entry.get("source_id") or "")
+        thread = game_state.threads.get(thread_id)
+        if thread is None:
+            synchronized.append(entry)
+            continue
+        current = dict(entry)
+        current["source_id"] = thread.thread_id
+        current["text"] = f"thread {thread.thread_id} is {thread.status.value} at progress {thread.progress:g}"
+        current["world_time"] = (
+            thread.last_advanced_world_time if thread.last_advanced_world_time is not None else game_state.world_time
+        )
+        current["payload"] = {
+            **payload,
+            "thread_id": thread.thread_id,
+            "status": thread.status.value,
+            "progress": thread.progress,
+            "urgency": thread.urgency,
+        }
+        synchronized.append(current)
+    return synchronized
 
 
 def _relevant_relationships(game_state: Any, character_ids: tuple[str, ...]) -> list[dict[str, Any]]:

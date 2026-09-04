@@ -154,7 +154,13 @@ def belief_to_candidate(record: BeliefRecord) -> MemoryCandidate:
 
 
 def thread_to_candidate(record: NarrativeThreadRecord) -> MemoryCandidate:
-    payload = dict(record.payload)
+    payload = {
+        **dict(record.payload),
+        "thread_id": record.thread_id,
+        "status": record.status,
+        "progress": record.progress,
+        "urgency": record.urgency,
+    }
     return MemoryCandidate(
         source_id=record.thread_id,
         kind=MemoryKind.THREAD,

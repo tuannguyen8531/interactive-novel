@@ -36,3 +36,7 @@ operation in the proposed patch. Any character described as arriving at or
 occupying a different place must have a matching `set_character_location`
 operation. Reject prose/state mismatches; registering a place alone does not
 move a character there.
+
+For narrative threads, accept a same-status `transition_thread` only when an
+already active or escalating thread has a non-zero `progress_delta`. Require a
+real allowed lifecycle transition for seeded, resolved, or abandoned threads.

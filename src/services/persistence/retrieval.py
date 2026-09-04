@@ -410,10 +410,24 @@ class SqlAlchemyRetrievalRepository(SqlAlchemyEmbeddingStore):
                 )
             ).all()
         )
+        branch_rank = {branch_id: index for index, branch_id in enumerate(branch_ids)}
+        turn_rank = {turn_id: index for index, turn_id in enumerate(turn_ids)}
+        current_threads: dict[str, NarrativeThreadModel] = {}
+        for thread in threads:
+            thread_id = str(thread.payload.get("thread_id", thread.id))
+            current = current_threads.get(thread_id)
+            if current is None or (
+                branch_rank.get(thread.branch_id, -1),
+                turn_rank.get(thread.turn_id, -1),
+            ) > (
+                branch_rank.get(current.branch_id, -1),
+                turn_rank.get(current.turn_id, -1),
+            ):
+                current_threads[thread_id] = thread
         candidates.extend(
             thread_to_candidate(
                 NarrativeThreadRecord(
-                    thread_id=thread.id,
+                    thread_id=str(thread.payload.get("thread_id", thread.id)),
                     playthrough_id=thread.playthrough_id,
                     branch_id=thread.branch_id,
                     turn_id=thread.turn_id,
@@ -423,7 +437,7 @@ class SqlAlchemyRetrievalRepository(SqlAlchemyEmbeddingStore):
                     payload=dict(thread.payload),
                 )
             )
-            for thread in threads
+            for thread in current_threads.values()
         )
 
         hooks = list(

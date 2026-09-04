@@ -71,7 +71,12 @@ class NarrativeThread:
         self, status: ThreadStatus | str, *, progress_delta: float = 0.0, world_time: int | None = None
     ) -> NarrativeThread:
         next_status = ThreadStatus(status)
-        if next_status not in THREAD_TRANSITIONS[self.status]:
+        advances_in_place = (
+            next_status == self.status
+            and self.status in {ThreadStatus.ACTIVE, ThreadStatus.ESCALATING}
+            and abs(progress_delta) > 1e-9
+        )
+        if not advances_in_place and next_status not in THREAD_TRANSITIONS[self.status]:
             raise DomainValidationError(
                 "invalid_thread_transition", f"Thread cannot transition from {self.status} to {next_status}."
             )
