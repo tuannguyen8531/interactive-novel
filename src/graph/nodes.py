@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from typing import Any, TypeVar, cast
 
 from src.application.contracts.ai import (
@@ -40,7 +40,7 @@ from src.application.contracts.providers import (
     ExecutionMode,
     ProviderCancelledError,
 )
-from src.application.contracts.retrieval import InitialContextRequest, RetrievalScope
+from src.application.contracts.retrieval import InitialContextRequest, MemoryCandidate, MemoryKind, RetrievalScope
 from src.domain.content import ConsentState, Rating, ViolenceCeiling
 from src.domain.content import SceneSpec as DomainSceneSpec
 from src.domain.errors import GuardRejected
@@ -224,9 +224,12 @@ class TurnGraphNodes:
         if self.runtime.candidate_source is None:
             manifest = await self.assembler.build_initial_context(request, [], provider=self.runtime.provider)
         else:
-            manifest = await self.assembler.build_initial_context_from_source(
+            candidates = _without_stale_location_candidates(
+                await self.runtime.candidate_source.list_candidates(scope), game_state
+            )
+            manifest = await self.assembler.build_initial_context(
                 request,
-                self.runtime.candidate_source,
+                candidates,
                 provider=self.runtime.provider,
             )
         context_manifest = manifest.as_context()
@@ -244,6 +247,11 @@ class TurnGraphNodes:
             }
             for location_id in sorted(game_state.locations)
         ]
+        context_manifest["current_locations"] = {
+            character_id: game_state.characters[character_id].state.location_id
+            for character_id in relevant_character_ids
+            if character_id in game_state.characters and game_state.characters[character_id].state.location_id is not None
+        }
         context_manifest["world_profile"] = dict(game_state.metadata.get("world_profile", {}))
         context_manifest["story_language"] = _story_language(game_state).value
         context_manifest["world_profile"]["story_language"] = _story_language(game_state).value
@@ -267,7 +275,7 @@ class TurnGraphNodes:
     async def _plan(self, state: TurnGraphState) -> dict[str, Any]:
         if state.get("plan") is not None and not state.get("repair_requested", False):
             return {}
-        context = _role_context(state)
+        context = _role_context(state, repair_feedback=state.get("repair_feedback"))
         roles: tuple[AIPromptRole, ...]
         if self.runtime.execution_mode == ExecutionMode.FAST:
             roles = (AIPromptRole.PLANNER, AIPromptRole.SIMULATOR)
@@ -285,6 +293,7 @@ class TurnGraphNodes:
         update: dict[str, Any] = {"plan": plan, **_trace_update(state, result)}
         if AIPromptRole.SIMULATOR in result.artifacts:
             update["simulation"] = result.artifacts[AIPromptRole.SIMULATOR]
+            update["repair_requested"] = False
         return update
 
     async def _simulate(self, state: TurnGraphState) -> dict[str, Any]:
@@ -351,7 +360,9 @@ class TurnGraphNodes:
                 world_time=game_state.world_time,
                 owner_id=state.get("actor_id"),
             )
-            candidates = list(await self.runtime.candidate_source.list_candidates(base_scope))
+            candidates = list(
+                _without_stale_location_candidates(await self.runtime.candidate_source.list_candidates(base_scope), game_state)
+            )
         for query in extraction.validation_queries:
             scope = RetrievalScope(
                 playthrough_id=state["playthrough_id"],
@@ -602,6 +613,7 @@ class TurnGraphNodes:
             return _failure(state, "repair_limit_exceeded", "Guard/context repair limit was reached.")
         counters["repair"] = attempt + 1
         report = state.get("consistency_report")
+        repair_plan = isinstance(report, ConsistencyReport) and report.status != ConsistencyStatus.PASS
         feedback: dict[str, Any] = {}
         if isinstance(report, ConsistencyReport):
             feedback["consistency_report"] = report.model_dump(mode="json")
@@ -611,6 +623,7 @@ class TurnGraphNodes:
             "retry_counters": counters,
             "repair_requested": True,
             "repair_feedback": feedback,
+            "plan": None if repair_plan else state.get("plan"),
             "simulation": None,
             "claim_extraction": None,
             "targeted_evidence": (),
@@ -1051,6 +1064,27 @@ def _synchronize_thread_context_entries(entries: Any, game_state: Any) -> list[A
         }
         synchronized.append(current)
     return synchronized
+
+
+def _without_stale_location_candidates(candidates: Iterable[MemoryCandidate], game_state: Any) -> tuple[MemoryCandidate, ...]:
+    """Discard historical positive location claims superseded by current character state."""
+
+    current_locations = {
+        character_id: character.state.location_id
+        for character_id, character in game_state.characters.items()
+        if character.state.location_id is not None
+    }
+    return tuple(
+        candidate
+        for candidate in candidates
+        if not (
+            candidate.kind == MemoryKind.CLAIM
+            and candidate.predicate == "located_at"
+            and str(candidate.payload.get("polarity", "positive")) == "positive"
+            and candidate.subject_id in current_locations
+            and candidate.object_id != current_locations[candidate.subject_id]
+        )
+    )
 
 
 def _relevant_relationships(game_state: Any, character_ids: tuple[str, ...]) -> list[dict[str, Any]]:

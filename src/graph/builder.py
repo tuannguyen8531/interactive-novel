@@ -79,7 +79,7 @@ def build_turn_graph(runtime: TurnGraphRuntime, *, checkpointer: Any = None) -> 
     builder.add_conditional_edges(
         "repair",
         _after_repair,
-        {"simulate": "simulate", "finish": END},
+        {"plan": "plan", "simulate": "simulate", "finish": END},
     )
     builder.add_conditional_edges(
         "write",
@@ -142,7 +142,9 @@ async def _after_guard(state: TurnGraphState, max_repairs: int) -> str:
 
 
 async def _after_repair(state: TurnGraphState) -> str:
-    return "simulate" if state.get("status", "running") == "running" else "finish"
+    if state.get("status", "running") != "running":
+        return "finish"
+    return "plan" if state.get("plan") is None else "simulate"
 
 
 async def _after_critique(state: TurnGraphState, max_revisions: int) -> str:

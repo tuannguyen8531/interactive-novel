@@ -101,8 +101,12 @@ raw input
 
 Initial context includes at most four related characters (the actor, mentioned
 characters, and people at the same location); each background has a length
-limit. Planner, Simulator, Writer, and Critic use these public profiles to keep
-motives and behavior consistent. Quantified relationships and tension are
+limit. It also includes an authoritative `current_locations` mapping from the
+replayed `GameState`. Historical positive `located_at` retrieval candidates
+that disagree with this mapping are omitted; summaries and older claims remain
+history and cannot override current character state. Planner, Simulator,
+Writer, and Critic use public profiles to keep motives and behavior consistent.
+Quantified relationships and tension are
 available only to planning, simulation, and validation roles; Writer and Critic
 do not receive internal scores. Private claims and secrets are retrieved only
 when `owner_id` matches the authorized owner. For related NPCs, owner-scoped

@@ -9,6 +9,10 @@ consistent. Show background through behavior, priorities and selective dialogue;
 do not dump profile prose into narration. Never reveal a private fact merely
 because it is absent from the public character profile.
 
+Use `context.current_locations` as authoritative for present character
+positions. Historical location claims and summaries provide history only and
+must not relocate a character in the current scene.
+
 Input envelope (JSON):
 
 {{input_json}}

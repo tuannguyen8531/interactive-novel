@@ -18,6 +18,13 @@ safety constraints. Do not return untyped state mutations or treat prose as a
 canon fact.
 
 Use `context.location_catalog` and exact existing location IDs when they fit.
+Treat `context.current_locations` as the authoritative present location of each
+listed character; it overrides historical `located_at` claims, summaries and
+assumptions. Interpret environmental details in `player_input` against the
+description of that current location. When a detail already fits there, retain
+the player's intent without inventing travel. When it does not fit and travel
+was not requested, preserve the intent but ground the beat in a plausible
+nearby feature of the current place.
 If the player's current action genuinely introduces a new place, candidate
 beats may give it one stable lowercase snake-case ASCII ID derived from its
 story-language name; the Simulator must register that place before anyone can

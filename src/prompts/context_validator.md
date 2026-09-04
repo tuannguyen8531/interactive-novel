@@ -34,8 +34,15 @@ outcome, or character movement must either be present in
 `context.location_catalog` or be registered by an earlier `register_location`
 operation in the proposed patch. Any character described as arriving at or
 occupying a different place must have a matching `set_character_location`
-operation. Reject prose/state mismatches; registering a place alone does not
-move a character there.
+operation. Treat `context.current_locations` as authoritative for present
+character positions; it overrides historical `located_at` claims, summaries,
+and assumptions. `player_input` expresses an attempted action, not an
+authoritative location fact. Do not fail merely because the raw input mentions
+a detail absent from an old location when that detail fits the current
+location's catalog description. Also do not fail when the Plan and Simulation
+have safely grounded an incompatible raw detail in the current place. Reject
+only a remaining mismatch in the realized Plan, Simulation, or proposed state
+operations; registering a place alone does not move a character there.
 
 For narrative threads, accept a same-status `transition_thread` only when an
 already active or escalating thread has a non-zero `progress_delta`. Require a

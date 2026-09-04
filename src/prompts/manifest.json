@@ -9,42 +9,42 @@
   },
   "planner": {
     "template": "planner.md",
-    "semantic_version": "1.4.0",
+    "semantic_version": "1.5.0",
     "input_contract": "role-input",
     "output_schema_version": "turn-plan",
     "required_variables": ["input_json"],
-    "changelog": "Plan against the canonical location catalog and use stable IDs for places introduced by the current story."
+    "changelog": "Use canonical current character locations over historical claims when grounding player intent."
   },
   "simulator": {
     "template": "simulator.md",
-    "semantic_version": "1.7.0",
+    "semantic_version": "1.8.0",
     "input_contract": "role-input",
     "output_schema_version": "simulation-result",
     "required_variables": ["input_json"],
-    "changelog": "Advance active or escalating narrative-thread progress without requiring a false lifecycle status change."
+    "changelog": "Ground physical actions in authoritative current character locations rather than superseded location claims."
   },
   "context_validator": {
     "template": "context_validator.md",
-    "semantic_version": "1.6.0",
+    "semantic_version": "1.7.0",
     "input_contract": "role-input",
     "output_schema_version": "consistency-report",
     "required_variables": ["input_json"],
-    "changelog": "Validate same-status narrative-thread progress separately from real lifecycle transitions."
+    "changelog": "Validate realized spatial continuity against authoritative current locations instead of raw input or historical claims."
   },
   "writer": {
     "template": "writer.md",
-    "semantic_version": "1.3.0",
+    "semantic_version": "1.4.0",
     "input_contract": "role-input",
     "output_schema_version": "narrative-draft",
     "required_variables": ["input_json"],
-    "changelog": "Render relevant backgrounds through consistent behavior and voice without exposition dumps, while preserving the configured story language in narrative and suggested actions."
+    "changelog": "Keep current scene positions aligned with authoritative character locations."
   },
   "critic": {
     "template": "critic.md",
-    "semantic_version": "1.3.0",
+    "semantic_version": "1.4.0",
     "input_contract": "role-input",
     "output_schema_version": "critique-result",
     "required_variables": ["input_json"],
-    "changelog": "Check narrative characterization against relevant public profiles without requiring exposition, and keep critique feedback in the configured story language."
+    "changelog": "Check current-scene location continuity against authoritative character positions."
   }
 }

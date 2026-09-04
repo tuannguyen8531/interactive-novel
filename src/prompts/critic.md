@@ -8,6 +8,8 @@ state.
 Check relevant `character_profiles` for unexplained contradictions in voice,
 background, values, boundaries or long-term motivation. Do not demand that the
 Writer repeat profile exposition in the scene.
+Treat `context.current_locations` as authoritative for present character
+positions and flag prose that revives a superseded historical location.
 
 Input envelope (JSON):
 

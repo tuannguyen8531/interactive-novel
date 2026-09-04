@@ -41,7 +41,12 @@ operation described below is the sole exception. In particular:
   lists; do not invent an ID from descriptive prose.
 
 The current canonical places, including their stable names and descriptions,
-are listed in `context.location_catalog`. When the current player action or
+are listed in `context.location_catalog`. The character-to-location mapping in
+`context.current_locations` is authoritative for the present moment and
+overrides historical `located_at` claims, summaries, and assumptions. A
+physical detail from `player_input` is consistent when it appears in the
+current location's catalog description; do not relocate a character merely
+because an older claim names another place. When the current player action or
 accepted outcome genuinely introduces a place that is not in that catalog,
 register only that immediately needed place with a `register_location`
 operation. Give it a stable lowercase snake-case ASCII `location_id` derived

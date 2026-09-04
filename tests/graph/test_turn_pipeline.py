@@ -33,6 +33,7 @@ from src.domain.characters import Character, CharacterProfile, CharacterState
 from src.domain.content import ContentPolicy
 from src.domain.guard import DomainGuard
 from src.domain.knowledge import KnowledgeClaim
+from src.domain.locations import Location
 from src.domain.narrative import NarrativeThread, ThreadStatus
 from src.domain.relationships import RelationshipVector
 from src.domain.state import GameState
@@ -434,6 +435,36 @@ async def test_guard_rejection_repairs_once_before_commit() -> None:
 
 
 @pytest.mark.asyncio
+async def test_context_validation_repair_reruns_plan_and_simulation() -> None:
+    failed_report = copy.deepcopy(ROLE_OUTPUTS["context_validator"])
+    failed_report["status"] = "fail"
+    failed_report["violations"] = [
+        {
+            "violation_id": "location-plan-mismatch",
+            "code": "LOCATION_INCONSISTENCY",
+            "severity": "error",
+            "description": "The plan uses an obsolete character location.",
+            "evidence_ids": ["library"],
+        }
+    ]
+    failed_report["recommended_corrections"] = ["Rebuild the plan from context.current_locations."]
+    provider = FakeProvider(
+        sequences={
+            "context_validator": (failed_report, ROLE_OUTPUTS["context_validator"]),
+        }
+    )
+
+    result = await make_pipeline(provider, FakeCommitter()).run(make_request(make_game_state(), "context-plan-repair-run"))
+
+    assert result["status"] == "completed"
+    assert result["retry_counters"]["repair"] == 1
+    assert sum(roles == ("planner",) for _, roles in provider.calls) == 2
+    assert sum(roles == ("simulator",) for _, roles in provider.calls) == 2
+    planner_requests = [request for request in provider.requests if request.role == AIPromptRole.PLANNER]
+    assert "Rebuild the plan from context.current_locations." in planner_requests[1].user_prompt
+
+
+@pytest.mark.asyncio
 async def test_active_story_thread_progress_is_committed_without_status_change() -> None:
     state = make_game_state()
     state.threads["thread-trust"] = NarrativeThread(
@@ -598,6 +629,63 @@ async def test_initial_context_exposes_exact_authoritative_ids() -> None:
         {"location_id": "courtyard", "name": "courtyard", "description": ""},
         {"location_id": "library", "name": "library", "description": ""},
     ]
+    assert context_manifest["current_locations"] == {}
+
+
+@pytest.mark.asyncio
+async def test_current_locations_override_stale_location_claims_in_context() -> None:
+    state = make_game_state()
+    state.locations.add("rooftop")
+    state.location_details["rooftop"] = Location(
+        location_id="rooftop",
+        name="School rooftop",
+        description="An open rooftop bordered by a weathered metal railing.",
+    )
+    state.characters["player"] = state.characters["player"].with_state(location_id="rooftop")
+    state.characters["alice"] = state.characters["alice"].with_state(location_id="rooftop")
+    source = CandidateSource()
+    source.candidates = (
+        MemoryCandidate(
+            source_id="claim-alice-old-location",
+            kind=MemoryKind.CLAIM,
+            playthrough_id="playthrough-1",
+            branch_id="root",
+            world_time=0,
+            text="alice located_at library",
+            claim_id="claim-alice-old-location",
+            branch_scope="root",
+            entity_ids=("alice", "library"),
+            predicate="located_at",
+            subject_id="alice",
+            object_id="library",
+            payload={"polarity": "positive"},
+        ),
+    )
+    simulation = copy.deepcopy(ROLE_OUTPUTS["simulator"])
+    simulation["claim_proposals"] = []
+    simulation["knowledge_requirements"] = []
+    simulation["state_patch"]["operations"] = [{"operation_type": "advance_clock", "duration_minutes": 2}]
+    provider = FakeProvider(sequences={"simulator": (simulation,)})
+
+    result = await make_pipeline(provider, FakeCommitter(), candidate_source=source).run(
+        TurnPipelineRequest(
+            turn_run_id="rooftop-railing-run",
+            playthrough_id=state.playthrough_id,
+            branch_id=state.branch_id,
+            base_revision=0,
+            raw_input="I step closer and stand beside her at the railing.",
+            actor_id="player",
+            game_state=state,
+        )
+    )
+
+    context_manifest = result.get("context_manifest")
+    assert isinstance(context_manifest, dict)
+    assert context_manifest["current_locations"] == {"player": "rooftop", "alice": "rooftop"}
+    assert all(entry["source_id"] != "claim-alice-old-location" for entry in context_manifest["entries"])
+    planner_request = next(request for request in provider.requests if request.role == AIPromptRole.PLANNER)
+    assert '"current_locations":{"player":"rooftop","alice":"rooftop"}' in planner_request.user_prompt
+    assert "weathered metal railing" in planner_request.user_prompt
 
 
 @pytest.mark.asyncio
