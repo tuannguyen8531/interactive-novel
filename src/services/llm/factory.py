@@ -108,7 +108,7 @@ class PhysicalCallPlanner:
             return tuple((role,) for role in roles)
         fused_groups = (
             (LogicalRole.PLANNER, LogicalRole.SIMULATOR),
-            (LogicalRole.CONTEXT_VALIDATOR,),
+            (LogicalRole.VALIDATOR,),
             (LogicalRole.WRITER, LogicalRole.CRITIC),
         )
         remaining = list(roles)

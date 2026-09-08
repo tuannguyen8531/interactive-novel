@@ -6,7 +6,7 @@ import type { ConnectivityResult, OllamaAccount, ProviderSettings, ProviderTarge
 export const PROVIDER_ROLES = [
   'planner',
   'simulator',
-  'context_validator',
+  'validator',
   'writer',
   'critic',
   'world_builder',

@@ -446,7 +446,7 @@ async def test_guard_rejection_repairs_once_before_commit() -> None:
 
 @pytest.mark.asyncio
 async def test_context_validation_repair_reruns_plan_and_simulation() -> None:
-    failed_report = copy.deepcopy(ROLE_OUTPUTS["context_validator"])
+    failed_report = copy.deepcopy(ROLE_OUTPUTS["validator"])
     failed_report["status"] = "fail"
     failed_report["violations"] = [
         {
@@ -460,7 +460,7 @@ async def test_context_validation_repair_reruns_plan_and_simulation() -> None:
     failed_report["recommended_corrections"] = ["Rebuild the plan from context.current_locations."]
     provider = FakeProvider(
         sequences={
-            "context_validator": (failed_report, ROLE_OUTPUTS["context_validator"]),
+            "validator": (failed_report, ROLE_OUTPUTS["validator"]),
         }
     )
 
@@ -789,7 +789,7 @@ async def test_initial_context_includes_bounded_public_character_backgrounds() -
 
     planner_request = next(request for request in provider.requests if request.role == AIPromptRole.PLANNER)
     simulator_request = next(request for request in provider.requests if request.role == AIPromptRole.SIMULATOR)
-    validator_request = next(request for request in provider.requests if request.role == AIPromptRole.CONTEXT_VALIDATOR)
+    validator_request = next(request for request in provider.requests if request.role == AIPromptRole.VALIDATOR)
     writer_request = next(request for request in provider.requests if request.role == AIPromptRole.WRITER)
     critic_request = next(request for request in provider.requests if request.role == AIPromptRole.CRITIC)
     assert "Alice inherited responsibility" in planner_request.user_prompt
@@ -823,7 +823,7 @@ async def test_fast_mode_keeps_private_npc_context_inside_simulation_roles() -> 
     prompts = {request.role: request.user_prompt for request in provider.requests}
     assert "secret-alice-letter" not in prompts[AIPromptRole.PLANNER]
     assert "secret-alice-letter" in prompts[AIPromptRole.SIMULATOR]
-    assert "secret-alice-letter" in prompts[AIPromptRole.CONTEXT_VALIDATOR]
+    assert "secret-alice-letter" in prompts[AIPromptRole.VALIDATOR]
     assert "secret-alice-letter" not in prompts[AIPromptRole.WRITER]
     assert "secret-alice-letter" not in prompts[AIPromptRole.CRITIC]
 
@@ -1040,7 +1040,7 @@ async def test_ai_clock_context_uses_canonical_time_and_approved_end(mode: Execu
     assert {str(request.role) for request in provider.requests} == {
         "planner",
         "simulator",
-        "context_validator",
+        "validator",
         "writer",
         "critic",
     }
@@ -1154,3 +1154,26 @@ def test_scene_claims_come_from_final_patch_and_exclude_npc_private_claims() -> 
     state["guard_approved"] = False
     with pytest.raises(ValueError, match="Guard-approved patch"):
         prepare_scene(state, game_state, DomainGuard())  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_repair_prompt_identity_survives_role_execution_trace() -> None:
+    from dataclasses import replace
+
+    class RepairedProvider(FakeProvider):
+        async def generate_structured(self, request: ProviderRequest, schema: StructuredSchema) -> StructuredResponse:
+            response = await super().generate_structured(request, schema)
+            return replace(response, repaired=True, repair_prompt_version="1.0.0", repair_template_hash="repair-hash")
+
+    provider = RepairedProvider()
+    result = await make_pipeline(provider, FakeCommitter()).run(make_request(make_game_state(), "repair-trace-run"))
+    assert result["status"] == "completed"
+    for trace in result["llm_traces"]:
+        assert trace["parse_status"] == "repaired"
+        assert trace["repair_prompt_version"] == "1.0.0"
+        assert trace["repair_template_hash"] == "repair-hash"
+        assert len(trace["template_hash"]) == 64
+        assert trace["raw_output_stored"] is False
+    for request in provider.requests:
+        assert len(request.metadata["template_hash"]) == 64
+        assert request.metadata["prompt_version"]

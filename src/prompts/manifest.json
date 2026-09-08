@@ -1,11 +1,11 @@
 {
   "world_builder": {
     "template": "world_builder.md",
-    "semantic_version": "1.8.0",
-    "input_contract": "role-input",
+    "semantic_version": "1.9.0",
+    "input_contract": "world-builder-input",
     "output_schema_version": "world-seed",
     "required_variables": ["input_json"],
-    "changelog": "Ground story time in explicit 24-hour clock context and distinguish elapsed minutes from HHMM."
+    "changelog": "Resolve example provenance versions from the prompt manifest."
   },
   "planner": {
     "template": "planner.md",
@@ -23,13 +23,13 @@
     "required_variables": ["input_json"],
     "changelog": "Ground story time in explicit 24-hour clock context and distinguish elapsed minutes from HHMM."
   },
-  "context_validator": {
-    "template": "context_validator.md",
-    "semantic_version": "1.9.0",
+  "validator": {
+    "template": "validator.md",
+    "semantic_version": "1.10.0",
     "input_contract": "role-input",
     "output_schema_version": "consistency-report",
     "required_variables": ["input_json"],
-    "changelog": "Check selected outcomes and movements rather than unselected Planner destinations."
+    "changelog": "Rename the logical role to validator."
   },
   "writer": {
     "template": "writer.md",
@@ -46,5 +46,14 @@
     "output_schema_version": "critique-result",
     "required_variables": ["input_json"],
     "changelog": "Use accepted outcomes and approved before/after locations; keep rejected outcomes out of fallback narration."
+  },
+  "repair": {
+    "semantic_version": "1.1.0",
+    "template": "repair.md",
+    "required_variables": [
+      "original_prompt",
+      "repair_input_json"
+    ],
+    "changelog": "Remove repeated repair instructions while retaining the original context and boundaries."
   }
 }

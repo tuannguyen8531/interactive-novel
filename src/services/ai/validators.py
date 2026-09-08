@@ -72,7 +72,7 @@ def _validate_claim(claim: KnowledgeClaimProposal, *, path: str) -> None:
     if claim.source_role not in {
         AIPromptRole.WORLD_BUILDER,
         AIPromptRole.SIMULATOR,
-        AIPromptRole.CONTEXT_VALIDATOR,
+        AIPromptRole.VALIDATOR,
     }:
         _raise(path, "claim_source_role_not_authorized", "this AI role cannot propose an authoritative claim")
 

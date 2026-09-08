@@ -11,7 +11,7 @@ const newProvider = ref<ProviderTarget['provider']>('ollama')
 const roles = [
   { id: 'planner', label: 'Planner' },
   { id: 'simulator', label: 'Simulator' },
-  { id: 'context_validator', label: 'Context validator' },
+  { id: 'validator', label: 'Validator' },
   { id: 'writer', label: 'Writer' },
   { id: 'critic', label: 'Critic' },
   { id: 'world_builder', label: 'World builder' },

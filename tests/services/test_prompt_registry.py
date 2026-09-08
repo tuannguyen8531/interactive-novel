@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+from pathlib import Path
 
 import pytest
 
@@ -77,7 +79,7 @@ def test_runtime_prompts_use_public_character_profiles_for_consistency() -> None
     for role in (
         AIPromptRole.PLANNER,
         AIPromptRole.SIMULATOR,
-        AIPromptRole.CONTEXT_VALIDATOR,
+        AIPromptRole.VALIDATOR,
         AIPromptRole.WRITER,
         AIPromptRole.CRITIC,
     ):
@@ -140,3 +142,65 @@ def test_missing_prompt_variable_is_a_clear_error() -> None:
 
     with pytest.raises(PromptRegistryError, match="missing variables"):
         definition.render({})
+
+
+def test_world_builder_example_versions_follow_manifest() -> None:
+    definition = PromptRegistry().get(AIPromptRole.WORLD_BUILDER)
+    example = json.loads(definition.content.split("```json", 1)[1].split("```", 1)[0])
+    assert example["prompt_version"] == definition.semantic_version
+    assert all(claim["provenance"]["prompt_version"] == definition.semantic_version for claim in example["initial_claims"])
+    assert definition.input_contract == "world-builder-input"
+
+
+def test_shared_clock_is_expanded_once_and_changes_prompt_hash(tmp_path: Path) -> None:
+    root = tmp_path / "prompts"
+    shutil.copytree(PromptRegistry.default_root, root)
+    before = PromptRegistry(root)
+    old = {role: before.get(role) for role in before.roles()}
+    shared = root / "shared" / "story_time.md"
+    shared.write_text(shared.read_text() + "A new shared temporal rule.\n")
+    after = PromptRegistry(root)
+    for role in before.roles():
+        definition = after.get(role)
+        if role == AIPromptRole.WORLD_BUILDER:
+            assert old[role].template_hash == definition.template_hash
+        else:
+            assert definition.content.count("Story time is authoritative.") == 1
+            assert "{{>" not in definition.content
+            assert old[role].template_hash != definition.template_hash
+
+
+@pytest.mark.parametrize("include", ["shared/missing.md", "../outside.md"])
+def test_invalid_shared_template_fails_clearly(tmp_path: Path, include: str) -> None:
+    root = tmp_path / "prompts"
+    shutil.copytree(PromptRegistry.default_root, root)
+    (tmp_path / "outside.md").write_text("outside registry")
+    path = root / "writer.md"
+    path.write_text(path.read_text().replace("shared/story_time.md", include))
+    with pytest.raises(PromptRegistryError, match="inside registry root"):
+        PromptRegistry(root).get(AIPromptRole.WRITER)
+
+
+def test_repair_system_and_user_sections_are_both_hashed(tmp_path: Path) -> None:
+    root = tmp_path / "prompts"
+    shutil.copytree(PromptRegistry.default_root, root)
+    before = PromptRegistry(root).get_repair()
+    path = root / "repair.md"
+    path.write_text(path.read_text().replace("# System\n\n", "# System\n\nPreserve the branch boundary.\n"))
+    after = PromptRegistry(root).get_repair()
+    assert before.template_hash != after.template_hash
+    path = root / "repair.md"
+    path.write_text(path.read_text() + "Keep original scene IDs.\n")
+    assert after.template_hash != PromptRegistry(root).get_repair().template_hash
+
+
+def test_legacy_validator_role_is_rejected() -> None:
+    from src.application.contracts.providers import LogicalRole
+
+    for role_type in (AIPromptRole, LogicalRole):
+        with pytest.raises(ValueError):
+            role_type("context_validator")
+    with pytest.raises(ValueError):
+        PromptRegistry().get("context_validator")
+    with pytest.raises(ValueError):
+        AIContractRegistry().parse("context_validator", {})

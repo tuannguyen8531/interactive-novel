@@ -15,9 +15,9 @@ from src.application.errors import ApplicationValidationError
 from src.application.ports.persistence import UowFactory
 from src.application.services.world_drafts import WorldDraftApplicationService
 from src.domain.language import StoryLanguage
+from src.services.prompts import PromptRegistry
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "ai" / "role_outputs.json"
-WORLD_BUILDER_PROMPT = Path(__file__).parents[2] / "src" / "prompts" / "world_builder.md"
 
 
 def _seed() -> WorldSeed:
@@ -25,7 +25,7 @@ def _seed() -> WorldSeed:
 
 
 def _current_seed_payload() -> dict[str, Any]:
-    content = WORLD_BUILDER_PROMPT.read_text(encoding="utf-8")
+    content = PromptRegistry().get("world_builder").content
     return json.loads(content.split("```json", 1)[1].split("```", 1)[0])
 
 

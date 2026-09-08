@@ -20,7 +20,7 @@ class AIPromptRole(StrEnum):
     WORLD_BUILDER = "world_builder"
     PLANNER = "planner"
     SIMULATOR = "simulator"
-    CONTEXT_VALIDATOR = "context_validator"
+    VALIDATOR = "validator"
     WRITER = "writer"
     CRITIC = "critic"
 
@@ -175,6 +175,9 @@ class LLMRunTrace(AIModel):
     model: str = Field(min_length=1)
     request_id: str | None = Field(default=None, min_length=1)
     prompt_version: str = Field(min_length=1)
+    template_hash: str | None = None
+    repair_prompt_version: str | None = None
+    repair_template_hash: str | None = None
     output_schema_version: str = Field(min_length=1)
     config_snapshot_id: str | None = Field(default=None, min_length=1)
     latency_ms: float = Field(ge=0.0)
@@ -408,7 +411,7 @@ class ConsistencyViolation(AIModel):
 
 class ConsistencyReport(VersionedOutput):
     expected_schema_version: ClassVar[str] = "consistency-report"
-    expected_role: ClassVar[AIPromptRole] = AIPromptRole.CONTEXT_VALIDATOR
+    expected_role: ClassVar[AIPromptRole] = AIPromptRole.VALIDATOR
     status: ConsistencyStatus
     violations: tuple[ConsistencyViolation, ...] = Field(default_factory=tuple)
     evidence_manifest_ids: tuple[str, ...] = Field(default_factory=tuple)

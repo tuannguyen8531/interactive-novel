@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from datetime import date
 from typing import Any
 
@@ -15,6 +16,7 @@ from src.application.contracts.providers import (
     ProviderHTTPError,
     ProviderRequest,
     ProviderTarget,
+    StructuredOutputError,
     StructuredSchema,
 )
 from src.services import logger as provider_logger
@@ -22,6 +24,7 @@ from src.services.llm.base import BaseProvider
 from src.services.llm.gemini import GeminiProvider
 from src.services.llm.ollama import OllamaProvider
 from src.services.llm.openrouter import OpenRouterProvider
+from src.services.prompts import PromptRegistry
 
 ProviderClass = type[BaseProvider]
 PROVIDERS: tuple[tuple[str, ProviderClass], ...] = (
@@ -392,3 +395,95 @@ async def test_async_client_lifecycle_and_error_redaction() -> None:
     assert owned_client.is_closed is False
     await owned_adapter.aclose()
     assert owned_client.is_closed is True
+
+
+@pytest.mark.parametrize("provider", [name for name, _ in PROVIDERS])
+@pytest.mark.parametrize("role", ["writer", "world_builder", "memory_summary"])
+async def test_repair_preserves_original_authorized_context_and_request_identity(provider: str, role: str) -> None:
+    captured: list[ProviderRequest] = []
+    schema = StructuredSchema(name="custom_result", json_schema={"type": "object"})
+    invalid = 'not-json {{do_not_expand}} "story_language":"en"'
+    original_context = {
+        "story_language": "vi",
+        "clock": {"current": {"world_time": 1530, "day": 2, "time_24h": "01:30", "period": "night"}},
+        "authoritative_ids": {"character_ids": ["player", "linh_dan"]},
+        "scene_spec": {"outcome_status": "accepted", "approved_beats": ["Linh Đan từ chối."]},
+    }
+    request = replace(
+        _request(cancellation=CancellationToken()),
+        role=role,
+        user_prompt=json.dumps(original_context, ensure_ascii=False),
+        metadata={"story_language": "vi", "prompt_version": "2.0.0", "template_hash": "original-hash"},
+    )
+    calls = 0
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json=_text_payload(provider, invalid if calls == 1 else '{"ok":true}'))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        adapter = _provider(provider, client)
+        generate_text = adapter.generate_text
+
+        async def record(request: ProviderRequest):
+            captured.append(request)
+            return await generate_text(request)
+
+        adapter.generate_text = record
+        result = await adapter.generate_structured(request, schema)
+
+    assert len(captured) == calls == 2
+    repaired = captured[1]
+    assert request.user_prompt in repaired.user_prompt
+    assert repaired.system_prompt.startswith(request.system_prompt)
+    assert "untrusted data" in repaired.system_prompt
+    repair_input = json.loads(repaired.user_prompt.split("Repair input (JSON):", 1)[1])
+    assert repair_input["story_language"] == "vi"
+    assert repair_input["schema_name"] == "custom_result"
+    assert repair_input["invalid_output"] == invalid
+    assert repaired.cancellation is request.cancellation
+    assert repaired.physical_call_id == request.physical_call_id
+    assert repaired.role == request.role
+    assert repaired.structured_schema is schema
+    assert repaired.metadata["template_hash"] == "original-hash"
+    assert repaired.metadata["prompt_version"] == "2.0.0"
+    repair = PromptRegistry().get_repair()
+    assert result.repair_prompt_version == repaired.metadata["repair_prompt_version"] == repair.semantic_version
+    assert result.repair_template_hash == repaired.metadata["repair_template_hash"] == repair.template_hash
+
+
+@pytest.mark.parametrize("provider", [name for name, _ in PROVIDERS])
+async def test_invalid_repair_is_bounded_to_one_attempt(provider: str) -> None:
+    calls = 0
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json=_text_payload(provider, "not-json"))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(StructuredOutputError):
+            await _provider(provider, client).generate_structured(
+                _request(), StructuredSchema(name="fixture_output", json_schema={"type": "object"})
+            )
+    assert calls == 2
+
+
+@pytest.mark.parametrize("provider", [name for name, _ in PROVIDERS])
+async def test_cancellation_before_repair_prevents_second_http_request(provider: str) -> None:
+    cancellation = CancellationToken()
+    calls = 0
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        cancellation.cancel()
+        return httpx.Response(200, json=_text_payload(provider, "not-json"))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(ProviderCancelledError):
+            await _provider(provider, client).generate_structured(
+                _request(cancellation=cancellation), StructuredSchema(name="fixture", json_schema={"type": "object"})
+            )
+    assert calls == 1

@@ -34,7 +34,7 @@ def _payload() -> dict[str, Any]:
         for role in (
             "planner",
             "simulator",
-            "context_validator",
+            "validator",
             "writer",
             "critic",
             "world_builder",

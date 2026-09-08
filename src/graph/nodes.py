@@ -397,10 +397,10 @@ class TurnGraphNodes:
                 severity=DiagnosticSeverity.ERROR,
                 description="Targeted retrieval did not find authorized evidence for a required check.",
             )
-            prompt = self._executor().prompts.get(AIPromptRole.CONTEXT_VALIDATOR)
+            prompt = self._executor().prompts.get(AIPromptRole.VALIDATOR)
             report = ConsistencyReport(
                 schema_version="consistency-report",
-                role=AIPromptRole.CONTEXT_VALIDATOR,
+                role=AIPromptRole.VALIDATOR,
                 run_id=state["turn_run_id"],
                 prompt_version=prompt.semantic_version,
                 physical_call_id=f"deterministic-validator-{state['turn_run_id']}",
@@ -444,12 +444,12 @@ class TurnGraphNodes:
             actor_id=state.get("actor_id"),
         )
         result = await self._execute(
-            (AIPromptRole.CONTEXT_VALIDATOR,),
+            (AIPromptRole.VALIDATOR,),
             state,
-            {AIPromptRole.CONTEXT_VALIDATOR: context},
+            {AIPromptRole.VALIDATOR: context},
             call_prefix="validate",
         )
-        report = cast(ConsistencyReport, result.artifacts[AIPromptRole.CONTEXT_VALIDATOR])
+        report = cast(ConsistencyReport, result.artifacts[AIPromptRole.VALIDATOR])
         final_failure = (
             report.status != ConsistencyStatus.PASS
             and state.get("retry_counters", {}).get("repair", 0) >= self.runtime.max_repair_attempts

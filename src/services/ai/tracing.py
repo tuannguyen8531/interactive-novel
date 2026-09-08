@@ -36,6 +36,7 @@ def build_llm_run_trace(
         model=response.model,
         request_id=response.request_id,
         prompt_version=prompt.semantic_version,
+        template_hash=prompt.template_hash,
         output_schema_version=prompt.output_schema_version,
         config_snapshot_id=config_snapshot_id,
         latency_ms=response.latency_ms,
