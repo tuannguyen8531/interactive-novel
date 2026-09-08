@@ -245,7 +245,7 @@ def test_llm_run_trace_records_prompt_and_schema_versions_without_raw_output() -
         parse_status="repaired",
     )
 
-    assert trace.prompt_version == "1.5.0"
+    assert trace.prompt_version == "1.6.0"
     assert trace.output_schema_version == "narrative-draft"
     assert trace.token_usage is not None
     assert trace.token_usage.total_tokens == 12

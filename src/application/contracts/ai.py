@@ -589,6 +589,7 @@ class SceneSpec(AIModel):
     source_role: AIPromptRole
     source_run_id: str = Field(min_length=1)
     guard_approved: bool = False
+    outcome_status: Literal["accepted", "attempt_only"] = "accepted"
     world_time: int = Field(ge=0)
     tags: tuple[str, ...] = Field(default_factory=tuple)
     participants: dict[str, int] = Field(min_length=1)

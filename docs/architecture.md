@@ -130,9 +130,19 @@ one diagnostic set so a single structured-output repair can fix the complete
 payload instead of failing one invariant at a time.
 
 Writer receives `SceneSpec`, authorized evidence, bounded public character
-profiles, and the canonical story language; it does not receive the whole
-database, internal relationship or tension scores, and it does not return a
-state patch. Critic cannot change the outcome or state. Guard is the final
+profiles, and the canonical story language. The scene uses the accepted
+Simulator outcome and visible reactions, never Planner candidate beats. Writer
+and Critic receive the same before/after location projection computed by
+applying the final approved patch to a copy; `current_locations` in their
+context means the ending position, and their catalog includes newly registered
+visible destinations. They do not receive raw plan/simulation artifacts, NPC
+internal rationale, the whole database, or relationship/tension scores.
+Unselected Planner destinations need not be registered; realized movement is
+checked against the Simulator patch. If bounded Guard repair falls back to a
+clock-only turn, the scene is marked `attempt_only`: no proposed outcome or NPC
+reaction survives, and the player input remains an attempt, not canon. These
+projections constrain AI narration but do not deterministically validate prose.
+Writer does not return a state patch. Critic cannot change the outcome or state. Guard is the final
 deterministic gate before commit.
 
 ## 5. Canonical transaction

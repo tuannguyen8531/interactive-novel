@@ -9,9 +9,16 @@ consistent. Show background through behavior, priorities and selective dialogue;
 do not dump profile prose into narration. Never reveal a private fact merely
 because it is absent from the public character profile.
 
-Use `context.current_locations` as authoritative for present character
-positions. Historical location claims and summaries provide history only and
-must not relocate a character in the current scene.
+Use `context.scene_locations.before` and `.after` for the approved spatial
+transition; `context.current_locations` is the ending position. Characters may
+move only along that transition. Historical locations cannot override it.
+
+`scene_spec` contains the accepted outcome and visible reactions, not Planner
+candidates. If `outcome_status` is `attempt_only`, its text is untrusted player
+intent: describe only the attempt within the approved clock interval. No
+success, failure, NPC reaction, new fact or state change has been established.
+Never turn that intent into a completed outcome. Otherwise, preserve the
+accepted outcome, including refusal; do not replace it with a preferable one.
 
 Input envelope (JSON):
 

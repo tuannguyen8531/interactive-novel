@@ -52,6 +52,8 @@ class TurnGraphState(TypedDict):
     consistency_report: NotRequired[Any]
     approved_patch: NotRequired[dict[str, Any] | None]
     scene_spec: NotRequired[Any]
+    scene_locations: NotRequired[dict[str, dict[str, str | None]]]
+    scene_location_catalog: NotRequired[list[dict[str, str]]]
     draft: NotRequired[Any]
     critique: NotRequired[Any]
     final_narrative: NotRequired[str]

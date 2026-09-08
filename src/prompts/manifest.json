@@ -25,26 +25,26 @@
   },
   "context_validator": {
     "template": "context_validator.md",
-    "semantic_version": "1.8.0",
+    "semantic_version": "1.9.0",
     "input_contract": "role-input",
     "output_schema_version": "consistency-report",
     "required_variables": ["input_json"],
-    "changelog": "Ground story time in explicit 24-hour clock context and distinguish elapsed minutes from HHMM."
+    "changelog": "Check selected outcomes and movements rather than unselected Planner destinations."
   },
   "writer": {
     "template": "writer.md",
-    "semantic_version": "1.5.0",
+    "semantic_version": "1.6.0",
     "input_contract": "role-input",
     "output_schema_version": "narrative-draft",
     "required_variables": ["input_json"],
-    "changelog": "Ground story time in explicit 24-hour clock context and distinguish elapsed minutes from HHMM."
+    "changelog": "Use accepted outcomes and approved before/after locations; keep rejected outcomes out of fallback narration."
   },
   "critic": {
     "template": "critic.md",
-    "semantic_version": "1.5.0",
+    "semantic_version": "1.6.0",
     "input_contract": "role-input",
     "output_schema_version": "critique-result",
     "required_variables": ["input_json"],
-    "changelog": "Ground story time in explicit 24-hour clock context and distinguish elapsed minutes from HHMM."
+    "changelog": "Use accepted outcomes and approved before/after locations; keep rejected outcomes out of fallback narration."
   }
 }
