@@ -168,7 +168,9 @@ record IDs, scopes, scores, match reasons, model, revision, budget, and role.
 Simulator may receive the hidden state required for simulation; Writer receives
 only the part of `SceneSpec` that is allowed to be expressed. Player mode does
 not place internal beliefs, hidden goals, or numeric relationships in the
-store/UI.
+store/UI. The standalone character memory and numeric relationship endpoints
+require backend debug mode, like the Inspector endpoint; the play screen loads
+public profiles only.
 
 ## 7. Logical roles and physical calls
 

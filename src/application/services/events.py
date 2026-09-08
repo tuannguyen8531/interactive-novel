@@ -76,6 +76,8 @@ class InMemoryJobEventBroker:
             self._history[job_id].append(event)
             subscribers = tuple(self._subscribers.get(job_id, ()))
         for queue in subscribers:
+            if terminal and queue.full():
+                queue.get_nowait()
             with suppress(asyncio.QueueFull):
                 queue.put_nowait(event)
         return event

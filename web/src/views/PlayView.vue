@@ -17,7 +17,7 @@ import {
   turnMoveSuggestions
 } from '@/play/guidance'
 import { capitalizeStatus, displayTemplate, turnProgressPercent } from '@/play/progress'
-import type { CharacterView, MemoryView } from '@/api/types'
+import type { CharacterView } from '@/api/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -231,16 +231,6 @@ function selectedProfileList(key: string): string[] {
 function selectedStateText(key: string): string | null {
   const value = selectedCharacter.value?.state?.[key]
   return typeof value === 'string' && value.trim() ? value.trim() : null
-}
-
-function memoryLabel(memory: MemoryView): string {
-  const qualifier = memory.kind === 'belief' ? memory.payload.stance : memory.payload.method
-  const detail = typeof qualifier === 'string' && qualifier.trim() ? ` · ${qualifier.replaceAll('_', ' ')}` : ''
-  return `${memory.kind.replaceAll('_', ' ')}${detail}`
-}
-
-function memoryConfidence(memory: MemoryView): string | null {
-  return memory.confidence === null ? null : `${Math.round(memory.confidence * 100)}% confidence`
 }
 
 function playerTurnNumber(index: number): number {
@@ -557,26 +547,7 @@ function playerTurnNumber(index: number): number {
               </div>
             </section>
 
-            <section class="memory-section">
-              <div class="memory-heading">
-                <h4>Visible memories</h4>
-                <span v-if="characters.memories.length">{{ characters.memories.length }}</span>
-              </div>
-              <p v-if="characters.loading" class="memory-empty">Loading memories…</p>
-              <p v-else-if="characters.error" class="memory-error">{{ characters.error }}</p>
-              <p v-else-if="characters.memories.length === 0" class="memory-empty">
-                No turn-scoped observations or beliefs have been formed yet.
-              </p>
-              <div v-else class="memory-list">
-                <article v-for="memory in characters.memories" :key="memory.memory_id" class="memory-item">
-                  <strong>{{ memoryLabel(memory) }}</strong>
-                  <span>
-                    Minute {{ memory.world_time }}
-                    <template v-if="memoryConfidence(memory)"> · {{ memoryConfidence(memory) }}</template>
-                  </span>
-                </article>
-              </div>
-            </section>
+
           </div>
         </section>
       </aside>

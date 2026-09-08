@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 from typing import Any, cast
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -130,3 +132,26 @@ async def test_submit_is_idempotent_and_sse_reconnect_replays_final_event() -> N
         assert stream.status_code == 200
         assert "event: completed" in stream.text
         assert '"terminal": true' in stream.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["completed", "failed", "cancelled", "interrupted"])
+@pytest.mark.parametrize("cursor_source", ["header", "query"])
+async def test_sse_recovers_persisted_outcome_after_broker_restart(status: str, cursor_source: str) -> None:
+    events = InMemoryJobEventBroker()
+    job = SimpleNamespace(turn_run_id="run", status=status, result={"narrative": "Saved result"}, error=None)
+    services = SimpleNamespace(events=events, turns=SimpleNamespace(get_job=AsyncMock(return_value=job)))
+    app = create_app(Settings(), services=services)  # type: ignore[arg-type]
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        response = await asyncio.wait_for(
+            client.get(
+                "/api/jobs/job/events",
+                headers={"Last-Event-ID": "20"} if cursor_source == "header" else {},
+                params={"last_event_id": "20"} if cursor_source == "query" else {},
+            ),
+            timeout=2,
+        )
+    assert response.status_code == 200
+    assert f"event: {status}" in response.text
+    assert '"terminal": true' in response.text
+    assert "Saved result" in response.text

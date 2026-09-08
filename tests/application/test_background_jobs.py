@@ -303,3 +303,19 @@ async def test_event_broker_replays_from_last_event_and_closes_on_terminal() -> 
     events = [event async for event in broker.subscribe("job-1", last_event_id="1")]
     assert [event.event_type for event in events] == ["writer_token", "completed"]
     assert [event.id for event in events] == ["2", "3"]
+
+
+@pytest.mark.asyncio
+async def test_slow_subscriber_receives_terminal_when_queue_is_full() -> None:
+    broker = InMemoryJobEventBroker(queue_size=1)
+    await broker.register(job_id="job", turn_run_id="run")
+    await broker.publish_job_event(job_id="job", turn_run_id="run", event_type="progress", phase="writer")
+    stream = broker.subscribe("job")
+    await anext(stream)
+    await broker.publish_job_event(job_id="job", turn_run_id="run", event_type="progress", phase="writer")
+    await broker.publish_job_event(job_id="job", turn_run_id="run", event_type="completed", phase="job", terminal=True)
+    outcome = await asyncio.wait_for(anext(stream), timeout=1)
+    assert outcome.terminal
+    assert outcome.event_type == "completed"
+    with pytest.raises(StopAsyncIteration):
+        await anext(stream)

@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -86,3 +87,19 @@ async def test_inspector_endpoint_is_not_available_when_debug_is_disabled() -> N
 
     assert response.status_code == 404
     assert response.json()["error"] == {"code": "http_error", "message": "Not Found", "details": {}}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("debug", [False, True])
+@pytest.mark.parametrize("suffix", ["characters/npc/memory", "relationships"])
+async def test_internal_character_queries_require_debug(debug: bool, suffix: str) -> None:
+    settings = Settings().model_copy(update={"debug": debug})
+    queries = SimpleNamespace(
+        inspect_character_memory=AsyncMock(return_value=[{"kind": "belief"}]),
+        inspect_relationships=AsyncMock(return_value=[{"values": {"trust": 0.8}}]),
+    )
+    app = create_app(settings, services=SimpleNamespace(settings=settings, queries=queries))  # type: ignore[arg-type]
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get(f"/api/playthroughs/play/branches/root/{suffix}")
+    assert response.status_code == (200 if debug else 404)
+    assert queries.inspect_character_memory.await_count + queries.inspect_relationships.await_count == int(debug)

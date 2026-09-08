@@ -45,6 +45,8 @@ async def inspect_character_memory(
     limit: int = Query(default=100, ge=1, le=500),
     services: ApplicationContainer = _services_dependency,
 ):
+    if not services.settings.debug:
+        raise HTTPException(status_code=404, detail="Not Found")
     return public_json(
         await services.queries.inspect_character_memory(
             playthrough_id=playthrough_id,
@@ -62,6 +64,8 @@ async def inspect_relationships(
     character_id: str | None = None,
     services: ApplicationContainer = _services_dependency,
 ):
+    if not services.settings.debug:
+        raise HTTPException(status_code=404, detail="Not Found")
     return public_json(
         await services.queries.inspect_relationships(
             playthrough_id=playthrough_id,

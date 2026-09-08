@@ -125,6 +125,8 @@ async def job_events(
             terminal=True,
         )
 
+        cursor = None
+
     async def stream() -> AsyncIterator[dict[str, str]]:
         async for event in services.events.subscribe(job_id, last_event_id=cursor):
             if await request.is_disconnected():
