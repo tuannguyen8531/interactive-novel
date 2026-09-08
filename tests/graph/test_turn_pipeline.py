@@ -983,3 +983,39 @@ async def test_checkpoint_resume_does_not_double_commit_after_one_crash() -> Non
 
     assert result["status"] == "completed"
     assert len(committer.bundles) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", [ExecutionMode.QUALITY, ExecutionMode.FAST])
+@pytest.mark.parametrize("start", [930, 1439, 1530])
+async def test_ai_clock_context_uses_canonical_time_and_approved_end(mode: ExecutionMode, start: int) -> None:
+    from src.application.contracts.clock import StoryTimeContext
+    from src.domain.clock import InWorldClock
+
+    simulation = copy.deepcopy(ROLE_OUTPUTS["simulator"])
+    simulation["claim_proposals"] = []
+    simulation["state_patch"] = None
+    simulation["knowledge_requirements"] = []
+    provider = FakeProvider(sequences={"simulator": (simulation,)})
+    committer = FakeCommitter()
+    game_state = make_game_state()
+    game_state.clock = InWorldClock(start)
+    result = await make_pipeline(provider, committer, mode=mode).run(make_request(game_state, "clock-run"))
+    assert result["status"] == "completed"
+    assert committer.bundles[0].world_time_end == start + 1
+    assert {str(request.role) for request in provider.requests} == {
+        "planner",
+        "simulator",
+        "context_validator",
+        "writer",
+        "critic",
+    }
+    for request in provider.requests:
+        envelope, _ = json.JSONDecoder().raw_decode(request.user_prompt.split("Input envelope (JSON):", 1)[1].lstrip())
+        clock = envelope["context"]["clock"]
+        assert clock["current"] == StoryTimeContext.from_minutes(start).model_dump()
+        if str(request.role) in {"writer", "critic"}:
+            assert clock["approved_end"] == StoryTimeContext.from_minutes(start + 1).model_dump()
+            assert clock["approved_duration_minutes"] == 1
+        else:
+            assert "approved_end" not in clock

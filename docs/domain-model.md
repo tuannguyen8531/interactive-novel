@@ -228,7 +228,21 @@ management.
 ## 9. Clock, RNG, and policy visibility
 
 `InWorldClock` uses integer minutes from an epoch; each turn has a
-start/duration/end, with duration proposed by Planner and clamped by Guard.
+start/duration/end, with duration proposed by Simulator and validated by Guard.
+Invalid durations are rejected rather than silently clamped. Completed player
+turns without positive clock movement receive the default one-minute advance.
+The epoch is midnight on Day 1: 930 means Day 1 at 15:30, while 1530 means
+Day 2 at 01:30. Values are never interpreted as HHMM.
+
+Every turn role receives engine-derived `context.clock.current` with the minute
+count, day, 24-hour time and conventional period (night 22–06, morning 06–12,
+afternoon 12–18, evening 18–22). These periods do not model astronomical daylight.
+Writer and Critic also receive the approved duration and end time, including
+midnight crossings. Prompts require temporal consistency with these values;
+semantic lighting consistency is checked by AI, not a deterministic sunlight
+rule. The World Builder preview displays the converted opening time before
+confirmation. Existing saves are not reinterpreted or migrated by this change.
+
 Branches inherit the clock at the fork and then advance independently. UTC
 timestamps are audit data only.
 

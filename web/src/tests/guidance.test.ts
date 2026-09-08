@@ -15,6 +15,8 @@ describe('play guidance', () => {
   it('formats the in-world clock as a readable day and time', () => {
     expect(formatWorldTime(0)).toBe('Day 1 · 00:00')
     expect(formatWorldTime(480)).toBe('Day 1 · 08:00')
+    expect(formatWorldTime(930)).toBe('Day 1 · 15:30')
+    expect(formatWorldTime(1530)).toBe('Day 2 · 01:30')
     expect(formatWorldTime(1505)).toBe('Day 2 · 01:05')
     expect(formatWorldTime(Number.NaN)).toBe('Day 1 · 00:00')
   })

@@ -2,6 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import EditableCombobox from '@/components/EditableCombobox.vue'
+import { formatWorldTime } from '@/play/guidance'
 import { useWorldBuilderStore } from '@/stores/worldBuilder'
 
 const router = useRouter()
@@ -346,6 +347,7 @@ function cancel(): void {
       <section class="card">
         <p class="eyebrow">Opening scene</p>
         <h2>How the story begins</h2>
+        <p>Opening time: {{ formatWorldTime(store.draft.opening_scene.world_time) }}</p>
         <p>{{ store.draft.opening_scene.visible_actions.join(' · ') }}</p>
         <p class="small-copy">
           Participants:

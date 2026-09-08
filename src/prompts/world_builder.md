@@ -44,8 +44,14 @@ place a hidden secret in background. If a secret is useful, propose it as a
 `secret_exists` claim scoped to its owning character and add that claim ID to
 the character's `private_claim_ids`.
 Treat `opening_scene.world_time` as minutes since midnight on Day 1. Choose a
-time that fits the opening scene (for example, 480 means 08:00); do not default
-to midnight unless the requested premise actually begins there.
+time that fits the opening scene; do not default to midnight unless the
+requested premise actually begins there. Convert explicitly using
+`(day - 1) * 1440 + hour_24h * 60 + minute`. Never encode HHMM as minutes:
+Day 1 at 15:30 is 930, NOT 1530 (which means Day 2 at 01:30).
+Day 1 at 08:00 is 480; Day 1 at 13:30 is 810. Before returning the draft,
+convert the chosen value back to day and 24-hour time and check that opening
+prose, lighting and activities agree. Unless an explicit world rule establishes
+unusual daylight, a scene at 01:30 is at night, not a sunny afternoon.
 
 Translate each background into the structures that make it matter during play:
 

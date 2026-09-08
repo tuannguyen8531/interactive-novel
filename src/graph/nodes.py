@@ -36,6 +36,7 @@ from src.application.contracts.ai import (
 from src.application.contracts.ai import (
     SceneSpec as AISceneSpec,
 )
+from src.application.contracts.clock import StoryTimeContext, TurnClockContext
 from src.application.contracts.providers import (
     ExecutionMode,
     ProviderCancelledError,
@@ -767,12 +768,31 @@ class TurnGraphNodes:
         repair_attempt: int = 0,
         call_prefix: str,
     ) -> RoleExecutionResult:
+        current_time = self.runtime.request.game_state.world_time
+        clock = TurnClockContext(current=StoryTimeContext.from_minutes(current_time))
+        approved_patch = state.get("approved_patch")
+        if state.get("guard_approved") and isinstance(approved_patch, dict):
+            from src.domain.codec import patch_from_payload
+
+            duration = sum(
+                operation.duration_minutes
+                for operation in patch_from_payload(approved_patch).operations
+                if isinstance(operation, AdvanceClock)
+            )
+            clock = TurnClockContext(
+                current=clock.current,
+                approved_end=StoryTimeContext.from_minutes(current_time + duration),
+                approved_duration_minutes=duration,
+            )
+        timed_contexts = {
+            role: {**context, "clock": clock.model_dump(mode="json", exclude_none=True)} for role, context in contexts.items()
+        }
         return await self._executor().execute(
             roles,
             run_id=state["turn_run_id"],
             branch_id=state["branch_id"],
             world_time=self.runtime.request.game_state.world_time,
-            contexts=cast(Mapping[Any, Mapping[str, Any]], contexts),
+            contexts=cast(Mapping[Any, Mapping[str, Any]], timed_contexts),
             cancellation=self.runtime.cancellation,
             repair_attempt=repair_attempt,
             call_prefix=f"{state['turn_run_id']}-{call_prefix}",
