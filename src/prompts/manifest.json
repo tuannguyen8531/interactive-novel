@@ -17,11 +17,11 @@
   },
   "simulator": {
     "template": "simulator.md",
-    "semantic_version": "1.9.0",
+    "semantic_version": "1.10.0",
     "input_contract": "role-input",
     "output_schema_version": "simulation-result",
     "required_variables": ["input_json"],
-    "changelog": "Ground story time in explicit 24-hour clock context and distinguish elapsed minutes from HHMM."
+    "changelog": "Ground story time in explicit 24-hour clock context and ground reactions in observable behavioral cues."
   },
   "validator": {
     "template": "validator.md",
@@ -33,19 +33,19 @@
   },
   "writer": {
     "template": "writer.md",
-    "semantic_version": "1.6.0",
+    "semantic_version": "1.7.0",
     "input_contract": "role-input",
     "output_schema_version": "narrative-draft",
-    "required_variables": ["input_json"],
-    "changelog": "Use accepted outcomes and approved before/after locations; keep rejected outcomes out of fallback narration."
+    "required_variables": ["input_json", "language_guidance"],
+    "changelog": "Incorporate shared literary guidance, dynamic language guidance, and dramatic contrast in suggested actions."
   },
   "critic": {
     "template": "critic.md",
-    "semantic_version": "1.6.0",
+    "semantic_version": "1.7.0",
     "input_contract": "role-input",
     "output_schema_version": "critique-result",
-    "required_variables": ["input_json"],
-    "changelog": "Use accepted outcomes and approved before/after locations; keep rejected outcomes out of fallback narration."
+    "required_variables": ["input_json", "language_guidance"],
+    "changelog": "Incorporate shared literary guidance, dynamic language guidance, and evaluate dialogue naturalness."
   },
   "repair": {
     "semantic_version": "1.1.0",

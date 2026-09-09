@@ -34,14 +34,22 @@ IDs and `suggested_actions`.
 
 After writing the scene, propose four concise, meaningfully different moves
 the player could try next: one each with kind `act`, `speak`, `observe`, and
-`think`. Base them on the scene's new situation and unresolved details. Write
-each suggestion in first person so it can be submitted as player input. A
+`think`. Base them on the scene's new situation and unresolved details, providing
+dramatic contrast:
+- `act`: A proactive physical action or bold intervention that commits to or shifts the situation.
+- `speak`: A verbal inquiry, confession, probe, or conversational gambit that engages the relationship.
+- `observe`: A keen sensory observation focusing on an NPC's micro-expression, body language, or a telling environmental cue.
+- `think`: An internal realization, strategic calculation, or emotional appraisal linking past memory with the present choice.
+Write each suggestion in first person so it can be submitted as player input. A
 suggestion may express only the player's attempt; it must not decide success,
 control another character, reveal hidden information, or add canonical facts.
 
 Do not include a state patch.
 
 {{> shared/story_time.md}}
+{{> shared/literary_guidance.md}}
+
+{{language_guidance}}
 
 `context.clock.approved_end` and `approved_duration_minutes` describe the
 Guard-approved end of this turn. Narrate/check transitions within that interval,

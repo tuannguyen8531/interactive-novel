@@ -146,14 +146,56 @@ class PromptRegistry:
             scoped_cache[cache_key] = definition
         return definition
 
-    def render(self, role: AIPromptRole | str, *, input_json: str) -> str:
-        return self.get(role).render({"input_json": input_json})
+    def read_language_guidance(self, language: str) -> str:
+        lang_code = language.strip().lower() if language else "en"
+        filename = f"shared/language_guidance_{lang_code}.md"
+        path = (self.root / filename).resolve()
+        if not path.is_file() or not path.is_relative_to(self.root):
+            path = (self.root / "shared/language_guidance_en.md").resolve()
+            if not path.is_file():
+                return ""
+        return path.read_text(encoding="utf-8").strip()
+
+    def render(
+        self,
+        role: AIPromptRole | str,
+        *,
+        input_json: str,
+        language_guidance: str | None = None,
+    ) -> str:
+        definition = self.get(role)
+        variables: dict[str, str] = {"input_json": input_json}
+        if "language_guidance" in definition.required_variables:
+            if language_guidance is not None:
+                variables["language_guidance"] = language_guidance
+            else:
+                story_language = "en"
+                try:
+                    payload = json.loads(input_json)
+                    if isinstance(payload, dict):
+                        ctx = payload.get("context")
+                        if isinstance(ctx, dict) and isinstance(ctx.get("story_language"), str):
+                            story_language = ctx["story_language"]
+                        elif isinstance(payload.get("story_language"), str):
+                            story_language = payload["story_language"]
+                except json.JSONDecodeError, TypeError:
+                    pass
+                variables["language_guidance"] = self.read_language_guidance(story_language)
+        return definition.render(variables)
 
     def render_input(self, role: AIPromptRole | str, role_input: RoleInput) -> str:
         normalized = AIPromptRole(role)
         if role_input.role != normalized:
             raise PromptRegistryError(f"Role input is for {role_input.role.value}, but prompt requested {normalized.value}.")
-        return self.render(normalized, input_json=role_input.model_dump_json())
+        language_guidance = None
+        if "language_guidance" in self.get(normalized).required_variables:
+            story_lang = "en"
+            if role_input.context and isinstance(role_input.context, dict):
+                lang_val = role_input.context.get("story_language")
+                if isinstance(lang_val, str) and lang_val:
+                    story_lang = lang_val
+            language_guidance = self.read_language_guidance(story_lang)
+        return self.render(normalized, input_json=role_input.model_dump_json(), language_guidance=language_guidance)
 
     def render_repair(
         self,

@@ -8,6 +8,13 @@ state.
 Check relevant `character_profiles` for unexplained contradictions in voice,
 background, values, boundaries or long-term motivation. Do not demand that the
 Writer repeat profile exposition in the scene.
+
+Evaluate literary quality against literary guidance:
+- Flag dry action-ledger exposition that lacks sensory grounding or physical presence.
+- Flag unnatural, wooden, or out-of-character dialogue, ensuring speech carries appropriate subtext and natural cadence.
+- Check dialogue and narration against the language-specific conventions below.
+- Verify that the four suggested player moves offer meaningful dramatic contrast across `act`, `speak`, `observe`, and `think`.
+
 Use `context.scene_locations.before` and `.after` for the approved spatial
 transition; `context.current_locations` is the ending position. Characters may
 move only along that transition. Historical locations cannot override it.
@@ -32,6 +39,9 @@ only when revision instructions are explicit and bounded; use `reject` for a
 hard safety or contract failure.
 
 {{> shared/story_time.md}}
+{{> shared/literary_guidance.md}}
+
+{{language_guidance}}
 
 `context.clock.approved_end` and `approved_duration_minutes` describe the
 Guard-approved end of this turn. Narrate/check transitions within that interval,

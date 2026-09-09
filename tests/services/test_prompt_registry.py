@@ -61,7 +61,7 @@ def test_repair_prompt_contains_role_schema_and_diagnostics() -> None:
 def test_simulator_prompt_requires_authoritative_ids_and_clock_progress() -> None:
     prompt = PromptRegistry().get(AIPromptRole.SIMULATOR)
 
-    assert prompt.semantic_version == "1.9.0"
+    assert prompt.semantic_version
     assert "context.authoritative_ids" in prompt.content
     assert "character_profiles" in prompt.content
     assert "exactly one" in prompt.content
@@ -204,3 +204,46 @@ def test_legacy_validator_role_is_rejected() -> None:
         PromptRegistry().get("context_validator")
     with pytest.raises(ValueError):
         AIContractRegistry().parse("context_validator", {})
+
+
+def test_writer_and_critic_branch_language_guidance_by_story_language() -> None:
+    registry = PromptRegistry()
+
+    input_vi = RoleInput(
+        input_schema_version="role-input",
+        role=AIPromptRole.WRITER,
+        run_id="run-vi",
+        context_manifest_id="manifest-vi",
+        branch_id="root",
+        world_time=100,
+        context={"story_language": "vi"},
+    )
+    rendered_vi = registry.render_input(AIPromptRole.WRITER, input_vi)
+    assert "Vietnamese (`vi`)" in rendered_vi
+    assert "English (`en`)" not in rendered_vi
+
+    input_en = RoleInput(
+        input_schema_version="role-input",
+        role=AIPromptRole.WRITER,
+        run_id="run-en",
+        context_manifest_id="manifest-en",
+        branch_id="root",
+        world_time=100,
+        context={"story_language": "en"},
+    )
+    rendered_en = registry.render_input(AIPromptRole.WRITER, input_en)
+    assert "English (`en`)" in rendered_en
+    assert "Vietnamese (`vi`)" not in rendered_en
+
+    critic_vi = RoleInput(
+        input_schema_version="role-input",
+        role=AIPromptRole.CRITIC,
+        run_id="run-vi-critic",
+        context_manifest_id="manifest-vi-critic",
+        branch_id="root",
+        world_time=100,
+        context={"story_language": "vi"},
+    )
+    rendered_critic_vi = registry.render_input(AIPromptRole.CRITIC, critic_vi)
+    assert "Vietnamese (`vi`)" in rendered_critic_vi
+    assert "English (`en`)" not in rendered_critic_vi

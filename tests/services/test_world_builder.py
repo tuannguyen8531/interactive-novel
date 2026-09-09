@@ -10,6 +10,7 @@ from src.application.contracts.ai import AIPromptRole, WorldSeed
 from src.application.contracts.providers import ProviderResponse, StructuredResponse
 from src.domain.language import StoryLanguage
 from src.services.ai.world_builder import ProviderWorldDraftGenerator
+from src.services.prompts import PromptRegistry
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "ai" / "role_outputs.json"
 
@@ -46,7 +47,7 @@ async def test_provider_world_builder_renders_versioned_school_romance_prompt() 
     assert '"player_character"' in provider.request.user_prompt
     assert '"opening_scene"' in provider.request.user_prompt
     assert provider.request.metadata["output_schema_version"] == "world-seed"
-    assert result.prompt_version == "1.9.0"
+    assert result.prompt_version == PromptRegistry().get(AIPromptRole.WORLD_BUILDER).semantic_version
     assert result.run_id != payload["run_id"]
 
 

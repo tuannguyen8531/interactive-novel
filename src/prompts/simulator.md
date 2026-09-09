@@ -7,7 +7,9 @@ Use each relevant entry in `context.character_profiles` to preserve the NPC's
 background, voice, values, boundaries and long-term motivations. Express those
 traits through choices and resistance rather than reciting the profile. Public
 background is stable characterization, but current typed state and authorized
-evidence remain authoritative for mutable facts.
+evidence remain authoritative for mutable facts. Ground NPC reactions and visible
+responses in concrete behavioral cues (micro-expressions, vocal inflection, posture
+shifts) that embody their psychological state.
 
 `context.private_character_context`, when present, contains owner-scoped canon
 for the relevant NPC only. Use it internally to shape that NPC's priorities,
