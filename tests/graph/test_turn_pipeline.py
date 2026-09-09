@@ -1177,3 +1177,55 @@ async def test_repair_prompt_identity_survives_role_execution_trace() -> None:
     for request in provider.requests:
         assert len(request.metadata["template_hash"]) == 64
         assert request.metadata["prompt_version"]
+
+
+@pytest.mark.asyncio
+async def test_writer_revision_receives_previous_draft_and_critic_feedback() -> None:
+    critique = copy.deepcopy(ROLE_OUTPUTS["critic"])
+    critique.update(decision="revise", revision_instructions=["Replace emotional labels with observable gestures."])
+    provider = FakeProvider(sequences={"critic": (critique,)})
+    committer = FakeCommitter()
+
+    result = await make_pipeline(provider, committer).run(make_request(make_game_state()))
+
+    writers = [request for request in provider.requests if request.role == AIPromptRole.WRITER]
+    assert len(writers) == 2
+    prompt = writers[1].user_prompt
+    assert "Replace emotional labels with observable gestures." in prompt
+    assert json.dumps(ROLE_OUTPUTS["writer"]["narrative_text"], ensure_ascii=False) in prompt
+    assert result["commit_done"] is True
+    assert len(committer.bundles) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("decision", "code", "writer_calls"),
+    [("revise", "revision_limit_exceeded", 2), ("reject", "critique_rejected", 1)],
+)
+async def test_critic_failure_preserves_reason_without_committing(decision: str, code: str, writer_calls: int) -> None:
+    critique = copy.deepcopy(ROLE_OUTPUTS["critic"])
+    critique.update(
+        decision=decision,
+        issues=[
+            {
+                "issue_id": "telling",
+                "category": "literary_quality",
+                "severity": "warning",
+                "description": "The draft labels emotions instead of showing them.",
+            }
+        ],
+        revision_instructions=["Describe observable gestures."],
+    )
+    provider = FakeProvider(sequences={"critic": (critique, critique)})
+    committer = FakeCommitter()
+
+    result = await make_pipeline(provider, committer).run(make_request(make_game_state()))
+
+    assert result["status"] == "failed"
+    assert result["commit_done"] is False
+    assert not committer.bundles
+    assert sum(request.role == AIPromptRole.WRITER for request in provider.requests) == writer_calls
+    diagnostic = result["errors"][-1]
+    assert diagnostic["node"] == "critique"
+    assert diagnostic["code"] == code
+    assert "The draft labels emotions instead of showing them." in diagnostic["message"]

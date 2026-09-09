@@ -651,7 +651,7 @@ class TurnGraphNodes:
         result = await self._execute(
             (AIPromptRole.WRITER,),
             state,
-            {AIPromptRole.WRITER: context},
+            {AIPromptRole.WRITER: {**context, "revision_feedback": state.get("revision_feedback", {})}},
             repair_attempt=state.get("revision_count", 0),
             call_prefix="write",
         )
@@ -690,9 +690,21 @@ class TurnGraphNodes:
         exhausted = critique.decision == CritiqueDecision.REJECT or (
             critique.decision == CritiqueDecision.REVISE and state.get("revision_count", 0) >= self.runtime.max_revision_attempts
         )
+        errors = state["errors"]
+        if exhausted:
+            rejected = critique.decision == CritiqueDecision.REJECT
+            message = "Critic rejected the narrative." if rejected else "Writer/critic revision limit was reached."
+            reasons = [issue.description for issue in critique.issues] or list(critique.revision_instructions)
+            errors = _append_error(
+                state,
+                "critique",
+                "critique_rejected" if rejected else "revision_limit_exceeded",
+                " ".join((message, *reasons)),
+            )
         return {
             "critique": critique,
             "status": "failed" if exhausted else "running",
+            "errors": errors,
             **_trace_update(state, result),
         }
 
@@ -703,8 +715,15 @@ class TurnGraphNodes:
         count = state.get("revision_count", 0)
         if count >= self.runtime.max_revision_attempts:
             return _failure(state, "revision_limit_exceeded", "Writer/critic revision limit was reached.")
+        draft = state.get("draft")
+        if not isinstance(draft, NarrativeDraft):
+            return _failure(state, "revision_draft_missing", "Revision requires the previous narrative draft.")
         return {
             "revision_count": count + 1,
+            "revision_feedback": {
+                "draft": draft.model_dump(mode="json"),
+                "critique": critique.model_dump(mode="json"),
+            },
             "draft": None,
             "final_narrative": None,
             "critique": None,

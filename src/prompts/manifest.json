@@ -33,11 +33,11 @@
   },
   "writer": {
     "template": "writer.md",
-    "semantic_version": "1.7.0",
+    "semantic_version": "1.8.0",
     "input_contract": "role-input",
     "output_schema_version": "narrative-draft",
     "required_variables": ["input_json", "language_guidance"],
-    "changelog": "Incorporate shared literary guidance, dynamic language guidance, and dramatic contrast in suggested actions."
+    "changelog": "Revise the previous draft using critic feedback within the Guard-approved scene boundaries."
   },
   "critic": {
     "template": "critic.md",
