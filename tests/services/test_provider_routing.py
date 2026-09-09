@@ -156,7 +156,7 @@ def test_quality_and_fast_plans_keep_each_logical_role_independent() -> None:
     assert len(fast) == 3
     assert fast[0].logical_roles == (LogicalRole.PLANNER, LogicalRole.SIMULATOR)
     assert fast[0].fused is True
-    assert fast[1].logical_roles == (LogicalRole.CONTEXT_VALIDATOR,)
+    assert fast[1].logical_roles == (LogicalRole.VALIDATOR,)
     assert fast[2].logical_roles == (LogicalRole.WRITER, LogicalRole.CRITIC)
     assert fast[2].fused is True
     assert {role for plan in fast for role in plan.logical_roles} == set(roles)
@@ -172,7 +172,7 @@ def test_fast_plan_splits_roles_when_their_targets_differ() -> None:
     routes: dict[LogicalRole | str, ProviderRoute] = {
         LogicalRole.PLANNER: ProviderRoute("planner"),
         LogicalRole.SIMULATOR: ProviderRoute("simulator"),
-        LogicalRole.CONTEXT_VALIDATOR: ProviderRoute("validator"),
+        LogicalRole.VALIDATOR: ProviderRoute("validator"),
         LogicalRole.WRITER: ProviderRoute("writer"),
         LogicalRole.CRITIC: ProviderRoute("writer"),
         "embedding": ProviderRoute("validator"),
@@ -187,7 +187,7 @@ def test_fast_plan_splits_roles_when_their_targets_differ() -> None:
     assert [(plan.target_name, plan.logical_roles, plan.fused) for plan in plans] == [
         ("planner", (LogicalRole.PLANNER,), False),
         ("simulator", (LogicalRole.SIMULATOR,), False),
-        ("validator", (LogicalRole.CONTEXT_VALIDATOR,), False),
+        ("validator", (LogicalRole.VALIDATOR,), False),
         ("writer", (LogicalRole.WRITER, LogicalRole.CRITIC), True),
     ]
 

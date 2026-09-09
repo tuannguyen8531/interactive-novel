@@ -39,7 +39,8 @@ from src.domain.relationships import RelationshipVector
 from src.domain.state import GameState
 from src.graph import TurnPipeline, TurnPipelineDependencies, TurnPipelineRequest
 from src.graph.checkpoint import build_in_memory_checkpointer
-from src.graph.nodes import scene_from_plan
+from src.graph.nodes import domain_patch_from_simulation
+from src.graph.scenes import prepare_scene
 from src.services.ai.contracts import AIContractRegistry
 from src.services.retrieval.embeddings import DEFAULT_EMBEDDING_VERSION, InMemoryEmbeddingStore
 from src.services.retrieval.tracing import InMemoryRetrievalTraceStore
@@ -242,12 +243,21 @@ def test_scene_uses_planned_content_classification_and_persisted_world_tone() ->
     state = make_game_state()
     state.metadata["world_profile"] = {"tone": "intimate, ominous"}
 
-    scene = scene_from_plan(
-        {"turn_run_id": "turn-run-1", "actor_id": "player"},  # type: ignore[arg-type]
+    from src.domain.codec import patch_to_payload
+
+    scene = prepare_scene(
+        {
+            "turn_run_id": "turn-run-1",
+            "actor_id": "player",
+            "raw_input": "Offer help",
+            "plan": plan,
+            "simulation": simulation,
+            "guard_approved": True,
+            "approved_patch": patch_to_payload(domain_patch_from_simulation(simulation, branch_id=state.branch_id)),
+        },  # type: ignore[arg-type]
         state,
-        plan,
-        simulation,
-    )
+        DomainGuard(),
+    ).scene
 
     assert scene.tags == ("romantic_affection",)
     assert scene.violence_detail.value == "none"
@@ -436,7 +446,7 @@ async def test_guard_rejection_repairs_once_before_commit() -> None:
 
 @pytest.mark.asyncio
 async def test_context_validation_repair_reruns_plan_and_simulation() -> None:
-    failed_report = copy.deepcopy(ROLE_OUTPUTS["context_validator"])
+    failed_report = copy.deepcopy(ROLE_OUTPUTS["validator"])
     failed_report["status"] = "fail"
     failed_report["violations"] = [
         {
@@ -450,7 +460,7 @@ async def test_context_validation_repair_reruns_plan_and_simulation() -> None:
     failed_report["recommended_corrections"] = ["Rebuild the plan from context.current_locations."]
     provider = FakeProvider(
         sequences={
-            "context_validator": (failed_report, ROLE_OUTPUTS["context_validator"]),
+            "validator": (failed_report, ROLE_OUTPUTS["validator"]),
         }
     )
 
@@ -532,10 +542,19 @@ async def test_turn_can_register_story_location_before_moving_characters() -> No
     ]
     committer = FakeCommitter()
 
-    result = await make_pipeline(
-        FakeProvider(sequences={"planner": (plan,), "simulator": (simulation,)}),
-        committer,
-    ).run(make_request(make_game_state(), "dynamic-location-run"))
+    simulation["proposed_outcome"] = "The player and Alice reach the school rooftop."
+    provider = FakeProvider(sequences={"planner": (plan,), "simulator": (simulation,)})
+    game_state = make_game_state()
+    for key, character in tuple(game_state.characters.items()):
+        game_state.characters[key] = Character(character.profile, CharacterState(location_id="library"))
+    result = await make_pipeline(provider, committer).run(make_request(game_state, "dynamic-location-run"))
+    for context in _writing_inputs(provider):
+        assert context["scene_locations"]["before"] == {"player": "library", "alice": "library"}
+        assert context["scene_locations"]["after"] == {"player": "school_rooftop", "alice": "school_rooftop"}
+        assert context["current_locations"] == context["scene_locations"]["after"]
+        assert any(place["location_id"] == "school_rooftop" for place in context["location_catalog"])
+    assert game_state.characters["player"].state.location_id == "library"
+    assert "school_rooftop" not in game_state.locations
 
     assert result["status"] == "completed"
     assert result["retry_counters"].get("repair", 0) == 0
@@ -555,27 +574,34 @@ async def test_turn_can_register_story_location_before_moving_characters() -> No
 
 
 @pytest.mark.asyncio
-async def test_plan_location_must_be_existing_or_registered_by_simulation() -> None:
+async def test_unselected_candidate_location_does_not_become_an_approved_destination() -> None:
     plan = copy.deepcopy(ROLE_OUTPUTS["planner"])
     plan["candidate_beats"][0]["location_id"] = "school_rooftop"
+    plan["candidate_beats"][0]["description"] = "UNSELECTED: Alice and the player reach the rooftop."
     simulation = copy.deepcopy(ROLE_OUTPUTS["simulator"])
-    provider = FakeProvider(sequences={"planner": (plan,), "simulator": (simulation, simulation)})
+    simulation["proposed_outcome"] = "Alice refuses to leave and stays in the library."
+    provider = FakeProvider(sequences={"planner": (plan,), "simulator": (simulation,)})
     committer = FakeCommitter()
 
-    result = await make_pipeline(provider, committer).run(make_request(make_game_state(), "unregistered-plan-location-run"))
+    result = await make_pipeline(provider, committer).run(make_request(make_game_state(), "unselected-location-run"))
 
-    assert result["status"] == "failed"
-    assert result["retry_counters"]["repair"] == 1
-    guard_error = result.get("guard_error")
-    assert isinstance(guard_error, dict)
-    assert guard_error["code"] == "unknown_plan_location"
-    assert committer.bundles == []
+    assert result["status"] == "completed"
+    assert result["retry_counters"].get("repair", 0) == 0
+    assert len(committer.bundles) == 1
+    for context in _writing_inputs(provider):
+        assert context["scene_spec"]["approved_beats"] == [simulation["proposed_outcome"]]
+        assert "UNSELECTED" not in json.dumps(context)
+        assert "school_rooftop" not in json.dumps(context)
+        assert "plan" not in context
+        assert "simulation" not in context
 
 
 @pytest.mark.asyncio
 async def test_invalid_model_mutations_after_repair_are_dropped_without_blocking_turn() -> None:
     invalid = copy.deepcopy(ROLE_OUTPUTS["simulator"])
     invalid["claim_proposals"][0]["subject_id"] = "colorful-posters"
+    invalid["proposed_outcome"] = "REJECTED_OUTCOME: Alice gives you the prize."
+    invalid["npc_reactions"][0]["immediate_reaction"] = "REJECTED_REACTION: Alice hands over the prize."
     provider = FakeProvider(sequences={"simulator": (invalid, invalid)})
     committer = FakeCommitter()
 
@@ -592,6 +618,14 @@ async def test_invalid_model_mutations_after_repair_are_dropped_without_blocking
     ]
     assert committer.bundles[0].duration_minutes == 1
     assert any(roles == ("writer",) for _, roles in provider.calls)
+    for context in _writing_inputs(provider):
+        assert context["scene_spec"]["outcome_status"] == "attempt_only"
+        assert context["scene_spec"]["allowed_claims"] == []
+        assert context["scene_spec"]["visible_actions"] == [context["normalized_input"]]
+        assert "REJECTED_OUTCOME" not in json.dumps(context)
+        assert "REJECTED_REACTION" not in json.dumps(context)
+        assert context["scene_locations"]["before"] == context["scene_locations"]["after"]
+        assert context["clock"]["approved_duration_minutes"] == 1
 
 
 @pytest.mark.asyncio
@@ -755,7 +789,7 @@ async def test_initial_context_includes_bounded_public_character_backgrounds() -
 
     planner_request = next(request for request in provider.requests if request.role == AIPromptRole.PLANNER)
     simulator_request = next(request for request in provider.requests if request.role == AIPromptRole.SIMULATOR)
-    validator_request = next(request for request in provider.requests if request.role == AIPromptRole.CONTEXT_VALIDATOR)
+    validator_request = next(request for request in provider.requests if request.role == AIPromptRole.VALIDATOR)
     writer_request = next(request for request in provider.requests if request.role == AIPromptRole.WRITER)
     critic_request = next(request for request in provider.requests if request.role == AIPromptRole.CRITIC)
     assert "Alice inherited responsibility" in planner_request.user_prompt
@@ -789,7 +823,7 @@ async def test_fast_mode_keeps_private_npc_context_inside_simulation_roles() -> 
     prompts = {request.role: request.user_prompt for request in provider.requests}
     assert "secret-alice-letter" not in prompts[AIPromptRole.PLANNER]
     assert "secret-alice-letter" in prompts[AIPromptRole.SIMULATOR]
-    assert "secret-alice-letter" in prompts[AIPromptRole.CONTEXT_VALIDATOR]
+    assert "secret-alice-letter" in prompts[AIPromptRole.VALIDATOR]
     assert "secret-alice-letter" not in prompts[AIPromptRole.WRITER]
     assert "secret-alice-letter" not in prompts[AIPromptRole.CRITIC]
 
@@ -1006,7 +1040,7 @@ async def test_ai_clock_context_uses_canonical_time_and_approved_end(mode: Execu
     assert {str(request.role) for request in provider.requests} == {
         "planner",
         "simulator",
-        "context_validator",
+        "validator",
         "writer",
         "critic",
     }
@@ -1019,3 +1053,127 @@ async def test_ai_clock_context_uses_canonical_time_and_approved_end(mode: Execu
             assert clock["approved_duration_minutes"] == 1
         else:
             assert "approved_end" not in clock
+
+
+def _writing_inputs(provider: FakeProvider) -> list[dict[str, Any]]:
+    return [
+        json.JSONDecoder().raw_decode(request.user_prompt.split("Input envelope (JSON):", 1)[1].lstrip())[0]["context"]
+        for request in provider.requests
+        if str(request.role) in {"writer", "critic"}
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["quality", "fast"])
+async def test_refusal_replaces_planner_success_and_hides_internal_npc_rationale(mode: str) -> None:
+    plan = copy.deepcopy(ROLE_OUTPUTS["planner"])
+    plan["candidate_beats"][0]["description"] = "DISCARDED_CANDIDATE: Alice agrees to help."
+    simulation = copy.deepcopy(ROLE_OUTPUTS["simulator"])
+    simulation["proposed_outcome"] = "Alice declines the offer."
+    simulation["npc_reactions"][0]["immediate_reaction"] = "Alice shakes her head."
+    simulation["npc_reactions"][0]["agency_goal"] = "INTERNAL_RATIONALE: hide her plan to resign."
+    provider = FakeProvider(sequences={"planner": (plan,), "simulator": (simulation,)})
+    result = await make_pipeline(provider, FakeCommitter(), mode=mode).run(make_request(make_game_state(), "refusal-run"))
+    assert result["status"] == "completed"
+    for context in _writing_inputs(provider):
+        assert context["scene_spec"]["approved_beats"] == ["Alice declines the offer."]
+        assert "Alice shakes her head." in context["scene_spec"]["visible_actions"]
+        assert context["scene_spec"]["outcome_status"] == "accepted"
+        assert "DISCARDED_CANDIDATE" not in json.dumps(context)
+        assert "INTERNAL_RATIONALE" not in json.dumps(context)
+
+
+@pytest.mark.asyncio
+async def test_guard_repair_exposes_only_the_repaired_outcome() -> None:
+    invalid = copy.deepcopy(ROLE_OUTPUTS["simulator"])
+    invalid["claim_proposals"][0]["subject_id"] = "unknown-subject"
+    invalid["proposed_outcome"] = "REJECTED_RESULT: Alice accepts the gift."
+    repaired = copy.deepcopy(ROLE_OUTPUTS["simulator"])
+    repaired["proposed_outcome"] = "Alice politely refuses the gift."
+    provider = FakeProvider(sequences={"simulator": (invalid, repaired)})
+    result = await make_pipeline(provider, FakeCommitter()).run(make_request(make_game_state(), "repaired-outcome-run"))
+    assert result["status"] == "completed"
+    assert result["retry_counters"]["repair"] == 1
+    for context in _writing_inputs(provider):
+        assert context["scene_spec"]["approved_beats"] == [repaired["proposed_outcome"]]
+        assert "REJECTED_RESULT" not in json.dumps(context)
+
+
+@pytest.mark.asyncio
+async def test_realized_movement_to_unregistered_location_still_fails() -> None:
+    simulation = copy.deepcopy(ROLE_OUTPUTS["simulator"])
+    simulation["state_patch"]["operations"] = [
+        {"operation_type": "set_character_location", "character_id": "player", "location_id": "unregistered_place"},
+        {"operation_type": "advance_clock", "duration_minutes": 5},
+    ]
+    provider = FakeProvider(sequences={"simulator": (simulation, simulation)})
+    committer = FakeCommitter()
+    result = await make_pipeline(provider, committer).run(make_request(make_game_state(), "invalid-movement-run"))
+    assert result["status"] == "failed"
+    assert committer.bundles == []
+    assert _writing_inputs(provider) == []
+
+
+def test_scene_claims_come_from_final_patch_and_exclude_npc_private_claims() -> None:
+    from src.domain.codec import patch_to_payload
+    from src.domain.patch import AddKnowledgeClaim, AdvanceClock, StatePatch
+
+    contracts = AIContractRegistry()
+    simulation = contracts.parse(AIPromptRole.SIMULATOR, ROLE_OUTPUTS["simulator"])
+    plan = contracts.parse(AIPromptRole.PLANNER, ROLE_OUTPUTS["planner"])
+    game_state = make_game_state()
+    public = KnowledgeClaim("alice", "public_fact", typed_value="Alice joined the club.", claim_id="approved-public")
+    private = KnowledgeClaim(
+        "alice", "public_fact", typed_value="PRIVATE_SECRET_TEXT", claim_id="private-npc-claim", branch_scope="alice"
+    )
+    game_state.claims[private.claim_id] = private
+    assert isinstance(simulation, SimulationResult)
+    simulation = simulation.model_copy(
+        update={
+            "claim_proposals": (
+                simulation.claim_proposals[0].model_copy(update={"proposal_id": private.claim_id, "branch_scope": "alice"}),
+            )
+        }
+    )
+    patch = StatePatch((AddKnowledgeClaim(public), AdvanceClock(1)), branch_id="root")
+    state = {
+        "turn_run_id": "projection-run",
+        "actor_id": "player",
+        "raw_input": "Offer help",
+        "plan": plan,
+        "simulation": simulation,
+        "guard_approved": True,
+        "approved_patch": patch_to_payload(patch),
+    }
+    prepared = prepare_scene(state, game_state, DomainGuard())  # type: ignore[arg-type]
+    assert [claim.claim_id for claim in prepared.scene.allowed_claims] == ["approved-public"]
+    assert "private-npc-claim" not in prepared.scene.model_dump_json()
+    assert "PRIVATE_SECRET_TEXT" not in prepared.scene.model_dump_json()
+    assert "approved-public" not in game_state.claims
+    assert game_state.world_time == 0
+    state["guard_approved"] = False
+    with pytest.raises(ValueError, match="Guard-approved patch"):
+        prepare_scene(state, game_state, DomainGuard())  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_repair_prompt_identity_survives_role_execution_trace() -> None:
+    from dataclasses import replace
+
+    class RepairedProvider(FakeProvider):
+        async def generate_structured(self, request: ProviderRequest, schema: StructuredSchema) -> StructuredResponse:
+            response = await super().generate_structured(request, schema)
+            return replace(response, repaired=True, repair_prompt_version="1.0.0", repair_template_hash="repair-hash")
+
+    provider = RepairedProvider()
+    result = await make_pipeline(provider, FakeCommitter()).run(make_request(make_game_state(), "repair-trace-run"))
+    assert result["status"] == "completed"
+    for trace in result["llm_traces"]:
+        assert trace["parse_status"] == "repaired"
+        assert trace["repair_prompt_version"] == "1.0.0"
+        assert trace["repair_template_hash"] == "repair-hash"
+        assert len(trace["template_hash"]) == 64
+        assert trace["raw_output_stored"] is False
+    for request in provider.requests:
+        assert len(request.metadata["template_hash"]) == 64
+        assert request.metadata["prompt_version"]

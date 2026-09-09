@@ -42,6 +42,10 @@ class TelemetryEvent:
     estimated_cost_usd: float = 0.0
     retry_count: int = 0
     fallback_from: str | None = None
+    prompt_version: str | None = None
+    template_hash: str | None = None
+    repair_prompt_version: str | None = None
+    repair_template_hash: str | None = None
 
     def __post_init__(self) -> None:
         if self.recorded_at.tzinfo is None:
@@ -70,6 +74,10 @@ class TelemetryEvent:
             "estimated_cost_usd": self.estimated_cost_usd,
             "retry_count": self.retry_count,
             "fallback_from": self.fallback_from,
+            "prompt_version": self.prompt_version,
+            "template_hash": self.template_hash,
+            "repair_prompt_version": self.repair_prompt_version,
+            "repair_template_hash": self.repair_template_hash,
         }
 
     def as_json(self) -> str:

@@ -94,7 +94,7 @@ relationships, triadic tension, and narrative threads. Secrets belong in
 owner-scoped private claims and must not be placed in shared character context.
 The current draft format requires every character to link at least one owned
 goal, one public background claim, and one thread. Private NPC claims are
-available to Simulator and Context Validator as internal motivation; Writer and
+available to Simulator and Validator as internal motivation; Writer and
 Critic do not receive that context.
 
 `CharacterState` changes over time: location, physical condition, emotional

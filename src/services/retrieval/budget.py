@@ -10,7 +10,7 @@ DEFAULT_ROLE_BUDGETS: dict[str, int] = {
     "world_builder": 2_000,
     "planner": 2_500,
     "simulator": 3_500,
-    "context_validator": 4_000,
+    "validator": 4_000,
     "writer": 2_000,
     "critic": 2_200,
     "memory": 1_500,

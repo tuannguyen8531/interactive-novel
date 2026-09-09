@@ -56,7 +56,7 @@ ROLE_MODELS: Mapping[AIPromptRole, type[VersionedOutput]] = {
     AIPromptRole.WORLD_BUILDER: WorldSeed,
     AIPromptRole.PLANNER: TurnPlan,
     AIPromptRole.SIMULATOR: SimulationResult,
-    AIPromptRole.CONTEXT_VALIDATOR: ConsistencyReport,
+    AIPromptRole.VALIDATOR: ConsistencyReport,
     AIPromptRole.WRITER: NarrativeDraft,
     AIPromptRole.CRITIC: CritiqueResult,
 }

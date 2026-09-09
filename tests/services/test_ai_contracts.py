@@ -236,16 +236,17 @@ def test_llm_run_trace_records_prompt_and_schema_versions_without_raw_output() -
         fallback_from="primary",
     )
 
+    prompt = PromptRegistry().get(AIPromptRole.WRITER)
     trace = build_llm_run_trace(
         response,
         run_id="turn-run-1",
         role=AIPromptRole.WRITER,
-        prompt=PromptRegistry().get(AIPromptRole.WRITER),
+        prompt=prompt,
         config_snapshot_id="config-1",
         parse_status="repaired",
     )
 
-    assert trace.prompt_version == "1.5.0"
+    assert trace.prompt_version == prompt.semantic_version
     assert trace.output_schema_version == "narrative-draft"
     assert trace.token_usage is not None
     assert trace.token_usage.total_tokens == 12

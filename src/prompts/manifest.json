@@ -1,11 +1,11 @@
 {
   "world_builder": {
     "template": "world_builder.md",
-    "semantic_version": "1.8.0",
-    "input_contract": "role-input",
+    "semantic_version": "1.9.0",
+    "input_contract": "world-builder-input",
     "output_schema_version": "world-seed",
     "required_variables": ["input_json"],
-    "changelog": "Ground story time in explicit 24-hour clock context and distinguish elapsed minutes from HHMM."
+    "changelog": "Resolve example provenance versions from the prompt manifest."
   },
   "planner": {
     "template": "planner.md",
@@ -17,34 +17,43 @@
   },
   "simulator": {
     "template": "simulator.md",
-    "semantic_version": "1.9.0",
+    "semantic_version": "1.10.0",
     "input_contract": "role-input",
     "output_schema_version": "simulation-result",
     "required_variables": ["input_json"],
-    "changelog": "Ground story time in explicit 24-hour clock context and distinguish elapsed minutes from HHMM."
+    "changelog": "Ground story time in explicit 24-hour clock context and ground reactions in observable behavioral cues."
   },
-  "context_validator": {
-    "template": "context_validator.md",
-    "semantic_version": "1.8.0",
+  "validator": {
+    "template": "validator.md",
+    "semantic_version": "1.10.0",
     "input_contract": "role-input",
     "output_schema_version": "consistency-report",
     "required_variables": ["input_json"],
-    "changelog": "Ground story time in explicit 24-hour clock context and distinguish elapsed minutes from HHMM."
+    "changelog": "Rename the logical role to validator."
   },
   "writer": {
     "template": "writer.md",
-    "semantic_version": "1.5.0",
+    "semantic_version": "1.7.0",
     "input_contract": "role-input",
     "output_schema_version": "narrative-draft",
-    "required_variables": ["input_json"],
-    "changelog": "Ground story time in explicit 24-hour clock context and distinguish elapsed minutes from HHMM."
+    "required_variables": ["input_json", "language_guidance"],
+    "changelog": "Incorporate shared literary guidance, dynamic language guidance, and dramatic contrast in suggested actions."
   },
   "critic": {
     "template": "critic.md",
-    "semantic_version": "1.5.0",
+    "semantic_version": "1.7.0",
     "input_contract": "role-input",
     "output_schema_version": "critique-result",
-    "required_variables": ["input_json"],
-    "changelog": "Ground story time in explicit 24-hour clock context and distinguish elapsed minutes from HHMM."
+    "required_variables": ["input_json", "language_guidance"],
+    "changelog": "Incorporate shared literary guidance, dynamic language guidance, and evaluate dialogue naturalness."
+  },
+  "repair": {
+    "semantic_version": "1.1.0",
+    "template": "repair.md",
+    "required_variables": [
+      "original_prompt",
+      "repair_input_json"
+    ],
+    "changelog": "Remove repeated repair instructions while retaining the original context and boundaries."
   }
 }

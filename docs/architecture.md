@@ -88,7 +88,7 @@ raw input
   → Simulator artifact
   → Claim Extractor / typed proposed operations
   → targeted consistency retrieval
-  → Context Validator report
+  → Validator report
   → deterministic State Guard
   → approved StatePatch + SceneSpec
   → Writer draft
@@ -111,7 +111,7 @@ available only to planning, simulation, and validation roles; Writer and Critic
 do not receive internal scores. Private claims and secrets are retrieved only
 when `owner_id` matches the authorized owner. For related NPCs, owner-scoped
 private claims are joined directly into the internal context of Simulator and
-Context Validator so they influence choices without appearing in public
+Validator so they influence choices without appearing in public
 initial context, Planner, Writer, or Critic context.
 
 The current WorldSeed format passes validation only when each character has at
@@ -122,7 +122,7 @@ thread. Every private claim must be linked by its owner through
 background remains a public profile and has no mutation authority by itself.
 Validation also rejects public background that directly contains a private
 claim identifier or text value; indirect semantic disclosure remains controlled
-by the prompt and Context Validator. WorldSeed prompt v1.6 carries the
+by the prompt and Validator. WorldSeed prompt v1.6 carries the
 canonical story language and allows `initial_claims.subject_id` to refer only
 to declared characters or locations; global world rules remain in premise or
 canon prose. Preflight groups related coverage and cross-reference errors into
@@ -130,9 +130,19 @@ one diagnostic set so a single structured-output repair can fix the complete
 payload instead of failing one invariant at a time.
 
 Writer receives `SceneSpec`, authorized evidence, bounded public character
-profiles, and the canonical story language; it does not receive the whole
-database, internal relationship or tension scores, and it does not return a
-state patch. Critic cannot change the outcome or state. Guard is the final
+profiles, and the canonical story language. The scene uses the accepted
+Simulator outcome and visible reactions, never Planner candidate beats. Writer
+and Critic receive the same before/after location projection computed by
+applying the final approved patch to a copy; `current_locations` in their
+context means the ending position, and their catalog includes newly registered
+visible destinations. They do not receive raw plan/simulation artifacts, NPC
+internal rationale, the whole database, or relationship/tension scores.
+Unselected Planner destinations need not be registered; realized movement is
+checked against the Simulator patch. If bounded Guard repair falls back to a
+clock-only turn, the scene is marked `attempt_only`: no proposed outcome or NPC
+reaction survives, and the player input remains an attempt, not canon. These
+projections constrain AI narration but do not deterministically validate prose.
+Writer does not return a state patch. Critic cannot change the outcome or state. Guard is the final
 deterministic gate before commit.
 
 ## 5. Canonical transaction
@@ -174,7 +184,7 @@ public profiles only.
 
 ## 7. Logical roles and physical calls
 
-The five logical contracts are Planner, Simulator, Context Validator, Writer,
+The five logical contracts are Planner, Simulator, Validator, Writer,
 and Critic. `PhysicalCallPlan` may split or fuse them according to Quality/Fast
 mode and provider capability; tracing still creates a separate artifact or
 validator record for each logical role. No mode may bypass the deterministic
@@ -218,3 +228,34 @@ Do not scaffold every empty module, connect a real provider in the deterministic
 slice, or build combat, multiplayer, microservices, operational PostgreSQL or
 vector databases, TTS/images, mobile, a marketplace, a full
 WorldScheduler/NPCAgenda/WorldTick, or autonomous rumor propagation.
+
+
+## Prompt assembly and structured repair
+
+Role templates may include a shared asset with `{{> shared/story_time.md}}`.
+The registry expands only files inside its root and rejects nested includes.
+The effective template hash covers the expanded text; shared-rule changes thus
+change every affected role hash. Includes are expanded before request data is
+inserted. `{{prompt_version}}` in template examples is resolved from the role
+manifest, so top-level and nested provenance examples cannot drift separately.
+
+Provider structured-output repair uses one `repair.md` with System/User
+sections and metadata in the shared `manifest.json`. It retains the original system
+instructions and the exact already-scoped role prompt, then appends diagnostics
+and invalid output as untrusted JSON data. It uses the actual requested schema,
+including non-turn schemas. No database context is fetched or broadened for
+repair. Cancellation, routing and the one-repair-per-request bound are preserved.
+Repair inputs are larger because they retain context; ordinary role prompts
+are not expanded with repair instructions unless repair is needed.
+
+Requests, graph traces and opt-in telemetry carry prompt version/hash and,
+when used, repair version/hash. The repair hash covers both user and system
+assets. Telemetry stores these identities without storing prompt or invalid
+output text. Grouping shared text is a maintenance change, not a token-saving
+claim. Semantic correctness of model repairs still requires evaluation with
+real providers.
+
+
+The validation role is named `validator` in prompts, provider routes and the UI.
+The `consistency-report` schema and the
+`validate_context` graph node name remain unchanged for checkpoint continuity.

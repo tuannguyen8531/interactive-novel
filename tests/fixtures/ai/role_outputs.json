@@ -238,9 +238,9 @@
     "knowledge_requirements": [{"schema_version": "knowledge-requirement", "requirement_id": "req-alice-location", "actor_id": "player", "subject_id": "alice", "predicate": "located_at", "object_id": "library", "purpose": "authorize the meeting", "branch_scope": "root", "world_time": 0, "minimum_confidence": 0.5}],
     "uncertainties": [{"subject_id": "alice", "statement": "Alice may be distracted by the deadline.", "confidence": 0.6}]
   },
-  "context_validator": {
+  "validator": {
     "schema_version": "consistency-report",
-    "role": "context_validator",
+    "role": "validator",
     "run_id": "turn-run-1",
     "prompt_version": "1.0.0",
     "physical_call_id": "call-validate-1",

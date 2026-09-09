@@ -38,6 +38,7 @@ from src.application.contracts.providers import (
     TokenUsage,
 )
 from src.services.logger import log_api_request_received, log_api_request_sent, log_error
+from src.services.prompts import PromptRegistry
 
 from .structured import parse_structured_text
 
@@ -66,11 +67,13 @@ class BaseProvider(ABC):
         *,
         client: httpx.AsyncClient | None = None,
         sleep: Callable[[float], Awaitable[None]] | None = None,
+        prompts: PromptRegistry | None = None,
     ) -> None:
         self.target = target
         self._client = client
         self._owns_client = client is None
         self._sleep = sleep or asyncio.sleep
+        self._prompts = prompts or PromptRegistry()
 
     @property
     @abstractmethod
@@ -354,20 +357,23 @@ class BaseProvider(ABC):
             )
             if request.repair_attempt >= 1:
                 raise first_error
+            repair = self._prompts.get_repair()
             repair_request = replace(
                 structured_request,
-                system_prompt=(
-                    "Return only valid JSON matching the requested schema. Resolve every listed validation failure, "
-                    "not merely the first one. Do not include Markdown fences or commentary. "
-                    f"Preserve all player-facing prose in the configured story language "
-                    f"({request.metadata.get('story_language', 'en')}); do not translate it to another language. "
-                    "Keep contract keys, enum values and authoritative IDs unchanged."
+                system_prompt=f"{request.system_prompt}\n\n{repair.system_content}",
+                user_prompt=repair.render(
+                    original_prompt=request.user_prompt,
+                    role=str(request.role),
+                    schema_name=schema.name,
+                    diagnostics=self._repair_diagnostic(first_error),
+                    invalid_output=response.text,
+                    story_language=str(request.metadata.get("story_language", "en")),
                 ),
-                user_prompt=(
-                    f"Repair this invalid structured response for schema {schema.name}.\n\n"
-                    f"All validation failures:\n{self._repair_diagnostic(first_error)}\n\n"
-                    f"Invalid output:\n{response.text}"
-                ),
+                metadata={
+                    **request.metadata,
+                    "repair_prompt_version": repair.semantic_version,
+                    "repair_template_hash": repair.template_hash,
+                },
                 repair_attempt=1,
             )
             repaired_response = await self.generate_text(repair_request)
@@ -387,6 +393,8 @@ class BaseProvider(ABC):
                     physical_call_id=request.physical_call_id,
                     schema=schema.name,
                     repair_attempt=1,
+                    repair_prompt_version=repair.semantic_version,
+                    repair_template_hash=repair.template_hash,
                 )
                 raise error from first_error
             return StructuredResponse(
@@ -394,6 +402,8 @@ class BaseProvider(ABC):
                 data=repaired_data,
                 repaired=True,
                 validation_attempts=2,
+                repair_prompt_version=repair.semantic_version,
+                repair_template_hash=repair.template_hash,
             )
 
     async def _stream_with_retry(self, request: ProviderRequest) -> AsyncIterator[StreamChunk]:
@@ -559,6 +569,10 @@ class BaseProvider(ABC):
                     "role": str(request.role),
                     "physical_call_id": request.physical_call_id,
                     "repair_attempt": request.repair_attempt,
+                    "prompt_version": request.metadata.get("prompt_version"),
+                    "template_hash": request.metadata.get("template_hash"),
+                    "repair_prompt_version": request.metadata.get("repair_prompt_version"),
+                    "repair_template_hash": request.metadata.get("repair_template_hash"),
                 }
             )
         return metadata

@@ -82,7 +82,7 @@ appropriate to the input, and keep participant ages equal to character ages:
   "schema_version": "world-seed",
   "role": "world_builder",
   "run_id": "copy the input run_id",
-  "prompt_version": "1.7.0",
+  "prompt_version": "{{prompt_version}}",
   "story_language": "en",
   "template_id": "selected template id",
   "title": "World title",
@@ -154,7 +154,7 @@ appropriate to the input, and keep participant ages equal to character ages:
         "source_type": "world_seed",
         "source_id": "copy the input run_id",
         "run_id": "copy the input run_id",
-        "prompt_version": "1.7.0",
+        "prompt_version": "{{prompt_version}}",
         "model_metadata": {}
       }
     },
@@ -175,7 +175,7 @@ appropriate to the input, and keep participant ages equal to character ages:
         "source_type": "world_seed",
         "source_id": "copy the input run_id",
         "run_id": "copy the input run_id",
-        "prompt_version": "1.7.0",
+        "prompt_version": "{{prompt_version}}",
         "model_metadata": {}
       }
     },
@@ -196,7 +196,7 @@ appropriate to the input, and keep participant ages equal to character ages:
         "source_type": "world_seed",
         "source_id": "copy the input run_id",
         "run_id": "copy the input run_id",
-        "prompt_version": "1.7.0",
+        "prompt_version": "{{prompt_version}}",
         "model_metadata": {}
       }
     },
@@ -217,7 +217,7 @@ appropriate to the input, and keep participant ages equal to character ages:
         "source_type": "world_seed",
         "source_id": "copy the input run_id",
         "run_id": "copy the input run_id",
-        "prompt_version": "1.7.0",
+        "prompt_version": "{{prompt_version}}",
         "model_metadata": {}
       }
     }

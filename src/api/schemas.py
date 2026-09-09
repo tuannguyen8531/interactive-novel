@@ -159,7 +159,7 @@ class ProviderSettingsRequest(BaseModel):
         required_roles = {
             "planner",
             "simulator",
-            "context_validator",
+            "validator",
             "writer",
             "critic",
             "world_builder",

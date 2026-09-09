@@ -90,6 +90,10 @@ class TelemetryRecorder:
             estimated_cost_usd=cost,
             retry_count=trace.retry_count,
             fallback_from=trace.fallback_from,
+            prompt_version=trace.prompt_version,
+            template_hash=trace.template_hash,
+            repair_prompt_version=trace.repair_prompt_version,
+            repair_template_hash=trace.repair_template_hash,
         )
         self._events.append(event)
         if self._sink is not None:

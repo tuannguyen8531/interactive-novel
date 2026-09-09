@@ -15,6 +15,7 @@ from typing import Any
 from src.application.contracts.ai import AIPromptRole, RoleInput
 
 _PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
+_INCLUDE = re.compile(r"\{\{>\s*([^{}]+?)\s*\}\}")
 _PROMPT_CACHE: ContextVar[dict[tuple[str, str], PromptDefinition] | None] = ContextVar(
     "interactive_novel_prompt_cache",
     default=None,
@@ -59,6 +60,39 @@ class PromptDefinition:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class RepairPromptDefinition:
+    semantic_version: str
+    template_hash: str
+    content: str
+    system_content: str
+
+    def render(
+        self,
+        *,
+        original_prompt: str,
+        role: str,
+        schema_name: str,
+        invalid_output: str,
+        diagnostics: str,
+        story_language: str,
+    ) -> str:
+        repair_input = json.dumps(
+            {
+                "role": role,
+                "schema_name": schema_name,
+                "story_language": story_language,
+                "diagnostics": diagnostics,
+                "invalid_output": invalid_output,
+            },
+            ensure_ascii=False,
+        )
+        return _render(self.content, {"original_prompt": original_prompt, "repair_input_json": repair_input}).strip()
+
+    def snapshot(self) -> dict[str, str]:
+        return {"semantic_version": self.semantic_version, "template_hash": self.template_hash}
+
+
 class PromptRegistry:
     """Immutable prompt definitions loaded from the bundled manifest."""
 
@@ -67,10 +101,11 @@ class PromptRegistry:
     def __init__(self, root: Path | None = None) -> None:
         self.root = (root or self.default_root).resolve()
         self._definitions: dict[AIPromptRole, PromptDefinition] = {}
+        self._repair: RepairPromptDefinition | None = None
         self._manifest = self._load_manifest()
 
     def roles(self) -> tuple[AIPromptRole, ...]:
-        return tuple(AIPromptRole(role) for role in self._manifest)
+        return tuple(AIPromptRole)
 
     def get(self, role: AIPromptRole | str) -> PromptDefinition:
         normalized = AIPromptRole(role)
@@ -85,10 +120,9 @@ class PromptRegistry:
         except KeyError as error:
             raise PromptRegistryError(f"No prompt registered for role {normalized.value}.") from error
         template_name = _required_text(metadata, "template", normalized.value)
-        path = self.root / template_name
-        if not path.is_file():
-            raise PromptRegistryError(f"Prompt template not found: {path}")
-        content = path.read_text(encoding="utf-8")
+        version = _required_text(metadata, "semantic_version", normalized.value)
+        content = self._read_template(template_name)
+        content = _render(content, {"prompt_version": version})
         placeholders = tuple(dict.fromkeys(_PLACEHOLDER.findall(content)))
         required_variables = tuple(_required_variables(metadata, normalized.value))
         if set(placeholders) != set(required_variables):
@@ -98,7 +132,7 @@ class PromptRegistry:
             )
         definition = PromptDefinition(
             role=normalized,
-            semantic_version=_required_text(metadata, "semantic_version", normalized.value),
+            semantic_version=version,
             input_contract=_required_text(metadata, "input_contract", normalized.value),
             output_schema_version=_required_text(metadata, "output_schema_version", normalized.value),
             template_name=template_name,
@@ -112,14 +146,56 @@ class PromptRegistry:
             scoped_cache[cache_key] = definition
         return definition
 
-    def render(self, role: AIPromptRole | str, *, input_json: str) -> str:
-        return self.get(role).render({"input_json": input_json})
+    def read_language_guidance(self, language: str) -> str:
+        lang_code = language.strip().lower() if language else "en"
+        filename = f"shared/language_guidance_{lang_code}.md"
+        path = (self.root / filename).resolve()
+        if not path.is_file() or not path.is_relative_to(self.root):
+            path = (self.root / "shared/language_guidance_en.md").resolve()
+            if not path.is_file():
+                return ""
+        return path.read_text(encoding="utf-8").strip()
+
+    def render(
+        self,
+        role: AIPromptRole | str,
+        *,
+        input_json: str,
+        language_guidance: str | None = None,
+    ) -> str:
+        definition = self.get(role)
+        variables: dict[str, str] = {"input_json": input_json}
+        if "language_guidance" in definition.required_variables:
+            if language_guidance is not None:
+                variables["language_guidance"] = language_guidance
+            else:
+                story_language = "en"
+                try:
+                    payload = json.loads(input_json)
+                    if isinstance(payload, dict):
+                        ctx = payload.get("context")
+                        if isinstance(ctx, dict) and isinstance(ctx.get("story_language"), str):
+                            story_language = ctx["story_language"]
+                        elif isinstance(payload.get("story_language"), str):
+                            story_language = payload["story_language"]
+                except json.JSONDecodeError, TypeError:
+                    pass
+                variables["language_guidance"] = self.read_language_guidance(story_language)
+        return definition.render(variables)
 
     def render_input(self, role: AIPromptRole | str, role_input: RoleInput) -> str:
         normalized = AIPromptRole(role)
         if role_input.role != normalized:
             raise PromptRegistryError(f"Role input is for {role_input.role.value}, but prompt requested {normalized.value}.")
-        return self.render(normalized, input_json=role_input.model_dump_json())
+        language_guidance = None
+        if "language_guidance" in self.get(normalized).required_variables:
+            story_lang = "en"
+            if role_input.context and isinstance(role_input.context, dict):
+                lang_val = role_input.context.get("story_language")
+                if isinstance(lang_val, str) and lang_val:
+                    story_lang = lang_val
+            language_guidance = self.read_language_guidance(story_lang)
+        return self.render(normalized, input_json=role_input.model_dump_json(), language_guidance=language_guidance)
 
     def render_repair(
         self,
@@ -127,24 +203,54 @@ class PromptRegistry:
         *,
         invalid_output: str,
         diagnostics: str,
+        original_prompt: str = "",
+        schema_name: str | None = None,
+        story_language: str = "en",
     ) -> str:
-        normalized = AIPromptRole(role)
-        path = self.root / "repair.md"
-        if not path.is_file():
-            raise PromptRegistryError(f"Repair prompt template not found: {path}")
+        return self.get_repair().render(
+            original_prompt=original_prompt,
+            role=str(role),
+            schema_name=schema_name or self.get(role).output_schema_version,
+            invalid_output=invalid_output,
+            diagnostics=diagnostics,
+            story_language=story_language,
+        )
+
+    def get_repair(self) -> RepairPromptDefinition:
+        if self._repair is not None:
+            return self._repair
+        metadata = self._manifest["repair"]
+        template = self._read_template(_required_text(metadata, "template", "repair"))
+        system_section, separator, content = template.partition("\n\n# User\n\n")
+        if not system_section.startswith("# System\n\n") or not separator or not content.strip():
+            raise PromptRegistryError("Repair template requires System and User sections.")
+        system_content = system_section.removeprefix("# System\n\n").strip()
+        if not system_content:
+            raise PromptRegistryError("Repair System section cannot be empty.")
+        required = set(_required_variables(metadata, "repair"))
+        if set(_PLACEHOLDER.findall(content)) != required or _PLACEHOLDER.search(system_content):
+            raise PromptRegistryError("Repair template variables do not match its manifest.")
+        if required != {"original_prompt", "repair_input_json"}:
+            raise PromptRegistryError("Unsupported repair template variables.")
+        self._repair = RepairPromptDefinition(
+            semantic_version=_required_text(metadata, "semantic_version", "repair"),
+            template_hash=hashlib.sha256(json.dumps([system_content, content]).encode("utf-8")).hexdigest(),
+            content=content,
+            system_content=system_content,
+        )
+        return self._repair
+
+    def _read_template(self, name: str, *, allow_includes: bool = True) -> str:
+        path = (self.root / name).resolve()
+        if not path.is_relative_to(self.root) or not path.is_file():
+            raise PromptRegistryError(f"Prompt template not found inside registry root: {name}")
         content = path.read_text(encoding="utf-8")
-        return _render(
-            content,
-            {
-                "role": normalized.value,
-                "schema_name": self.get(normalized).output_schema_version,
-                "invalid_output": invalid_output,
-                "diagnostics": diagnostics,
-            },
-        ).strip()
+        if not allow_includes and _INCLUDE.search(content):
+            raise PromptRegistryError("Nested prompt includes are not supported.")
+        return _INCLUDE.sub(lambda match: self._read_template(match[1].strip(), allow_includes=False).rstrip(), content)
 
     def snapshot(self) -> dict[str, dict[str, Any]]:
-        return {role.value: self.get(role).snapshot() for role in self.roles()}
+        return {**{role.value: self.get(role).snapshot() for role in self.roles()}, "repair": self.get_repair().snapshot()}
 
     def _load_manifest(self) -> dict[str, dict[str, Any]]:
         path = self.root / "manifest.json"
@@ -154,9 +260,9 @@ class PromptRegistry:
             raise PromptRegistryError(f"Unable to load prompt manifest: {path}") from error
         if not isinstance(payload, dict):
             raise PromptRegistryError("Prompt manifest must be a JSON object.")
-        expected = {role.value for role in AIPromptRole}
+        expected = {*(role.value for role in AIPromptRole), "repair"}
         if set(payload) != expected:
-            raise PromptRegistryError("Prompt manifest roles do not match AI role contracts.")
+            raise PromptRegistryError("Prompt manifest must contain the AI roles and repair template.")
         return {str(role): dict(metadata) for role, metadata in payload.items()}
 
 

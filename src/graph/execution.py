@@ -272,6 +272,13 @@ class RoleExecutor:
         )
         if retry_count:
             trace = trace.model_copy(update={"retry_count": max(trace.retry_count, retry_count)})
+        if response.repaired:
+            trace = trace.model_copy(
+                update={
+                    "repair_prompt_version": response.repair_prompt_version,
+                    "repair_template_hash": response.repair_template_hash,
+                }
+            )
         if self.telemetry is not None:
             self.telemetry.record(trace)
         return parsed, trace
@@ -301,6 +308,7 @@ class RoleExecutor:
             context=role_context,
         )
         prompt = self.prompts.render_input(role, role_input)
+        definition = self.prompts.get(role)
         return ProviderRequest(
             system_prompt=(
                 f"Return a valid {role.value} contract and no untyped mutation. "
@@ -318,6 +326,9 @@ class RoleExecutor:
                 "role": role.value,
                 "repair_attempt": repair_attempt,
                 "story_language": str(role_context.get("story_language", "en")),
+                "prompt_version": definition.semantic_version,
+                "template_hash": definition.template_hash,
+                "output_schema_version": definition.output_schema_version,
             },
             cancellation=cancellation,
             structured_schema=self.contracts.structured_schema(role),

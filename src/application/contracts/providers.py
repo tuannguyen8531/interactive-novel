@@ -25,7 +25,7 @@ class ProviderName(StrEnum):
 class LogicalRole(StrEnum):
     PLANNER = "planner"
     SIMULATOR = "simulator"
-    CONTEXT_VALIDATOR = "context_validator"
+    VALIDATOR = "validator"
     WRITER = "writer"
     CRITIC = "critic"
 
@@ -233,6 +233,8 @@ class StructuredResponse:
     data: Any
     repaired: bool = False
     validation_attempts: int = 1
+    repair_prompt_version: str | None = None
+    repair_template_hash: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

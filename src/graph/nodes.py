@@ -15,7 +15,6 @@ from src.application.contracts.ai import (
     AIProvenance,
     ApplyRelationshipDeltaOperation,
     AssertCanonFactOperation,
-    ClaimReference,
     ConsistencyReport,
     ConsistencyStatus,
     ConsistencyViolation,
@@ -77,6 +76,7 @@ from .events import NodeEvent, publish_event
 from .execution import RoleExecutionResult, RoleExecutor
 from .records import build_canonical_bundle
 from .runtime import TurnGraphRuntime
+from .scenes import prepare_scene
 from .state import TurnGraphState
 
 _T = TypeVar("_T")
@@ -397,10 +397,10 @@ class TurnGraphNodes:
                 severity=DiagnosticSeverity.ERROR,
                 description="Targeted retrieval did not find authorized evidence for a required check.",
             )
-            prompt = self._executor().prompts.get(AIPromptRole.CONTEXT_VALIDATOR)
+            prompt = self._executor().prompts.get(AIPromptRole.VALIDATOR)
             report = ConsistencyReport(
                 schema_version="consistency-report",
-                role=AIPromptRole.CONTEXT_VALIDATOR,
+                role=AIPromptRole.VALIDATOR,
                 run_id=state["turn_run_id"],
                 prompt_version=prompt.semantic_version,
                 physical_call_id=f"deterministic-validator-{state['turn_run_id']}",
@@ -444,12 +444,12 @@ class TurnGraphNodes:
             actor_id=state.get("actor_id"),
         )
         result = await self._execute(
-            (AIPromptRole.CONTEXT_VALIDATOR,),
+            (AIPromptRole.VALIDATOR,),
             state,
-            {AIPromptRole.CONTEXT_VALIDATOR: context},
+            {AIPromptRole.VALIDATOR: context},
             call_prefix="validate",
         )
-        report = cast(ConsistencyReport, result.artifacts[AIPromptRole.CONTEXT_VALIDATOR])
+        report = cast(ConsistencyReport, result.artifacts[AIPromptRole.VALIDATOR])
         final_failure = (
             report.status != ConsistencyStatus.PASS
             and state.get("retry_counters", {}).get("repair", 0) >= self.runtime.max_repair_attempts
@@ -495,9 +495,6 @@ class TurnGraphNodes:
                 current_world_time=self.runtime.request.game_state.world_time,
                 default_duration_minutes=self.runtime.guard.clock_policy.default_action_duration_minutes,
             )
-            plan = state.get("plan")
-            if isinstance(plan, TurnPlan):
-                _validate_plan_location_references(self.runtime.request.game_state, plan, patch)
             self.runtime.guard.validate_patch(self.runtime.request.game_state, patch)
         except GuardRejected as error:
             diagnostic = {"code": error.code, "message": error.message, "details": dict(error.details)}
@@ -527,7 +524,6 @@ class TurnGraphNodes:
             "invalid_location_description",
             "invalid_location_name",
             "unknown_location",
-            "unknown_plan_location",
         }
         if not final_attempt:
             recovery = "repair"
@@ -641,18 +637,17 @@ class TurnGraphNodes:
         simulation = state.get("simulation")
         if not isinstance(plan, TurnPlan) or not isinstance(simulation, SimulationResult):
             return _failure(state, "writer_input_missing", "Writer requires plan and simulation artifacts.")
-        scene = scene_from_plan(state, self.runtime.request.game_state, plan, simulation)
+        prepared = prepare_scene(state, self.runtime.request.game_state, self.runtime.guard)
+        scene = prepared.scene
         self.runtime.guard.validate_scene(self.runtime.request.game_state, domain_scene_from_ai(scene))
         scene = scene.model_copy(update={"guard_approved": True})
-        context = _role_context(
+        context = _writing_context(
             state,
-            plan=plan.model_dump(mode="json"),
-            simulation=simulation.model_dump(mode="json"),
             scene_spec=scene.model_dump(mode="json"),
+            scene_locations=prepared.locations.model_dump(mode="json"),
+            current_locations=prepared.locations.after,
+            location_catalog=list(prepared.location_catalog),
         )
-        context.pop("character_relationships", None)
-        context.pop("emotional_tensions", None)
-        context.pop("private_character_context", None)
         result = await self._execute(
             (AIPromptRole.WRITER,),
             state,
@@ -663,6 +658,8 @@ class TurnGraphNodes:
         draft = cast(NarrativeDraft, result.artifacts[AIPromptRole.WRITER])
         return {
             "scene_spec": scene,
+            "scene_locations": prepared.locations.model_dump(mode="json"),
+            "scene_location_catalog": list(prepared.location_catalog),
             "draft": draft,
             "final_narrative": draft.narrative_text,
             **_trace_update(state, result),
@@ -675,14 +672,14 @@ class TurnGraphNodes:
         scene = state.get("scene_spec")
         if not isinstance(draft, NarrativeDraft) or not isinstance(scene, AISceneSpec):
             return _failure(state, "critique_input_missing", "Critic requires a scene spec and narrative draft.")
-        context = _role_context(
+        context = _writing_context(
             state,
             scene_spec=scene.model_dump(mode="json"),
+            scene_locations=state.get("scene_locations", {}),
+            current_locations=state.get("scene_locations", {}).get("after", {}),
+            location_catalog=state.get("scene_location_catalog", []),
             draft=draft.model_dump(mode="json"),
         )
-        context.pop("character_relationships", None)
-        context.pop("emotional_tensions", None)
-        context.pop("private_character_context", None)
         result = await self._execute(
             (AIPromptRole.CRITIC,),
             state,
@@ -860,6 +857,14 @@ def _role_context(state: TurnGraphState, **extra: Any) -> dict[str, Any]:
     context["input_safety"] = dict(safety)
     context["targeted_evidence"] = list(state.get("targeted_evidence", ()))
     context.update(extra)
+    return context
+
+
+def _writing_context(state: TurnGraphState, **extra: Any) -> dict[str, Any]:
+    """Pass the resolved scene, never raw proposals or NPC internal rationale."""
+    context = _role_context(state, **extra)
+    for key in ("plan", "simulation", "character_relationships", "emotional_tensions", "private_character_context"):
+        context.pop(key, None)
     return context
 
 
@@ -1161,28 +1166,6 @@ def _authoritative_ids(game_state: Any, *, owner_id: str | None = None) -> dict[
     }
 
 
-def _validate_plan_location_references(game_state: Any, plan: TurnPlan, patch: StatePatch) -> None:
-    """Require every place exposed to the Writer to be canonically registered."""
-
-    known_locations = set(game_state.locations)
-    known_locations.update(
-        operation.location.location_id for operation in patch.operations if isinstance(operation, RegisterLocation)
-    )
-    unknown_locations = sorted(
-        {
-            beat.location_id
-            for beat in plan.candidate_beats
-            if beat.location_id is not None and beat.location_id not in known_locations
-        }
-    )
-    if unknown_locations:
-        raise GuardRejected(
-            "unknown_plan_location",
-            f"Plan references unregistered locations: {', '.join(unknown_locations)}.",
-            details={"location_ids": unknown_locations},
-        )
-
-
 def domain_patch_from_simulation(simulation: SimulationResult, *, branch_id: str) -> StatePatch:
     """Convert only typed AI operations/claims into domain operations."""
 
@@ -1350,47 +1333,6 @@ def _domain_operation(operation: Any, provenance: AIProvenance) -> Any:
     raise TypeError(f"Unsupported typed state operation: {type(operation).__name__}")
 
 
-def scene_from_plan(
-    state: TurnGraphState,
-    game_state: Any,
-    plan: TurnPlan,
-    simulation: SimulationResult,
-) -> AISceneSpec:
-    participant_ids = tuple(dict.fromkeys((*plan.characters_involved, *(item.character_id for item in simulation.npc_reactions))))
-    participants = {
-        character_id: game_state.characters[character_id].profile.age_at(game_state.world_time)
-        for character_id in participant_ids
-        if character_id in game_state.characters
-    }
-    if not participants:
-        participants = {state.get("actor_id", "player"): 17}
-    beats = tuple(item.description for item in plan.candidate_beats)
-    visible_actions = beats or (simulation.proposed_outcome,)
-    claims = tuple(ClaimReference(claim_id=item.proposal_id) for item in simulation.claim_proposals)
-    world_profile = game_state.metadata.get("world_profile", {})
-    tone = world_profile.get("tone", "gentle") if isinstance(world_profile, Mapping) else "gentle"
-    return AISceneSpec(
-        scene_id=f"scene-{state['turn_run_id']}",
-        source_role=AIPromptRole.PLANNER,
-        source_run_id=state["turn_run_id"],
-        guard_approved=False,
-        world_time=game_state.world_time,
-        tags=plan.content_tags,
-        participants=participants,
-        consent={},
-        violence_detail=plan.violence_detail,
-        approved_beats=beats or (simulation.proposed_outcome,),
-        visible_actions=visible_actions,
-        allowed_dialogue_intents=tuple(plan.intended_focus),
-        pov="second_person",
-        tone=str(tone or "gentle"),
-        continuity_details=tuple(plan.pacing_note for _ in (0,)),
-        allowed_claims=claims,
-        forbidden_claims=(),
-        length_target=300,
-    )
-
-
 def domain_scene_from_ai(scene: AISceneSpec) -> DomainSceneSpec:
     return DomainSceneSpec(
         scene_id=scene.scene_id,
@@ -1406,5 +1348,4 @@ __all__ = [
     "TurnGraphNodes",
     "domain_patch_from_simulation",
     "domain_scene_from_ai",
-    "scene_from_plan",
 ]

@@ -183,3 +183,18 @@ def test_feedback_store_redacts_and_bounds_comments(tmp_path: Path) -> None:
     payload = json.loads(line)
     assert "very-secret-token" not in line
     assert len(payload["comment"]) <= 40
+
+
+def test_telemetry_retains_prompt_identities_without_prompt_text() -> None:
+    trace = _trace().model_copy(
+        update={"template_hash": "original-hash", "repair_prompt_version": "1.0.0", "repair_template_hash": "repair-hash"}
+    )
+    recorder = TelemetryRecorder(TelemetryConfig(enabled=True))
+    recorder.record(trace)
+    payload = recorder.events[0].as_dict()
+    assert payload["prompt_version"] == trace.prompt_version
+    assert payload["template_hash"] == "original-hash"
+    assert payload["repair_prompt_version"] == "1.0.0"
+    assert payload["repair_template_hash"] == "repair-hash"
+    assert "user_prompt" not in payload
+    assert "invalid_output" not in payload

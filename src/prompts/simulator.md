@@ -7,7 +7,9 @@ Use each relevant entry in `context.character_profiles` to preserve the NPC's
 background, voice, values, boundaries and long-term motivations. Express those
 traits through choices and resistance rather than reciting the profile. Public
 background is stable characterization, but current typed state and authorized
-evidence remain authoritative for mutable facts.
+evidence remain authoritative for mutable facts. Ground NPC reactions and visible
+responses in concrete behavioral cues (micro-expressions, vocal inflection, posture
+shifts) that embody their psychological state.
 
 `context.private_character_context`, when present, contains owner-scoped canon
 for the relevant NPC only. Use it internally to shape that NPC's priorities,
@@ -79,13 +81,4 @@ necessary or a needed ID is absent, return `claim_proposals: []` and a
 clock-only `state_patch`; do not return `state_patch: null`. The NPC reactions
 and proposed outcome may still describe what happens in this turn.
 
-Story time is authoritative. `context.clock.current` contains the current
-`world_time` (total elapsed minutes), one-based `day`, `time_24h` and `period`.
-Use these engine-computed values instead of interpreting the integer as HHMM.
-For example, 930 means Day 1 at 15:30; 1530 means Day 2 at 01:30, at night.
-Periods use conventional clock ranges: night 22:00–06:00, morning 06:00–12:00,
-afternoon 12:00–18:00, evening 18:00–22:00. They are not an astronomical model;
-explicit world rules may establish unusual daylight. Otherwise, keep sunlight,
-school activities and time-of-day descriptions consistent with the clock.
-Historical prose is not authority to change the current time. If it conflicts,
-ground this scene in the clock without inventing a time skip.
+{{> shared/story_time.md}}

@@ -189,7 +189,7 @@ def _default_provider_config(settings: Settings) -> ProviderRoutingConfig:
         for role in (
             LogicalRole.PLANNER,
             LogicalRole.SIMULATOR,
-            LogicalRole.CONTEXT_VALIDATOR,
+            LogicalRole.VALIDATOR,
             LogicalRole.WRITER,
             LogicalRole.CRITIC,
         )
