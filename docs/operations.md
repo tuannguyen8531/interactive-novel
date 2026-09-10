@@ -35,8 +35,9 @@ uv run test
 uv run test --no-frontend
 ```
 
-By default, the command runs Ruff, Pyright, Pytest, and the Vue unit tests;
-`--no-frontend` only skips the Vue unit tests for backend-only validation. If an
+By default, the command runs Ruff, Pyright, Pytest, frontend ESLint, and the Vue unit tests;
+`--no-frontend` skips all frontend checks for backend-only validation, while `--no-frontend-lint`
+skips only frontend ESLint. If an
 API test does not return after 30 seconds in a sandbox, terminate the command
 and rerun the remaining checks as described in [Sandbox testing](#sandbox-testing).
 

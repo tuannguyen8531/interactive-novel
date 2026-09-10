@@ -8,7 +8,7 @@ import { FIXTURE_PLAYTHROUGH_ID } from '@/fixtures/fixture'
 import { formatWorldTime } from '@/play/guidance'
 import VnBadge from '@/components/vn/VnBadge.vue'
 import VnConfirmModal from '@/components/vn/VnConfirmModal.vue'
-import type { PlaythroughRecord, StoryTemplate, WorldRecord } from '@/api/types'
+import type { PlaythroughRecord, WorldRecord } from '@/api/types'
 
 const router = useRouter()
 const appStore = useAppStore()

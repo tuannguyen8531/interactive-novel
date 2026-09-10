@@ -226,8 +226,9 @@ function clearTargetNameError(event: Event): void {
   input.setCustomValidity('')
 }
 
-function changeProvider(targetName: string, provider: ProviderTarget['provider']): void {
-  settings.changeProvider(targetName, provider)
+function changeProvider(targetName: string, provider: unknown): void {
+  if (!provider) return
+  settings.changeProvider(targetName, provider as ProviderTarget['provider'])
   saved.value = false
   if (provider === 'ollama') void refreshOllamaAccount()
 }
@@ -237,13 +238,9 @@ async function refreshOllamaAccount(): Promise<void> {
   await settings.loadOllamaAccount(ollamaTarget.value.base_url)
 }
 
-function changePrimary(role: string, targetName: string): void {
-  settings.setPrimaryTarget(role, targetName)
-  saved.value = false
-}
-
-function changeFallback(role: string, targetName: string, event: Event): void {
-  settings.toggleFallback(role, targetName, (event.target as HTMLInputElement).checked)
+function changePrimary(role: string, targetName: unknown): void {
+  if (!targetName) return
+  settings.setPrimaryTarget(role, String(targetName))
   saved.value = false
 }
 

@@ -32,8 +32,8 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  (event: 'update:modelValue', value: any): void
-  (event: 'change', value: any): void
+  (event: 'update:modelValue', value: string | number | (string | number)[] | null): void
+  (event: 'change', value: string | number | (string | number)[] | null): void
   (event: 'toggleOption', option: VnSelectOption, isSelected: boolean): void
 }>()
 
@@ -118,13 +118,11 @@ function handleSelect(option: VnSelectOption): void {
   if (props.multiple) {
     const current = Array.isArray(props.modelValue) ? [...props.modelValue] : []
     const idx = current.indexOf(option.value)
-    let willBeSelected = false
+    const willBeSelected = idx < 0
     if (idx >= 0) {
       current.splice(idx, 1)
-      willBeSelected = false
     } else {
       current.push(option.value)
-      willBeSelected = true
     }
     emit('update:modelValue', current)
     emit('change', current)
@@ -188,6 +186,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeWhenOutsi
 
 <template>
   <div
+    :id="id"
     ref="root"
     class="vn-select"
     :class="{
@@ -195,7 +194,6 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeWhenOutsi
       'is-disabled': disabled,
       'has-selected': Boolean(selectedOption || selectedOptionsList.length),
     }"
-    :id="id"
   >
     <button
       ref="trigger"

@@ -16,12 +16,11 @@ import {
   isOpeningTurn,
   turnMoveSuggestions
 } from '@/play/guidance'
-import { capitalizeStatus, displayTemplate, turnProgressPercent } from '@/play/progress'
+import { turnProgressPercent } from '@/play/progress'
 import VnBadge from '@/components/vn/VnBadge.vue'
 import VnConfirmModal from '@/components/vn/VnConfirmModal.vue'
 import CharacterDetailSlider from '@/components/vn/CharacterDetailSlider.vue'
 import TypewriterText from '@/components/vn/TypewriterText.vue'
-import type { CharacterView } from '@/api/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -43,13 +42,11 @@ const routePlaythroughId = computed(() => String(route.params.playthroughId ?? '
 const playerCharacter = computed(() => findPlayerCharacter(playthrough.playthrough, playthrough.characters))
 const playerTurns = computed(() => playthrough.visibleTurns.filter((turn) => !isOpeningTurn(turn)))
 const latestPlayerTurn = computed(() => playerTurns.value.at(-1) ?? null)
-const latestTurn = computed(() => playthrough.visibleTurns.at(-1) ?? null)
 
 const activeBranchName = computed(() =>
   branches.activeBranch ? branchDisplayName(branches.activeBranch, branches.branches) : 'Main Route'
 )
 const canFork = computed(() => selectedForkTurnId.value !== null && !jobs.active)
-const selectedCharacter = computed(() => characters.selected)
 
 const guidance = computed(() =>
   playthrough.world
@@ -67,7 +64,6 @@ const suggestedActions = computed(() =>
   latestTurnSuggestions.value.length > 0 ? latestTurnSuggestions.value : guidance.value.suggestedActions
 )
 
-const isFirstMove = computed(() => playerTurns.value.length === 0)
 const currentChapter = computed(() => Math.max(1, Math.floor(playerTurns.value.length / 5) + 1))
 
 const actionPlaceholder = computed(() =>
@@ -76,7 +72,6 @@ const actionPlaceholder = computed(() =>
     : 'Describe what you attempt to do…'
 )
 
-const jobStatusLabel = computed(() => capitalizeStatus(jobs.progress))
 const jobProgressPercent = computed(() => turnProgressPercent(jobs.events, jobs.current?.status, jobs.loading))
 
 function canForkFromTurn(turnBranchId: string): boolean {

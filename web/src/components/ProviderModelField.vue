@@ -31,7 +31,7 @@ const modelOptions = computed(() => {
   ]
 })
 
-function selectModel(val: string | number): void {
+function selectModel(val: unknown): void {
   if (val) emit('update:modelValue', String(val))
 }
 

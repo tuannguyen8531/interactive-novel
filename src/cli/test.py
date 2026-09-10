@@ -19,8 +19,8 @@ def _clean_output(stdout: str, stderr: str) -> str:
 
 
 def _summary(output: str) -> str:
-    lines = [line.strip(" =") for line in output.splitlines() if line.strip()]
-    return lines[-1] if lines else "passed"
+    lines = [line.strip(" =") for line in output.splitlines() if line.strip() and not line.strip().startswith(">")]
+    return lines[-1] if lines else "All checks passed!"
 
 
 def _run(label: str, command: list[str], working_directory: Path) -> bool:
@@ -39,23 +39,24 @@ def main(argv: list[str] | None = None) -> int:
     """Run the backend checks and frontend unit tests."""
     parser = argparse.ArgumentParser(
         prog="interactive-novel test",
-        description="Run ruff, pyright, pytest, and frontend unit tests.",
+        description="Run ruff, pyright, pytest, and frontend checks.",
     )
     parser.add_argument(
         "--fix",
         action="store_true",
-        help="Apply safe ruff lint fixes and format files before validation.",
+        help="Apply safe lint fixes and formatting before validation.",
     )
     parser.add_argument(
         "--frontend",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="Run Vue unit tests after the Python checks (enabled by default).",
+        help="Run Vue lint and unit tests after the Python checks (enabled by default).",
     )
     parser.add_argument("--no-lint", action="store_true", help="Skip ruff lint check.")
     parser.add_argument("--no-format", action="store_true", help="Skip ruff format check.")
     parser.add_argument("--no-pyright", action="store_true", help="Skip pyright check.")
     parser.add_argument("--no-pytest", action="store_true", help="Skip pytest.")
+    parser.add_argument("--no-frontend-lint", action="store_true", help="Skip frontend eslint check.")
     parser.add_argument(
         "pytest_args",
         nargs=argparse.REMAINDER,
@@ -83,8 +84,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.frontend:
         npm = shutil.which("npm")
         if npm is None:
-            print("FAIL frontend unit: npm not found on PATH", flush=True)
+            print("FAIL frontend: npm not found on PATH", flush=True)
             return 1
+        if not args.no_frontend_lint:
+            lint_cmd = [npm, "run", "lint"]
+            if args.fix:
+                lint_cmd.extend(["--", "--fix"])
+            commands.append(("frontend lint", lint_cmd, web_root))
         commands.append(("frontend unit", [npm, "run", "test:unit"], web_root))
 
     results = [_run(label, command, working_directory) for label, command, working_directory in commands]
