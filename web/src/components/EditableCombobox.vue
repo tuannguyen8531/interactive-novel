@@ -146,10 +146,11 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeWhenOutsi
           type="button"
           role="option"
           :aria-selected="option.value === modelValue"
-          :class="{ highlighted: index === highlightedIndex }"
+          :class="{ highlighted: index === highlightedIndex, 'is-selected': option.value === modelValue }"
           @click="selectOption(option)"
         >
-          {{ option.label }}
+          <span>{{ option.label }}</span>
+          <span v-if="option.value === modelValue" class="selected-check">✓</span>
         </button>
       </li>
       <li v-if="!filteredOptions.length" class="empty-options">No matching presets — keep typing to use a custom tone.</li>
@@ -160,6 +161,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeWhenOutsi
 <style scoped>
 .editable-combobox {
   position: relative;
+  width: 100%;
   min-width: 0;
 }
 
@@ -167,11 +169,25 @@ input {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  padding: 0.7rem 2.4rem 0.7rem 0.7rem;
-  border: 1px solid var(--line);
-  border-radius: 0.55rem;
-  background: #fff;
-  color: var(--ink);
+  font: inherit;
+  font-size: 0.92rem;
+  padding: 0.65rem 2.4rem 0.65rem 0.9rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  background: rgba(13, 16, 26, 0.85);
+  color: #fff;
+  transition: all 180ms ease;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+  background: rgba(18, 22, 34, 0.95);
+}
+
+input::placeholder {
+  color: var(--muted-dark);
 }
 
 .combobox-toggle {
@@ -182,54 +198,114 @@ input {
   height: calc(100% - 2px);
   padding: 0;
   border: 0;
-  border-left: 1px solid var(--line);
-  border-radius: 0 0.5rem 0.5rem 0;
+  border-left: 1px solid var(--border-subtle);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
   background: transparent;
   color: var(--muted);
+  box-shadow: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 160ms ease;
 }
 
 .combobox-toggle:hover {
   transform: none;
-  background: var(--accent-soft);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  box-shadow: none;
+  filter: none;
+}
+
+.combobox-toggle:active {
+  transform: none;
 }
 
 .combobox-options {
   position: absolute;
-  z-index: 20;
-  top: calc(100% + 0.35rem);
+  z-index: 50;
+  top: calc(100% + 0.4rem);
   right: 0;
   left: 0;
-  max-height: 14rem;
+  max-height: 15rem;
   overflow-y: auto;
   margin: 0;
-  padding: 0.3rem;
-  border: 1px solid var(--line);
-  border-radius: 0.55rem;
-  background: #fff;
-  box-shadow: 0 0.75rem 1.8rem rgb(31 35 48 / 14%);
+  padding: 0.35rem;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: var(--radius-md);
+  background: rgba(18, 22, 34, 0.96);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 16px rgba(99, 102, 241, 0.15);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.combobox-options::-webkit-scrollbar {
+  width: 4px;
+}
+.combobox-options::-webkit-scrollbar-track {
+  background: transparent;
+}
+.combobox-options::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.25);
+  border-radius: 9999px;
+}
+
+.combobox-options li {
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
 
 .combobox-options button {
   width: 100%;
-  padding: 0.55rem 0.65rem;
-  border: 0;
-  border-radius: 0.4rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--ink);
+  color: #e2e8f0;
+  font-size: 0.88rem;
+  font-weight: 500;
   text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: none;
+  cursor: pointer;
+  transition: all 140ms ease;
 }
 
 .combobox-options button:hover,
 .combobox-options button.highlighted {
   transform: none;
-  background: var(--accent-soft);
+  background: rgba(99, 102, 241, 0.18);
+  color: #fff;
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: none;
+  filter: none;
+}
+
+.combobox-options button.is-selected {
+  background: rgba(99, 102, 241, 0.25);
+  color: #fff;
+  font-weight: 600;
+  border-color: #6366f1;
+}
+
+.selected-check {
+  font-size: 0.82rem;
+  color: #a5b4fc;
+  font-weight: 700;
 }
 
 .empty-options {
-  padding: 0.55rem 0.65rem;
+  padding: 0.65rem 0.75rem;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 500;
   line-height: 1.4;
 }

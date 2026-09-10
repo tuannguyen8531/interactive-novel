@@ -51,7 +51,11 @@ export function findPlayerCharacter(
   characters: CharacterView[]
 ): CharacterView | null {
   const playerId = playthrough?.player_character_id
-  return playerId ? characters.find((character) => character.id === playerId) ?? null : null
+  if (playerId) {
+    const found = characters.find((character) => character.id === playerId)
+    if (found) return found
+  }
+  return characters.find((character) => character.role === 'player') ?? null
 }
 
 export function isOpeningTurn(turn: TurnRecord): boolean {

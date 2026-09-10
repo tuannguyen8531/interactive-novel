@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useProviderModels } from '@/composables/models'
 import type { ProviderTarget } from '@/api/types'
+import VnSelect from '@/components/vn/VnSelect.vue'
 
 const props = defineProps<{
   target: ProviderTarget
@@ -15,9 +16,23 @@ const emit = defineEmits<{
 const { models, loading, loadError, refresh } = useProviderModels(() => props.target)
 const knownModel = computed(() => models.value.includes(props.modelValue))
 
-function selectModel(event: Event): void {
-  const value = (event.target as HTMLSelectElement).value
-  if (value) emit('update:modelValue', value)
+const modelOptions = computed(() => {
+  const list = models.value.map((m) => ({ value: m, label: m }))
+  return [
+    {
+      value: '',
+      label: loading.value
+        ? 'Loading models…'
+        : models.value.length
+          ? '(custom / not listed)'
+          : 'No models available',
+    },
+    ...list,
+  ]
+})
+
+function selectModel(val: unknown): void {
+  if (val) emit('update:modelValue', String(val))
 }
 
 function inputModel(event: Event): void {
@@ -27,17 +42,14 @@ function inputModel(event: Event): void {
 
 <template>
   <div class="model-field">
-    <select
-      :value="knownModel ? modelValue : ''"
+    <VnSelect
+      :model-value="knownModel ? modelValue : ''"
       :disabled="loading || !models.length"
       aria-label="Available models"
+      :options="modelOptions"
+      :placeholder="loading ? 'Loading models…' : models.length ? '(custom / not listed)' : 'No models available'"
       @change="selectModel"
-    >
-      <option value="">
-        {{ loading ? 'Loading models…' : models.length ? '(custom / not listed)' : 'No models available' }}
-      </option>
-      <option v-for="model in models" :key="model" :value="model">{{ model }}</option>
-    </select>
+    />
     <input
       type="text"
       :value="modelValue"
@@ -61,21 +73,41 @@ function inputModel(event: Event): void {
   align-items: center;
 }
 
-select,
 input {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  padding: 0.7rem;
-  border: 1px solid var(--line);
-  border-radius: 0.55rem;
-  background: #fff;
-  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  background: rgba(13, 16, 26, 0.85);
+  color: #fff;
+  transition: all 180ms ease;
+}
+
+select:focus,
+input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+  background: rgba(18, 22, 34, 0.95);
+}
+
+input::placeholder {
+  color: var(--muted-dark);
+}
+
+.model-field button {
+  padding: 0.65rem 0.95rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
 }
 
 .model-error {
   margin: 0.3rem 0 0;
-  color: #a33f48;
+  color: #f87171;
   font-size: 0.8rem;
 }
 

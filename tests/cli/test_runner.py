@@ -25,6 +25,46 @@ def test_frontend_unit_tests_run_by_default_from_web_directory(monkeypatch) -> N
 
     assert result == 0
     assert commands == [
+        (["/usr/bin/npm", "run", "lint"], Path(__file__).resolve().parents[2] / "web"),
+        (["/usr/bin/npm", "run", "test:unit"], Path(__file__).resolve().parents[2] / "web"),
+    ]
+
+
+def test_no_frontend_lint_flag_skips_eslint(monkeypatch) -> None:
+    commands: list[tuple[list[str], Path]] = []
+
+    def fake_run(command, *, cwd, **kwargs):
+        del kwargs
+        commands.append((command, cwd))
+        return subprocess.CompletedProcess(command, 0, stdout="10 passed", stderr="")
+
+    monkeypatch.setattr(test_cli.shutil, "which", lambda _: "/usr/bin/npm")
+    monkeypatch.setattr(test_cli.subprocess, "run", fake_run)
+
+    result = test_cli.main(["--no-lint", "--no-format", "--no-pyright", "--no-pytest", "--no-frontend-lint"])
+
+    assert result == 0
+    assert commands == [
+        (["/usr/bin/npm", "run", "test:unit"], Path(__file__).resolve().parents[2] / "web"),
+    ]
+
+
+def test_frontend_lint_passes_fix_flag(monkeypatch) -> None:
+    commands: list[tuple[list[str], Path]] = []
+
+    def fake_run(command, *, cwd, **kwargs):
+        del kwargs
+        commands.append((command, cwd))
+        return subprocess.CompletedProcess(command, 0, stdout="10 passed", stderr="")
+
+    monkeypatch.setattr(test_cli.shutil, "which", lambda _: "/usr/bin/npm")
+    monkeypatch.setattr(test_cli.subprocess, "run", fake_run)
+
+    result = test_cli.main(["--no-lint", "--no-format", "--no-pyright", "--no-pytest", "--fix"])
+
+    assert result == 0
+    assert commands == [
+        (["/usr/bin/npm", "run", "lint", "--", "--fix"], Path(__file__).resolve().parents[2] / "web"),
         (["/usr/bin/npm", "run", "test:unit"], Path(__file__).resolve().parents[2] / "web"),
     ]
 

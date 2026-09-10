@@ -28,8 +28,15 @@ describe('play guidance', () => {
   })
 
   it('identifies the controlled character instead of assuming the first character', () => {
-    const characters = [{ id: 'npc' }, { id: 'hero' }] as CharacterView[]
+    const characters = [{ id: 'npc', role: 'npc' }, { id: 'hero', role: 'player' }] as CharacterView[]
     const playthrough = { player_character_id: 'hero' } as PlaythroughRecord
+
+    expect(findPlayerCharacter(playthrough, characters)?.id).toBe('hero')
+  })
+
+  it('falls back to role=player when player_character_id is missing', () => {
+    const characters = [{ id: 'npc', role: 'npc' }, { id: 'hero', role: 'player' }] as CharacterView[]
+    const playthrough = { player_character_id: null } as unknown as PlaythroughRecord
 
     expect(findPlayerCharacter(playthrough, characters)?.id).toBe('hero')
   })
