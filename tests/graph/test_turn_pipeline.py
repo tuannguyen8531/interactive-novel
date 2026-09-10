@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from src.application.contracts.ai import AIPromptRole, SimulationResult, TurnPlan
+from src.application.contracts.ai import AIPromptRole, CritiqueResult, SimulationResult, TurnPlan
 from src.application.contracts.providers import (
     ConnectivityResult,
     EmbeddingResponse,
@@ -1182,7 +1182,18 @@ async def test_repair_prompt_identity_survives_role_execution_trace() -> None:
 @pytest.mark.asyncio
 async def test_writer_revision_receives_previous_draft_and_critic_feedback() -> None:
     critique = copy.deepcopy(ROLE_OUTPUTS["critic"])
-    critique.update(decision="revise", revision_instructions=["Replace emotional labels with observable gestures."])
+    critique.update(
+        decision="revise",
+        issues=[
+            {
+                "issue_id": "wrong_pov",
+                "category": "contract",
+                "severity": "error",
+                "description": "Draft uses first-person but SceneSpec requires third-person.",
+            }
+        ],
+        revision_instructions=["Replace emotional labels with observable gestures."],
+    )
     provider = FakeProvider(sequences={"critic": (critique,)})
     committer = FakeCommitter()
 
@@ -1198,6 +1209,36 @@ async def test_writer_revision_receives_previous_draft_and_critic_feedback() -> 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("category", ["literary_quality", "literary-quality"])
+async def test_warning_only_revise_is_accepted_with_issues_preserved(category: str) -> None:
+    critique = copy.deepcopy(ROLE_OUTPUTS["critic"])
+    critique.update(
+        decision="revise",
+        issues=[
+            {
+                "issue_id": "telling",
+                "category": category,
+                "severity": "warning",
+                "description": "The draft labels emotions instead of showing them.",
+            }
+        ],
+        revision_instructions=["Describe observable gestures."],
+    )
+    provider = FakeProvider(sequences={"critic": (critique,)})
+    committer = FakeCommitter()
+
+    result = await make_pipeline(provider, committer).run(make_request(make_game_state()))
+
+    assert result["status"] == "completed"
+    assert result["commit_done"] is True
+    assert len(committer.bundles) == 1
+    critique_result = result.get("critique")
+    assert isinstance(critique_result, CritiqueResult)
+    assert critique_result.decision == "accept"
+    assert len(critique_result.issues) == 1
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("decision", "code", "writer_calls"),
     [("revise", "revision_limit_exceeded", 2), ("reject", "critique_rejected", 1)],
@@ -1208,13 +1249,13 @@ async def test_critic_failure_preserves_reason_without_committing(decision: str,
         decision=decision,
         issues=[
             {
-                "issue_id": "telling",
-                "category": "literary_quality",
-                "severity": "warning",
-                "description": "The draft labels emotions instead of showing them.",
+                "issue_id": "wrong_pov",
+                "category": "contract",
+                "severity": "error",
+                "description": "Draft uses first-person but SceneSpec requires third-person.",
             }
         ],
-        revision_instructions=["Describe observable gestures."],
+        revision_instructions=["Fix POV to third-person."],
     )
     provider = FakeProvider(sequences={"critic": (critique, critique)})
     committer = FakeCommitter()
@@ -1228,4 +1269,30 @@ async def test_critic_failure_preserves_reason_without_committing(decision: str,
     diagnostic = result["errors"][-1]
     assert diagnostic["node"] == "critique"
     assert diagnostic["code"] == code
-    assert "The draft labels emotions instead of showing them." in diagnostic["message"]
+    assert "Draft uses first-person but SceneSpec requires third-person." in diagnostic["message"]
+
+
+@pytest.mark.asyncio
+async def test_warning_contract_issue_still_triggers_revision() -> None:
+    critique = copy.deepcopy(ROLE_OUTPUTS["critic"])
+    critique.update(
+        decision="revise",
+        issues=[
+            {
+                "issue_id": "wrong_pov",
+                "category": "contract",
+                "severity": "warning",
+                "description": "Draft uses first-person but SceneSpec requires third-person.",
+            }
+        ],
+        revision_instructions=["Fix POV to third-person."],
+    )
+    provider = FakeProvider(sequences={"critic": (critique, ROLE_OUTPUTS["critic"])})
+    committer = FakeCommitter()
+
+    result = await make_pipeline(provider, committer).run(make_request(make_game_state()))
+
+    assert result["status"] == "completed"
+    assert result["commit_done"] is True
+    assert len(committer.bundles) == 1
+    assert sum(request.role == AIPromptRole.WRITER for request in provider.requests) == 2

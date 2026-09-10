@@ -34,9 +34,16 @@ Use `context.story_language` for issue descriptions and revision instructions;
 the Writer must receive feedback in the same language as the story. Keep
 contract keys, enum values and IDs unchanged.
 
-Return only JSON matching `critique-result` with role `critic`. Use `revise`
-only when revision instructions are explicit and bounded; use `reject` for a
-hard safety or contract failure.
+Return only JSON matching `critique-result` with role `critic`. Decision thresholds:
+
+- `accept`: no issues, or only `info`/`warning` literary-quality observations. You
+  may still include the observations as issues alongside `accept`; they will be
+  stored for telemetry and future revision guidance.
+- `revise`: at least one `error`-severity issue that can be fixed locally, such
+  as wrong POV, clearly out-of-character dialogue, SceneSpec contradiction,
+  time-of-day mismatch, or suggested player moves that decide outcomes.
+- `reject`: hard safety or contract failure that cannot be resolved by revision
+  while preserving the SceneSpec.
 
 {{> shared/story_time.md}}
 {{> shared/literary_guidance.md}}

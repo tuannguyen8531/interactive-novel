@@ -687,9 +687,20 @@ class TurnGraphNodes:
             call_prefix="critique",
         )
         critique = cast(CritiqueResult, result.artifacts[AIPromptRole.CRITIC])
+
+        blocking_severities = {DiagnosticSeverity.ERROR, DiagnosticSeverity.CRITICAL}
+        has_only_minor_literary_issues = all(
+            issue.severity not in blocking_severities and issue.category.replace("_", "-") == "literary-quality"
+            for issue in critique.issues
+        )
+
+        if critique.decision == CritiqueDecision.REVISE and has_only_minor_literary_issues:
+            critique = critique.model_copy(update={"decision": CritiqueDecision.ACCEPT})
+
         exhausted = critique.decision == CritiqueDecision.REJECT or (
             critique.decision == CritiqueDecision.REVISE and state.get("revision_count", 0) >= self.runtime.max_revision_attempts
         )
+
         errors = state["errors"]
         if exhausted:
             rejected = critique.decision == CritiqueDecision.REJECT
