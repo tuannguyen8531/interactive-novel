@@ -37,6 +37,8 @@ const selectedForkTurnId = ref<string | null>(null)
 const openCharacterId = ref<string | null>(null)
 const loadingRoute = ref(false)
 const isCharacterDrawerOpen = ref(false)
+const animatedTurnId = ref<string | null>(null)
+const awaitingNewTurn = ref(false)
 
 const routePlaythroughId = computed(() => String(route.params.playthroughId ?? ''))
 const playerCharacter = computed(() => findPlayerCharacter(playthrough.playthrough, playthrough.characters))
@@ -90,8 +92,12 @@ watch(
   () => playthrough.visibleTurns.length,
   async (turns, previousTurns) => {
     if (turns <= previousTurns) return
-    await nextTick()
-    scrollTranscriptToEnd('smooth')
+    if (awaitingNewTurn.value) {
+      await handleNewTurnReady()
+    } else {
+      await nextTick()
+      scrollTranscriptToEnd('smooth')
+    }
   }
 )
 
@@ -102,6 +108,8 @@ watch(
     await playthrough.refresh()
     if (jobs.current?.status === 'completed') {
       input.value = ''
+    } else {
+      awaitingNewTurn.value = false
     }
     debug.refresh()
   }
@@ -110,8 +118,13 @@ watch(
 async function openRoute(): Promise<void> {
   if (!routePlaythroughId.value) return
   loadingRoute.value = true
+  awaitingNewTurn.value = false
+  animatedTurnId.value = null
   await playthrough.open(routePlaythroughId.value)
   if (!playthrough.fixtureMode && playthrough.playthrough) await jobs.resume(playthrough.playthrough.id)
+  if (jobs.active) {
+    awaitingNewTurn.value = true
+  }
   characters.clear()
   const defaultCharacter = playerCharacter.value ?? playthrough.characters.find((c) => c.role === 'player') ?? playthrough.characters[0]
   if (defaultCharacter) {
@@ -122,6 +135,39 @@ async function openRoute(): Promise<void> {
   loadingRoute.value = false
   await nextTick()
   scrollTranscriptToEnd('auto')
+}
+
+async function handleNewTurnReady(): Promise<void> {
+  awaitingNewTurn.value = false
+  const latestTurn = playthrough.visibleTurns[playthrough.visibleTurns.length - 1]
+  if (!latestTurn) return
+  animatedTurnId.value = latestTurn.id
+  await nextTick()
+  requestAnimationFrame(() => {
+    scrollToNewTurn(latestTurn.id)
+  })
+}
+
+function scrollToNewTurn(turnId: string): void {
+  const container = transcriptScroll.value
+  const turnEl = document.getElementById(`story-turn-${turnId}`)
+  if (container && turnEl) {
+    const containerRect = container.getBoundingClientRect()
+    const turnRect = turnEl.getBoundingClientRect()
+    const offset = turnRect.top - containerRect.top + container.scrollTop
+    container.scrollTo({ top: Math.max(0, offset - 12), behavior: 'smooth' })
+  } else if (container) {
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+  }
+  if (turnEl) {
+    turnEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+}
+
+function cancelJob(): void {
+  awaitingNewTurn.value = false
+  animatedTurnId.value = null
+  jobs.cancel()
 }
 
 function scrollTranscriptToEnd(behavior: ScrollBehavior): void {
@@ -147,6 +193,7 @@ async function submit(): Promise<void> {
   const turnRequest = request()
   if (!turnRequest) return
   const action = input.value.trim()
+  awaitingNewTurn.value = true
   try {
     if (playthrough.fixtureMode) {
       await jobs.runFixture(turnRequest, () => playthrough.appendFixture(action))
@@ -156,6 +203,7 @@ async function submit(): Promise<void> {
       await jobs.submit(turnRequest)
     }
   } catch {
+    awaitingNewTurn.value = false
     input.value = action
   }
 }
@@ -172,9 +220,9 @@ function regenerateLastTurn(): void {
   const turn = latestPlayerTurn.value
   if (!turn || jobs.active || playthrough.fixtureMode) return
   confirmActionModal.value = {
-    title: 'Regenerate Turn?',
-    message: 'Regenerate this turn on a new continuation branch? The current timeline remains intact in history.',
-    confirmText: 'Regenerate',
+    title: 'Retry Scene?',
+    message: 'Weave a new outcome for this moment on a new timeline branch? The current timeline remains intact in history.',
+    confirmText: 'Retry Scene',
     action: async () => {
       const action = turn.raw_input
       await playthrough.regenerate(turn.id)
@@ -193,6 +241,8 @@ function undoLastTurn(): void {
     message: 'Roll back to the previous decision point on a new branch? The current timeline remains intact.',
     confirmText: 'Undo Move',
     action: async () => {
+      awaitingNewTurn.value = false
+      animatedTurnId.value = null
       await playthrough.undo(turn.id)
       await refreshSelectedCharacter()
     }
@@ -209,6 +259,8 @@ async function onConfirmActionModal(): Promise<void> {
 
 async function fork(): Promise<void> {
   if (!selectedForkTurnId.value) return
+  awaitingNewTurn.value = false
+  animatedTurnId.value = null
   await branches.fork(selectedForkTurnId.value)
   selectedForkTurnId.value = null
   await refreshSelectedCharacter()
@@ -217,6 +269,8 @@ async function fork(): Promise<void> {
 
 async function switchTimeline(branchId: string): Promise<void> {
   if (branchId === branches.activeBranchId || jobs.active) return
+  awaitingNewTurn.value = false
+  animatedTurnId.value = null
   await branches.switchBranch(branchId)
   await refreshSelectedCharacter()
   debug.refresh()
@@ -389,6 +443,7 @@ function onTypewriterFinish(): void {
             <div v-else class="turns-sequence">
               <article
                 v-for="(turn, index) in playthrough.visibleTurns"
+                :id="`story-turn-${turn.id}`"
                 :key="turn.id"
                 class="story-turn-item"
                 :class="{
@@ -434,7 +489,7 @@ function onTypewriterFinish(): void {
                 <!-- Narrative Body -->
                 <div class="narrative-prose">
                   <TypewriterText
-                    v-if="index === playthrough.visibleTurns.length - 1 && !jobs.active"
+                    v-if="turn.id === animatedTurnId && !jobs.active"
                     :text="narrative(turn)"
                     :animate="true"
                     @tick="onTypewriterTick"
@@ -452,11 +507,11 @@ function onTypewriterFinish(): void {
                 </div>
               </article>
 
-              <!-- Realtime AI Processing status at end of story stream -->
-              <div v-if="jobs.active" class="ai-processing-notice">
+              <!-- Narrative progression status at end of story stream -->
+              <div v-if="jobs.active" class="scene-generating-notice">
                 <span class="spinner-dot" />
-                <span>AI is shaping the next chapter… ({{ jobProgressPercent }}%)</span>
-                <button class="cancel-link" type="button" @click="jobs.cancel()">Cancel</button>
+                <span>Weaving the next scene… ({{ jobProgressPercent }}%)</span>
+                <button class="cancel-link" type="button" @click="cancelJob()">Cancel</button>
               </div>
             </div>
           </div>
@@ -544,7 +599,7 @@ function onTypewriterFinish(): void {
           </div>
 
           <div class="action-card-footer">
-            <span class="shortcut-hint">Press <strong>Ctrl + Enter</strong> to commit</span>
+            <span class="shortcut-hint">Press <strong>Ctrl + Enter</strong> to send</span>
             <div class="footer-buttons">
               <button
                 v-if="latestPlayerTurn && !playthrough.fixtureMode"
@@ -562,7 +617,7 @@ function onTypewriterFinish(): void {
                 :disabled="jobs.active"
                 @click="regenerateLastTurn"
               >
-                ↻ Regenerate
+                ↻ Retry Scene
               </button>
               <button
                 type="button"
@@ -890,6 +945,7 @@ function onTypewriterFinish(): void {
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-md);
   transition: all 180ms ease;
+  scroll-margin-top: 1.5rem;
 }
 
 .story-turn-item.is-latest-turn {
@@ -984,7 +1040,7 @@ function onTypewriterFinish(): void {
   white-space: pre-wrap;
 }
 
-.ai-processing-notice {
+.scene-generating-notice {
   display: flex;
   align-items: center;
   gap: 0.6rem;

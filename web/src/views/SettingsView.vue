@@ -46,37 +46,37 @@ const roleDescriptions: Record<string, { icon: string; name: string; desc: strin
   writer: {
     icon: '📝',
     name: 'Story Writer',
-    desc: 'Composes narrative prose, vivid sensory descriptions, and emotional dialogue beats.'
+    desc: 'Composes narrative prose, vivid atmosphere, and expressive dialogue beats.'
   },
   planner: {
     icon: '🧠',
-    name: 'Narrative Planner',
-    desc: 'Plans branching paths, plot arcs, scene goals, and narrative pacing.'
+    name: 'Story Director',
+    desc: 'Directs scene progression, plot developments, and dramatic pacing.'
   },
   simulator: {
     icon: '🎭',
-    name: 'Character Simulator',
-    desc: 'Simulates NPC character reactions, dialogue choices, and relationship changes.'
+    name: 'Character Personality',
+    desc: 'Brings characters to life with expressive reactions, feelings, and evolving bonds.'
   },
   validator: {
     icon: '🛡️',
-    name: 'World Validator',
-    desc: 'Enforces content limits, memory continuity, and story logic constraints.'
+    name: 'Story Continuity',
+    desc: 'Ensures scene logic, timeline consistency, and character facts remain coherent.'
   },
   critic: {
     icon: '🔍',
-    name: 'Literary Critic',
-    desc: 'Reviews generated prose, refines dialogue flow, and polishes stylistic consistency.'
+    name: 'Prose Polish',
+    desc: 'Refines writing style, dialogue rhythm, and natural tone.'
   },
   world_builder: {
     icon: '🌍',
-    name: 'World Builder',
-    desc: 'Generates new story world seeds, character dossiers, lore, and opening scenes.'
+    name: 'World Lore & Setting',
+    desc: 'Creates world backgrounds, locations, cast dossiers, and initial scenarios.'
   },
   embedding: {
     icon: '🧬',
-    name: 'Memory Embeddings',
-    desc: 'Generates vector representations for semantic memory and lore retrieval.'
+    name: 'Long-Term Memory',
+    desc: 'Remembers past decisions, lore details, and prior encounters across scenes.'
   }
 }
 
@@ -251,9 +251,9 @@ function availableFallbacks(role: string): string[] {
 
 function fallbackSummary(role: string): string {
   const selected = settings.providerSettings?.role_routes[role]?.fallback_targets ?? []
-  if (!selected.length) return 'None (single model)'
+  if (!selected.length) return 'None (primary engine only)'
   if (selected.length <= 2) return selected.join(', ')
-  return `${selected.length} fallbacks configured`
+  return `${selected.length} backup engines configured`
 }
 
 function getProviderIcon(provider: ProviderTarget['provider']): string {
@@ -277,8 +277,8 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
     <header class="page-heading">
       <div class="heading-content">
         <p class="eyebrow">Settings</p>
-        <h1>Engine & Data Settings</h1>
-        <p class="lede">Configure AI providers, execution behavior, database backups, and story imports.</p>
+        <h1>Story Preferences & Engines</h1>
+        <p class="lede">Configure story generation engines, narrative detail, backups, and story imports.</p>
       </div>
       <div class="top-actions-bar">
         <button
@@ -322,17 +322,17 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
     <!-- Loading Placeholder -->
     <div v-if="settings.loading && !settings.providerSettings" class="card loading-card">
       <span class="spin-dot" />
-      <span>Loading provider configuration…</span>
+      <span>Loading configuration…</span>
     </div>
 
     <div v-else-if="settings.providerSettings" class="settings-content-flow">
-      <!-- SECTION 1: Execution & Runtime Policy -->
+      <!-- SECTION 1: Narrative & Privacy Policy -->
       <section class="card settings-card policy-section">
         <div class="card-header-row">
           <div>
-            <p class="eyebrow">Runtime</p>
-            <h3>Execution & Safety Policy</h3>
-            <p class="muted small-copy">Global behavior and defaults used when forging new story worlds.</p>
+            <p class="eyebrow">Generation</p>
+            <h3>Narrative & Privacy Preferences</h3>
+            <p class="muted small-copy">Story detail level, narrative language, and offline privacy settings.</p>
           </div>
         </div>
 
@@ -342,8 +342,8 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
             <div class="policy-card-header">
               <span class="policy-icon">⚡</span>
               <div>
-                <h4 class="policy-card-title">Story Pipeline Mode</h4>
-                <p class="policy-card-desc">Depth and complexity of the AI turn loop</p>
+                <h4 class="policy-card-title">Story Detail & Pacing</h4>
+                <p class="policy-card-desc">Balance between rich narrative depth and generation speed</p>
               </div>
             </div>
             <div class="segmented-control">
@@ -356,7 +356,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
                 <span class="seg-badge">✨</span>
                 <div class="seg-text">
                   <strong>Quality</strong>
-                  <small>Multi-step agentic graph</small>
+                  <small>Rich prose & deep scene details</small>
                 </div>
               </button>
               <button
@@ -368,7 +368,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
                 <span class="seg-badge">🚀</span>
                 <div class="seg-text">
                   <strong>Fast</strong>
-                  <small>Streamlined single-pass</small>
+                  <small>Quick & streamlined scenes</small>
                 </div>
               </button>
             </div>
@@ -380,7 +380,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
               <span class="policy-icon">🌐</span>
               <div>
                 <h4 class="policy-card-title">Default Story Language</h4>
-                <p class="policy-card-desc">Prose language for newly generated stories</p>
+                <p class="policy-card-desc">Narrative language for newly forged story worlds</p>
               </div>
             </div>
             <div class="segmented-control">
@@ -411,22 +411,22 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
             </div>
           </div>
 
-          <!-- Cloud Routing Privacy Switch -->
+          <!-- Cloud Assistance Privacy Switch -->
           <div class="policy-card full-span">
             <div class="cloud-switch-row">
               <div class="cloud-switch-info">
                 <div class="cloud-title-wrap">
                   <span class="policy-icon">☁️</span>
-                  <h4>Allow Cloud Provider Routing</h4>
+                  <h4>Cloud Engine Assistance</h4>
                   <VnBadge :variant="settings.allowCloud ? 'brand' : 'neutral'">
-                    {{ settings.allowCloud ? 'Cloud Routing Active 🌐' : 'Local Only 🔒' }}
+                    {{ settings.allowCloud ? 'Cloud Enabled 🌐' : '100% Offline & Private 🔒' }}
                   </VnBadge>
                 </div>
                 <p class="muted small-copy">
-                  When turned off, cloud targets (Gemini, OpenRouter) remain strictly dormant and all turns execute locally via Ollama, preventing any story data from leaving your machine.
+                  When turned off, cloud engines (Gemini, OpenRouter) remain inactive and all stories generate locally via Ollama, keeping your text strictly on this machine.
                 </p>
               </div>
-              <label class="switch-toggle" aria-label="Toggle cloud provider routing">
+              <label class="switch-toggle" aria-label="Toggle cloud engine assistance">
                 <input
                   v-model="settings.allowCloud"
                   type="checkbox"
@@ -439,13 +439,13 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
         </div>
       </section>
 
-      <!-- SECTION 2: Model Targets -->
+      <!-- SECTION 2: Story Engines -->
       <section class="card settings-card targets-section">
         <div class="card-header-row">
           <div>
             <p class="eyebrow">Engines</p>
-            <h3>Configured Model Targets</h3>
-            <p class="muted small-copy">Manage local Ollama instances and cloud API connections.</p>
+            <h3>Configured Story Engines</h3>
+            <p class="muted small-copy">Manage local engine connections (Ollama) and cloud services.</p>
           </div>
         </div>
 
@@ -454,8 +454,8 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
           <div class="add-target-info">
             <span class="toolbar-icon">➕</span>
             <div>
-              <strong>Add a Provider Target</strong>
-              <p class="muted small-copy">Create a new model endpoint, then assign it to specialized roles below.</p>
+              <strong>Add a Story Engine</strong>
+              <p class="muted small-copy">Configure a new engine endpoint to craft dialogue, plot, or character lore.</p>
             </div>
           </div>
           <div class="add-target-controls">
@@ -466,7 +466,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
               :options="providerOptions"
             />
             <button type="button" class="add-btn" @click="addTarget">
-              <span>+ Add Target</span>
+              <span>+ Add Engine</span>
             </button>
           </div>
         </div>
@@ -487,13 +487,13 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
                   <span>{{ formatProviderName(target.provider) }}</span>
                 </div>
                 <div class="target-rename-wrap">
-                  <span class="target-tag-label">ID:</span>
+                  <span class="target-tag-label">Name:</span>
                   <input
                     :value="targetName"
                     class="target-rename-input"
                     maxlength="160"
                     autocomplete="off"
-                    title="Click to rename target ID"
+                    title="Click to rename engine"
                     @input="clearTargetNameError"
                     @change="renameTarget(targetName, $event)"
                   />
@@ -503,7 +503,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
                 class="target-remove-btn"
                 type="button"
                 :disabled="targetNames.length <= 1"
-                :title="targetNames.length <= 1 ? 'At least one target is required' : `Remove ${targetName}`"
+                :title="targetNames.length <= 1 ? 'At least one engine is required' : `Remove ${targetName}`"
                 @click="removeTarget(targetName)"
               >
                 <span>✕</span>
@@ -515,7 +515,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
             <div class="target-body">
               <div class="field-row two-cols">
                 <div class="form-item">
-                  <label class="item-label">Provider Service</label>
+                  <label class="item-label">Engine Provider</label>
                   <VnSelect
                     v-model="target.provider"
                     :options="targetProviderOptions"
@@ -523,7 +523,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
                   />
                 </div>
                 <div class="form-item">
-                  <label class="item-label">Model Identifier</label>
+                  <label class="item-label">Model Name</label>
                   <ProviderModelField v-model="target.model" :target="target" @update:model-value="saved = false" />
                 </div>
               </div>
@@ -531,7 +531,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
               <!-- Ollama-specific configuration -->
               <div v-if="target.provider === 'ollama'" class="field-row three-cols">
                 <div class="form-item">
-                  <label class="item-label">Local Server Endpoint</label>
+                  <label class="item-label">Local Server Address</label>
                   <input
                     v-model="target.base_url"
                     placeholder="http://localhost:11434/api"
@@ -540,16 +540,16 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
                   />
                 </div>
                 <div class="form-item">
-                  <label class="item-label">Ollama Cloud Account</label>
+                  <label class="item-label">Ollama Account</label>
                   <div class="account-control-group">
-                    <input :value="ollamaAccountText" disabled aria-label="Ollama Cloud account" />
+                    <input :value="ollamaAccountText" disabled aria-label="Ollama account" />
                     <button class="secondary small-btn" type="button" :disabled="settings.ollamaAccountLoading" @click="refreshOllamaAccount">
                       {{ settings.ollamaAccountLoading ? '…' : '↻' }}
                     </button>
                   </div>
                 </div>
                 <div class="form-item">
-                  <label class="item-label">Timeout (seconds)</label>
+                  <label class="item-label">Response Timeout (seconds)</label>
                   <input v-model.number="target.timeout_seconds" type="number" min="1" max="600" @input="saved = false" />
                 </div>
               </div>
@@ -558,8 +558,8 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
               <div v-else class="field-row two-cols">
                 <div class="form-item">
                   <label class="item-label">
-                    API Key Environment Variable
-                    <span class="sub-hint">(Saved in .env)</span>
+                    API Key Variable Name
+                    <span class="sub-hint">(Environment variable in .env)</span>
                   </label>
                   <input
                     v-model="target.api_key_env"
@@ -569,17 +569,17 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
                   />
                 </div>
                 <div class="form-item">
-                  <label class="item-label">Timeout (seconds)</label>
+                  <label class="item-label">Response Timeout (seconds)</label>
                   <input v-model.number="target.timeout_seconds" type="number" min="1" max="600" @input="saved = false" />
                 </div>
               </div>
 
               <div class="target-security-note">
                 <span v-if="target.provider === 'ollama'">
-                  💡 Ollama runs completely offline on your device. Make sure <code>ollama serve</code> is running.
+                  💡 Ollama runs completely offline on your computer. Ensure your Ollama app or service is running.
                 </span>
                 <span v-else>
-                  🔒 Secrets are stored securely in your <code>.env</code> file. Only the environment variable name is saved here.
+                  🔒 Secrets stay safe in your local configuration. Only the variable name is stored here.
                 </span>
               </div>
             </div>
@@ -588,7 +588,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
 
         <!-- Connection Test Results -->
         <div v-if="settings.connectivity.length" class="connectivity-results-box">
-          <h4 class="conn-header">Latest Connectivity Test Results</h4>
+          <h4 class="conn-header">Engine Connection Status</h4>
           <div class="connectivity-grid">
             <div
               v-for="result in settings.connectivity"
@@ -599,20 +599,20 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
               <span class="conn-icon">{{ result.reachable ? '✓' : '✕' }}</span>
               <div class="conn-details">
                 <strong>{{ result.provider }} / {{ result.model }}</strong>
-                <small>{{ result.reachable ? 'Operational & Reachable' : (result.message || 'Connection failed') }}</small>
+                <small>{{ result.reachable ? 'Connected & Ready' : (result.message || 'Connection failed') }}</small>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- SECTION 3: AI Role Routing -->
+      <!-- SECTION 3: Story Role Assignments -->
       <section class="card settings-card routing-section">
         <div class="card-header-row">
           <div>
-            <p class="eyebrow">Routing</p>
-            <h3>AI Role Routing</h3>
-            <p class="muted small-copy">Map specialized model targets to each step of the visual novel engine.</p>
+            <p class="eyebrow">Creative Roles</p>
+            <h3>Story Role Assignments</h3>
+            <p class="muted small-copy">Choose which engine handles each creative aspect of your story.</p>
           </div>
         </div>
 
@@ -631,7 +631,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
 
             <!-- Primary Target Selection -->
             <div class="role-primary-col">
-              <label class="item-label">Primary Target</label>
+              <label class="item-label">Primary Engine</label>
               <VnSelect
                 v-model="settings.providerSettings.role_routes[role.id].primary_target"
                 class="primary-select"
@@ -646,12 +646,12 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
 
             <!-- Fallbacks Dropdown -->
             <div class="role-fallback-col">
-              <label class="item-label">Fallbacks (Optional)</label>
+              <label class="item-label">Backup Engines (Optional)</label>
               <VnSelect
                 v-model="settings.providerSettings.role_routes[role.id].fallback_targets"
                 multiple
                 class="fallback-select"
-                placeholder="None (single model)"
+                placeholder="None (primary engine only)"
                 :summary-format="() => fallbackSummary(role.id)"
                 :options="availableFallbacks(role.id).map((targetName) => ({
                   value: targetName,
@@ -668,13 +668,13 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
         </div>
       </section>
 
-      <!-- SECTION 4: Data Management & Backups -->
+      <!-- SECTION 4: Story Data & Backups -->
       <section class="card settings-card data-management-section">
         <div class="card-header-row">
           <div>
-            <p class="eyebrow">Local Storage</p>
-            <h3>Data Management & Backups</h3>
-            <p class="muted small-copy">Portable story bundles, playthrough imports, and full SQLite database snapshots stay safely on this machine.</p>
+            <p class="eyebrow">Storage</p>
+            <h3>Story Data & Backups</h3>
+            <p class="muted small-copy">Exported story files, playthrough progress, and complete archives stay safely on this machine.</p>
           </div>
         </div>
 
@@ -686,14 +686,14 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
                 <span class="subcard-icon">📦</span>
                 <div>
                   <h4 class="subcard-title">Import Playthrough</h4>
-                  <p class="subcard-desc">Choose a checksummed <code>.json</code> bundle exported by this application.</p>
+                  <p class="subcard-desc">Load an exported story file (<code>.json</code>) to continue your journey.</p>
                 </div>
               </div>
             </div>
             <div class="import-action-box">
               <label class="file-upload-btn" :class="{ disabled: dataBusy }">
                 <span>📂</span>
-                <span>{{ dataBusy ? 'Importing…' : 'Select .json Bundle' }}</span>
+                <span>{{ dataBusy ? 'Importing…' : 'Select Story File (.json)' }}</span>
                 <input
                   type="file"
                   accept="application/json,.json"
@@ -711,8 +711,8 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
               <div class="subcard-title-group">
                 <span class="subcard-icon">💾</span>
                 <div>
-                  <h4 class="subcard-title">Full Database Backups</h4>
-                  <p class="subcard-desc">Direct snapshots of canonical world, branch, and playthrough data.</p>
+                  <h4 class="subcard-title">Story Archive Backups</h4>
+                  <p class="subcard-desc">Complete snapshots of all story worlds, timelines, and playthrough progress.</p>
                 </div>
               </div>
               <button
@@ -728,7 +728,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
             <!-- Integrity status -->
             <div class="integrity-indicator" :class="{ 'is-ok': integrity?.ok, 'is-bad': integrity && !integrity.ok }">
               <span class="integrity-dot" />
-              <span>Database Integrity: {{ integrity?.message ?? 'checking…' }}</span>
+              <span>Archive Health: {{ integrity?.message ?? 'checking…' }}</span>
             </div>
 
             <!-- Backups list -->
