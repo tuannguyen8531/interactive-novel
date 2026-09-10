@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from src.application.contracts.persistence import CharacterRole
+
 
 @dataclass(frozen=True, slots=True)
 class CharacterView:
@@ -13,6 +15,7 @@ class CharacterView:
     id: str
     world_id: str
     playthrough_id: str | None
+    role: CharacterRole
     display_name: str
     aliases: tuple[str, ...]
     public_profile: dict[str, Any]

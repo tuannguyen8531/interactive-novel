@@ -5,7 +5,19 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -15,7 +27,6 @@ class Base(DeclarativeBase):
 
 class WorldModel(Base):
     __tablename__ = "worlds"
-    __table_args__ = (UniqueConstraint("name", name="uq_worlds_name"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     schema_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -95,12 +106,14 @@ class TurnModel(Base):
 
 class CharacterModel(Base):
     __tablename__ = "characters"
+    __table_args__ = (CheckConstraint("role IN ('player', 'npc')", name="ck_characters_role"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     world_id: Mapped[str] = mapped_column(String(36), ForeignKey("worlds.id", ondelete="RESTRICT"), nullable=False, index=True)
     playthrough_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("playthroughs.id", ondelete="CASCADE"), nullable=True, index=True
     )
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
     display_name: Mapped[str] = mapped_column(String(160), nullable=False)
     aliases: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     profile: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)

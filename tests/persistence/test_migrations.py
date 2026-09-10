@@ -53,6 +53,7 @@ async def test_empty_database_migrates_idempotently_and_has_expected_schema(empt
         "worlds",
     }
     assert "suggested_actions" in await _column_names(empty_database, "turns")
+    assert "role" in await _column_names(empty_database, "characters")
 
     async with empty_database.engine.connect() as connection:
         assert (await connection.scalar(text("PRAGMA foreign_keys"))) == 1

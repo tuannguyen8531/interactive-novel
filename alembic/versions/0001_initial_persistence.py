@@ -26,7 +26,6 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("name", name="uq_worlds_name"),
     )
     op.create_table(
         "playthroughs",
@@ -58,6 +57,7 @@ def upgrade() -> None:
         sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("world_id", sa.String(length=36), nullable=False),
         sa.Column("playthrough_id", sa.String(length=36), nullable=True),
+        sa.Column("role", sa.String(length=16), nullable=False),
         sa.Column("display_name", sa.String(length=160), nullable=False),
         sa.Column("aliases", sa.JSON(), nullable=False),
         sa.Column("profile", sa.JSON(), nullable=False),
@@ -66,6 +66,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["playthrough_id"], ["playthroughs.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["world_id"], ["worlds.id"], ondelete="RESTRICT"),
+        sa.CheckConstraint("role IN ('player', 'npc')", name="ck_characters_role"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_characters_playthrough_id", "characters", ["playthrough_id"])

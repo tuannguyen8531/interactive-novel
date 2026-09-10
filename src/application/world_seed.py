@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
-from src.application.contracts.ai import WorldSeed
+from src.application.contracts.ai import CharacterSeed, ClaimReference, KnowledgeClaimProposal, WorldSeed
+from src.domain.knowledge import KnowledgeClaim
+from src.domain.values import TimeRange
 
 _IDENTIFIER_LIMIT = 36
 
@@ -29,7 +31,6 @@ def normalize_npc_character_ids(seed: WorldSeed) -> WorldSeed:
         *(alias.casefold() for character in (seed.player_character, *seed.npc_profiles) for alias in character.aliases),
     }
     remapped_ids: dict[str, str] = {}
-    npc_profiles = []
     for npc in seed.npc_profiles:
         base_id = character_id_from_name(npc.name)
         character_id = (
@@ -39,10 +40,72 @@ def normalize_npc_character_ids(seed: WorldSeed) -> WorldSeed:
         )
         used_ids.add(character_id.casefold())
         remapped_ids[npc.character_id] = character_id
-        npc_profiles.append(npc.model_copy(update={"character_id": character_id}))
 
     if all(old_id == new_id for old_id, new_id in remapped_ids.items()):
         return seed
+
+    return remap_character_ids(seed, remapped_ids)
+
+
+def assign_canonical_uuids(seed: WorldSeed) -> WorldSeed:
+    """Assign UUIDs to seed entities that become global persistence records."""
+
+    draft_claims = seed.initial_claims
+    seed = remap_character_ids(
+        seed,
+        {character.character_id: str(uuid4()) for character in (seed.player_character, *seed.npc_profiles)},
+    )
+    claim_ids = {claim.proposal_id: str(uuid4()) for claim in seed.initial_claims}
+    claim_fingerprints = {
+        claim_fingerprint(draft): claim_fingerprint(canonical)
+        for draft, canonical in zip(draft_claims, seed.initial_claims, strict=True)
+    }
+
+    def remap_claim(value: str) -> str:
+        return claim_ids.get(value, value)
+
+    def remap_reference(reference: ClaimReference) -> ClaimReference:
+        if reference.claim_id is not None:
+            return reference.model_copy(update={"claim_id": remap_claim(reference.claim_id)})
+        fingerprint = reference.fingerprint
+        if fingerprint is None:
+            return reference
+        return reference.model_copy(update={"fingerprint": claim_fingerprints.get(fingerprint, fingerprint)})
+
+    opening_scene = seed.opening_scene.model_copy(
+        update={
+            "allowed_claims": tuple(remap_reference(item) for item in seed.opening_scene.allowed_claims),
+            "forbidden_claims": tuple(remap_reference(item) for item in seed.opening_scene.forbidden_claims),
+        }
+    )
+
+    def remap_private_claims(character: CharacterSeed) -> CharacterSeed:
+        return character.model_copy(
+            update={"private_claim_ids": tuple(remap_claim(item) for item in character.private_claim_ids)}
+        )
+
+    return seed.model_copy(
+        update={
+            "player_character": remap_private_claims(seed.player_character),
+            "npc_profiles": tuple(remap_private_claims(item) for item in seed.npc_profiles),
+            "initial_claims": tuple(
+                claim.model_copy(update={"proposal_id": remap_claim(claim.proposal_id)}) for claim in seed.initial_claims
+            ),
+            "initial_beliefs": tuple(
+                belief.model_copy(update={"belief_id": str(uuid4()), "claim_id": remap_claim(belief.claim_id)})
+                for belief in seed.initial_beliefs
+            ),
+            "tensions": tuple(tension.model_copy(update={"tension_id": str(uuid4())}) for tension in seed.tensions),
+            "threads": tuple(thread.model_copy(update={"thread_id": str(uuid4())}) for thread in seed.threads),
+            "opening_scene": opening_scene,
+        }
+    )
+
+
+def remap_character_ids(seed: WorldSeed, remapped_ids: dict[str, str]) -> WorldSeed:
+    """Atomically remap character identities throughout a world seed."""
+
+    known_character_ids = set(remapped_ids)
 
     def remap(value: str | None) -> str | None:
         return remapped_ids.get(value, value) if value is not None else None
@@ -56,13 +119,18 @@ def normalize_npc_character_ids(seed: WorldSeed) -> WorldSeed:
     )
     return seed.model_copy(
         update={
-            "npc_profiles": tuple(npc_profiles),
+            "player_character": seed.player_character.model_copy(
+                update={"character_id": remap(seed.player_character.character_id)}
+            ),
+            "npc_profiles": tuple(npc.model_copy(update={"character_id": remap(npc.character_id)}) for npc in seed.npc_profiles),
             "initial_claims": tuple(
                 claim.model_copy(
                     update={
                         "subject_id": remap(claim.subject_id),
-                        "object_id": remap(claim.object_id),
-                        "branch_scope": remap(claim.branch_scope),
+                        "object_id": remap(claim.object_id) if claim.object_id in known_character_ids else claim.object_id,
+                        "branch_scope": (
+                            remap(claim.branch_scope) if claim.branch_scope in known_character_ids else claim.branch_scope
+                        ),
                     }
                 )
                 for claim in seed.initial_claims
@@ -127,6 +195,24 @@ def _remap_consent_key(key: str, remapped_ids: dict[str, str]) -> str:
     return f"{remapped_ids.get(participant_id, participant_id)}:{activity}"
 
 
+def claim_fingerprint(claim: KnowledgeClaimProposal) -> str:
+    """Return the domain fingerprint for a proposed knowledge claim."""
+
+    return KnowledgeClaim(
+        claim_id=claim.proposal_id,
+        subject_id=claim.subject_id,
+        predicate=claim.predicate,
+        object_id=claim.object_id,
+        typed_value=claim.typed_value,
+        polarity=claim.polarity.value,
+        qualifiers=claim.qualifiers,
+        valid_time=TimeRange(start=claim.valid_time.start, end=claim.valid_time.end),
+        branch_scope=claim.branch_scope,
+        schema_version=claim.schema_version,
+        claim_type=claim.claim_type,
+    ).normalized_fingerprint
+
+
 def opening_location_claim_id(playthrough_id: str, branch_id: str, character_id: str) -> str:
     """Return the stable claim ID for a participant's opening location."""
 
@@ -134,4 +220,11 @@ def opening_location_claim_id(playthrough_id: str, branch_id: str, character_id:
     return str(uuid5(NAMESPACE_URL, value))
 
 
-__all__ = ["character_id_from_name", "normalize_npc_character_ids", "opening_location_claim_id"]
+__all__ = [
+    "assign_canonical_uuids",
+    "character_id_from_name",
+    "claim_fingerprint",
+    "normalize_npc_character_ids",
+    "opening_location_claim_id",
+    "remap_character_ids",
+]

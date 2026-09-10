@@ -10,7 +10,7 @@ from pydantic import TypeAdapter, ValidationError
 
 from src.application.contracts.ai import WorldSeed
 from src.application.contracts.exports import ExportBundle, PlaythroughExport
-from src.application.contracts.persistence import BranchRecord, TurnRecord
+from src.application.contracts.persistence import BranchRecord, CharacterRole, TurnRecord
 from src.application.errors import ApplicationValidationError, ResourceNotFoundError
 from src.application.ports.persistence import UowFactory
 from src.domain.codec import patch_from_payload
@@ -132,9 +132,12 @@ class PlaythroughExportApplicationService:
             world_clock_minutes=opening.world_time_start,
         )
         initial_root = replace(root, head_turn_id=None, head_revision=0)
-        characters = (_character_record(exported.world.id, seed.player_character),) + tuple(
-            _character_record(exported.world.id, item) for item in seed.npc_profiles
-        )
+        try:
+            characters = (_character_record(exported.world.id, seed.player_character, role=CharacterRole.PLAYER),) + tuple(
+                _character_record(exported.world.id, item, role=CharacterRole.NPC) for item in seed.npc_profiles
+            )
+        except ValueError as error:
+            raise ApplicationValidationError("Imported world_seed must use UUID character IDs.") from error
         opening_bundle = _build_opening_bundle(
             seed,
             playthrough=initial_playthrough,

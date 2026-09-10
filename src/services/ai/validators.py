@@ -109,6 +109,16 @@ def _validate_world_seed(seed: WorldSeed) -> None:
     known_characters = set(character_ids)
     known_locations = {item.location_id for item in seed.locations}
     known_goals = {item.goal_id for item in seed.goals}
+    if "public" in known_characters:
+        _raise("characters", "reserved_character_id", "character ID public is reserved for shared visibility")
+    overlapping_ids = known_characters & (known_locations | known_goals)
+    if overlapping_ids:
+        joined_ids = ", ".join(sorted(overlapping_ids))
+        _raise(
+            "characters",
+            "identifier_namespace_overlap",
+            f"character, location, and goal identifier namespaces overlap: {joined_ids}",
+        )
     goals_by_id = {item.goal_id: item for item in seed.goals}
     claims_by_id = {item.proposal_id: item for item in seed.initial_claims}
     known_entities = known_characters | known_locations

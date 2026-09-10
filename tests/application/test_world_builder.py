@@ -5,15 +5,17 @@ import json
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
+from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
 
-from src.application.contracts.ai import WorldSeed
+from src.application.contracts.ai import ClaimReference, WorldSeed
 from src.application.contracts.persistence import BranchRecord, TurnRecord, utc_now
 from src.application.errors import ApplicationValidationError
 from src.application.ports.persistence import UowFactory
 from src.application.services.world_drafts import WorldDraftApplicationService
+from src.application.world_seed import assign_canonical_uuids, claim_fingerprint
 from src.domain.language import StoryLanguage
 from src.services.prompts import PromptRegistry
 
@@ -27,6 +29,72 @@ def _seed() -> WorldSeed:
 def _current_seed_payload() -> dict[str, Any]:
     content = PromptRegistry().get("world_builder").content
     return json.loads(content.split("```json", 1)[1].split("```", 1)[0])
+
+
+def test_canonical_uuid_assignment_preserves_public_scope_and_remaps_claim_fingerprints() -> None:
+    seed = _seed()
+    original_claim = seed.initial_claims[0].model_copy(
+        update={"predicate": "secret_exists", "object_id": "player", "typed_value": None, "branch_scope": "player"}
+    )
+    seed = seed.model_copy(
+        update={
+            "initial_claims": (original_claim, *seed.initial_claims[1:]),
+            "opening_scene": seed.opening_scene.model_copy(
+                update={"allowed_claims": (ClaimReference(fingerprint=claim_fingerprint(original_claim)),)}
+            ),
+        }
+    )
+
+    canonical = assign_canonical_uuids(seed)
+
+    for draft_claim, canonical_claim in zip(seed.initial_claims, canonical.initial_claims, strict=True):
+        if draft_claim.branch_scope == "public":
+            assert canonical_claim.branch_scope == "public"
+    # object_id "player" is a character reference, so it must be remapped to the player's UUID.
+    assert canonical.initial_claims[0].object_id == canonical.player_character.character_id
+    assert UUID(canonical.initial_claims[0].object_id).version == 4
+    # Non-character object_ids (e.g. location references) must be preserved as-is.
+    location_claims = [c for c in canonical.initial_claims if c.predicate == "located_at"]
+    assert all(c.object_id == seed.locations[0].location_id for c in location_claims)
+    assert canonical.opening_scene.allowed_claims[0].fingerprint == claim_fingerprint(canonical.initial_claims[0])
+
+
+def test_world_draft_rejects_character_ids_that_collide_with_other_entity_namespaces() -> None:
+    payload = copy.deepcopy(json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"])
+    payload["locations"][0]["location_id"] = "player"
+    for claim in payload["initial_claims"]:
+        if claim["predicate"] == "located_at":
+            claim["object_id"] = "player"
+
+    with pytest.raises(ApplicationValidationError, match="identifier namespaces overlap"):
+        WorldDraftApplicationService(_factory(_State())).validate_world_draft(WorldSeed.model_validate(payload))
+
+
+def test_world_draft_reserves_public_for_shared_visibility() -> None:
+    seed = _seed()
+    seed = seed.model_copy(update={"player_character": seed.player_character.model_copy(update={"character_id": "public"})})
+
+    with pytest.raises(ApplicationValidationError, match="reserved for shared visibility"):
+        WorldDraftApplicationService(_factory(_State())).validate_world_draft(seed)
+
+
+@pytest.mark.asyncio
+async def test_confirmation_assigns_uuid_character_ids_roles_and_remaps_opening_references() -> None:
+    store = _State()
+    confirmation = await WorldDraftApplicationService(_factory(store)).confirm_world_bundle(_seed())
+
+    assert all(UUID(character.id).version == 4 for character in store.characters.values())
+    assert {character.role for character in store.characters.values()} == {"player", "npc"}
+    player = next(character for character in store.characters.values() if character.role == "player")
+    assert confirmation.playthrough.player_character_id == player.id
+    assert store.bundle is not None
+    participant_ids = set(store.bundle.events[0].actor_ids)
+    assert {state.character_id for state in store.bundle.character_states} == participant_ids
+    assert participant_ids <= set(store.characters)
+    assert all(
+        relationship.source_id in store.characters and relationship.target_id in store.characters
+        for relationship in store.bundle.relationships
+    )
 
 
 class _State:
@@ -228,7 +296,7 @@ async def test_confirm_creates_playable_opening_bundle_with_canonical_artifacts(
     assert len(bundle.character_states) == len(_seed().opening_scene.participants)
     assert {
         (claim.subject_id, claim.predicate, claim.object_id) for claim in bundle.claims if claim.predicate == "located_at"
-    } == {("player", "located_at", "library"), ("alice", "located_at", "library")}
+    } == {(character_id, "located_at", "library") for character_id in bundle.events[0].actor_ids}
     assert len(bundle.relationships) == 1
     assert len(bundle.threads) == len(bundle.hooks) == 1
     assert bundle.events[0].event_type == "opening_scene"

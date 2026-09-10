@@ -209,6 +209,7 @@ export interface CharacterView {
   id: string
   world_id: string
   playthrough_id: string | null
+  role: 'player' | 'npc'
   display_name: string
   aliases: string[]
   public_profile: Record<string, unknown>

@@ -7,7 +7,7 @@ from inspect import signature
 from typing import Any, Literal
 from uuid import uuid4
 
-from src.application.contracts.ai import RatingValue, SceneSpec, ViolenceCeilingValue, WorldSeed
+from src.application.contracts.ai import CharacterSeed, RatingValue, SceneSpec, ViolenceCeilingValue, WorldSeed
 from src.application.contracts.persistence import (
     BeliefEvidenceRecord,
     BeliefRecord,
@@ -15,6 +15,7 @@ from src.application.contracts.persistence import (
     CanonFactRecord,
     CanonicalTurnBundle,
     CharacterRecord,
+    CharacterRole,
     CharacterStateRecord,
     EmotionalTensionRecord,
     EventRecord,
@@ -29,7 +30,12 @@ from src.application.contracts.persistence import (
 from src.application.errors import ApplicationValidationError
 from src.application.ports.persistence import UowFactory
 from src.application.ports.worlds import WorldDraftGenerator
-from src.application.world_seed import normalize_npc_character_ids, opening_location_claim_id
+from src.application.world_seed import (
+    assign_canonical_uuids,
+    claim_fingerprint,
+    normalize_npc_character_ids,
+    opening_location_claim_id,
+)
 from src.domain.characters import CharacterState
 from src.domain.knowledge import KnowledgeClaim
 from src.domain.language import StoryLanguage
@@ -133,7 +139,7 @@ class WorldDraftApplicationService:
 
     async def confirm_world(self, seed: WorldSeed, *, world_id: str | None = None) -> WorldRecord:
         """Legacy world-only confirmation kept for older callers."""
-        validated = self.validate_world_draft(seed)
+        validated = assign_canonical_uuids(self.validate_world_draft(seed))
         template = self._require_template(validated.template_id)
         world, characters = _build_world_records(validated, template=template, world_id=world_id)
         async with self._uow_factory() as uow:
@@ -151,7 +157,7 @@ class WorldDraftApplicationService:
         provider_config_snapshot: dict[str, Any] | None = None,
     ) -> WorldConfirmation:
         """Atomically create the world and its playable opening branch."""
-        validated = self.validate_world_draft(seed)
+        validated = assign_canonical_uuids(self.validate_world_draft(seed))
         template = self._require_template(validated.template_id)
         world, characters = _build_world_records(validated, template=template, world_id=world_id)
         player = validated.player_character
@@ -195,7 +201,7 @@ class WorldDraftApplicationService:
         )
 
     def _validate_scene_fingerprint_references(self, seed: WorldSeed) -> None:
-        fingerprints = {_claim_fingerprint(claim) for claim in seed.initial_claims}
+        fingerprints = {claim_fingerprint(claim) for claim in seed.initial_claims}
         for reference in (*seed.opening_scene.allowed_claims, *seed.opening_scene.forbidden_claims):
             if reference.fingerprint is not None and reference.fingerprint not in fingerprints:
                 raise ApplicationValidationError("Opening scene references an unknown claim fingerprint.")
@@ -227,8 +233,8 @@ def _build_world_records(
         },
         content_policy=seed.content_boundaries.model_dump(mode="json"),
     )
-    characters = (_character_record(world.id, seed.player_character),) + tuple(
-        _character_record(world.id, item) for item in seed.npc_profiles
+    characters = (_character_record(world.id, seed.player_character, role=CharacterRole.PLAYER),) + tuple(
+        _character_record(world.id, item, role=CharacterRole.NPC) for item in seed.npc_profiles
     )
     return world, characters
 
@@ -505,7 +511,7 @@ def _claim_record(
         valid_time_start=claim.valid_time.start,
         valid_time_end=claim.valid_time.end,
         branch_scope=claim.branch_scope,
-        normalized_fingerprint=_claim_fingerprint(claim),
+        normalized_fingerprint=claim_fingerprint(claim),
         schema_version=claim.schema_version,
         provenance=provenance,
     )
@@ -559,27 +565,11 @@ def _opening_location_claim(
     )
 
 
-def _claim_fingerprint(claim: Any) -> str:
-    domain_claim = KnowledgeClaim(
-        claim_id=claim.proposal_id,
-        subject_id=claim.subject_id,
-        predicate=claim.predicate,
-        object_id=claim.object_id,
-        typed_value=claim.typed_value,
-        polarity=claim.polarity.value,
-        qualifiers=claim.qualifiers,
-        valid_time=TimeRange(start=claim.valid_time.start, end=claim.valid_time.end),
-        branch_scope=claim.branch_scope,
-        schema_version=claim.schema_version,
-        claim_type=claim.claim_type,
-    )
-    return domain_claim.normalized_fingerprint
-
-
-def _character_record(world_id: str, seed: Any) -> CharacterRecord:
+def _character_record(world_id: str, seed: CharacterSeed, *, role: CharacterRole) -> CharacterRecord:
     return CharacterRecord.new(
         character_id=seed.character_id,
         world_id=world_id,
+        role=role,
         display_name=seed.name,
         aliases=seed.aliases,
         profile={

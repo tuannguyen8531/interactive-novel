@@ -12,10 +12,16 @@ from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 type JSONValue = None | bool | int | float | str | list[JSONValue] | dict[str, JSONValue]
+
+
+class CharacterRole(StrEnum):
+    PLAYER = "player"
+    NPC = "npc"
 
 
 class PersistenceError(RuntimeError):
@@ -95,6 +101,7 @@ class CharacterRecord:
     id: str
     world_id: str
     playthrough_id: str | None
+    role: CharacterRole
     display_name: str
     aliases: tuple[str, ...]
     profile: dict[str, Any]
@@ -107,6 +114,7 @@ class CharacterRecord:
         cls,
         *,
         world_id: str,
+        role: CharacterRole,
         display_name: str,
         aliases: tuple[str, ...] = (),
         profile: dict[str, Any] | None = None,
@@ -115,11 +123,19 @@ class CharacterRecord:
     ) -> CharacterRecord:
         if not world_id.strip() or not display_name.strip():
             raise ValueError("Character world and display name must not be empty.")
+        identifier = character_id or str(uuid4())
+        try:
+            parsed_identifier = UUID(identifier)
+        except ValueError as error:
+            raise ValueError("Character ID must be a canonical UUID.") from error
+        if str(parsed_identifier) != identifier:
+            raise ValueError("Character ID must be a canonical UUID.")
         now = utc_now()
         return cls(
-            id=character_id or str(uuid4()),
+            id=identifier,
             world_id=world_id,
             playthrough_id=playthrough_id,
+            role=role,
             display_name=display_name,
             aliases=tuple(aliases),
             profile=dict(profile or {}),
@@ -608,6 +624,7 @@ __all__ = [
     "CanonFactRecord",
     "CanonicalTurnBundle",
     "CharacterRecord",
+    "CharacterRole",
     "CharacterStateRecord",
     "ClaimLinkRecord",
     "DerivedArtifactRecord",

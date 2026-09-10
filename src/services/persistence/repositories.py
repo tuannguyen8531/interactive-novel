@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.application.contracts.persistence import CharacterRecord, PlaythroughRecord, WorldRecord
+from src.application.contracts.persistence import CharacterRecord, CharacterRole, PlaythroughRecord, WorldRecord
 
 from .models import (
     BeliefEvidenceModel,
@@ -267,6 +267,7 @@ class SqlAlchemyCharacterRepository:
                 id=character.id,
                 world_id=character.world_id,
                 playthrough_id=character.playthrough_id,
+                role=character.role.value,
                 display_name=character.display_name,
                 aliases=list(character.aliases),
                 profile=dict(character.profile),
@@ -296,6 +297,7 @@ def _character_record(model: CharacterModel) -> CharacterRecord:
         id=model.id,
         world_id=model.world_id,
         playthrough_id=model.playthrough_id,
+        role=CharacterRole(model.role),
         display_name=model.display_name,
         aliases=tuple(model.aliases),
         profile=dict(model.profile),

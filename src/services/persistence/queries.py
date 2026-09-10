@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.application.contracts.persistence import CharacterRole
 from src.application.contracts.queries import CharacterView, MemoryView, RelationshipView
 
 from .models import (
@@ -41,6 +42,7 @@ def _character_view(model: CharacterModel, state: CharacterStateModel | None) ->
         id=model.id,
         world_id=model.world_id,
         playthrough_id=model.playthrough_id,
+        role=CharacterRole(model.role),
         display_name=model.display_name,
         aliases=tuple(model.aliases),
         public_profile=_public_profile(dict(model.profile)),

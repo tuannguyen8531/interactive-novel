@@ -43,6 +43,17 @@ their meaning or remove provenance and scope.
 
 ## 3. Aggregates and identity
 
+Canonical character IDs and persistence-record IDs are UUID strings assigned by
+the application when a WorldSeed is confirmed. Model-generated character IDs
+are temporary references; confirmation remaps them and every dependent
+reference atomically. Display names are not identities and may be shared by
+different worlds.
+
+Each persisted character has a structural `role` of `player` or `npc`. This is
+separate from the free-form story role in the character's public profile. A
+Playthrough's `player_character_id` references the UUID of the character whose
+structural role is `player`.
+
 ### World
 
 A World contains the premise, genre/tone, canon rules, locations, character

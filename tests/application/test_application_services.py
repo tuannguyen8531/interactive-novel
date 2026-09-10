@@ -13,6 +13,7 @@ from src.application.contracts.ai import WorldSeed
 from src.application.contracts.persistence import (
     BranchRecord,
     CharacterRecord,
+    CharacterRole,
     DerivedJobRecord,
     EventRecord,
     InvariantReport,
@@ -365,6 +366,7 @@ async def test_character_memory_relationship_and_timeline_queries_are_scoped() -
             id="yuki",
             world_id=playthrough.world_id,
             playthrough_id=playthrough.id,
+            role=CharacterRole.NPC,
             display_name="Yuki",
             aliases=("Yu",),
             public_profile={"role": "student"},
@@ -593,6 +595,7 @@ async def test_playthrough_export_contains_canonical_records_and_is_json_safe() 
             id="yuki",
             world_id=world.id,
             playthrough_id=playthrough.id,
+            role=CharacterRole.NPC,
             display_name="Yuki",
             aliases=(),
             public_profile={"role": "student"},
