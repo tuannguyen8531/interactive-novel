@@ -56,6 +56,16 @@ class WorldDraftGenerateRequest(BaseModel):
     story_language: StoryLanguage | None = None
 
 
+class WorldDraftAssistRequest(BaseModel):
+    """Transient request to refine a world-builder prompt before generation."""
+
+    prompt: str = Field(min_length=1, max_length=20_000)
+    template_id: str = Field(default="school_romance", min_length=1, max_length=80)
+    tone: str | None = Field(default=None, min_length=1, max_length=80)
+    player_gender: Literal["male", "female"] = "male"
+    story_language: StoryLanguage | None = None
+
+
 class WorldDraftRequest(BaseModel):
     """Edited WorldSeed sent back for deterministic validation or confirmation."""
 
@@ -235,5 +245,6 @@ __all__ = [
     "UndoBranchRequest",
     "WorldCreateRequest",
     "WorldDraftGenerateRequest",
+    "WorldDraftAssistRequest",
     "WorldDraftRequest",
 ]

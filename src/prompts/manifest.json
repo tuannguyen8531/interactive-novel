@@ -7,6 +7,14 @@
     "required_variables": ["input_json"],
     "changelog": "Resolve example provenance versions from the prompt manifest."
   },
+  "world_guide": {
+    "template": "world_guide.md",
+    "semantic_version": "1.1.0",
+    "input_contract": "world-guide-input",
+    "output_schema_version": "world-brief-suggestion",
+    "required_variables": ["input_json"],
+    "changelog": "Decouple rating and violence ceiling presets from creative brief ideation."
+  },
   "planner": {
     "template": "planner.md",
     "semantic_version": "1.6.0",

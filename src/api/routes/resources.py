@@ -20,6 +20,7 @@ from src.api.schemas import (
     SwitchBranchRequest,
     UndoBranchRequest,
     WorldCreateRequest,
+    WorldDraftAssistRequest,
     WorldDraftGenerateRequest,
     WorldDraftRequest,
 )
@@ -52,6 +53,27 @@ async def generate_world_draft(
     kwargs = {key: value for key, value in requested.items() if key in parameters and value is not None}
     draft = await generator(payload.prompt, **kwargs)
     return public_json(draft)
+
+
+@router.post("/world-drafts/assist")
+async def assist_world_draft(
+    payload: WorldDraftAssistRequest,
+    services: ApplicationContainer = _services_dependency,
+):
+    assistant = services.world_drafts.assist_world_prompt
+    parameters = signature(assistant).parameters
+    story_language = payload.story_language
+    if story_language is None:
+        story_language = await _configured_story_language(services)
+    requested = {
+        "template_id": payload.template_id,
+        "tone": payload.tone,
+        "player_gender": payload.player_gender,
+        "story_language": story_language,
+    }
+    kwargs = {key: value for key, value in requested.items() if key in parameters and value is not None}
+    suggestion = await assistant(payload.prompt, **kwargs)
+    return public_json(suggestion)
 
 
 async def _configured_story_language(services: ApplicationContainer) -> StoryLanguage:

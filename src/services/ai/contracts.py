@@ -18,6 +18,7 @@ from src.application.contracts.ai import (
     SimulationResult,
     TurnPlan,
     VersionedOutput,
+    WorldBriefSuggestion,
     WorldSeed,
 )
 from src.application.contracts.providers import StructuredOutputError, StructuredSchema
@@ -54,6 +55,7 @@ class AIContractValidationError(ValueError):
 
 ROLE_MODELS: Mapping[AIPromptRole, type[VersionedOutput]] = {
     AIPromptRole.WORLD_BUILDER: WorldSeed,
+    AIPromptRole.WORLD_GUIDE: WorldBriefSuggestion,
     AIPromptRole.PLANNER: TurnPlan,
     AIPromptRole.SIMULATOR: SimulationResult,
     AIPromptRole.VALIDATOR: ConsistencyReport,

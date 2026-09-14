@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass, replace
 from inspect import signature
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from uuid import uuid4
 
-from src.application.contracts.ai import CharacterSeed, RatingValue, SceneSpec, ViolenceCeilingValue, WorldSeed
+from src.application.contracts.ai import (
+    CharacterSeed,
+    RatingValue,
+    SceneSpec,
+    ViolenceCeilingValue,
+    WorldBriefSuggestion,
+    WorldSeed,
+)
 from src.application.contracts.persistence import (
     BeliefEvidenceRecord,
     BeliefRecord,
@@ -120,6 +128,45 @@ class WorldDraftApplicationService:
             }
         )
         return self.validate_world_draft(generated)
+
+    async def assist_world_prompt(
+        self,
+        prompt: str,
+        *,
+        template_id: str = "school_romance",
+        tone: str | None = None,
+        player_gender: Literal["male", "female"] = "male",
+        story_language: StoryLanguage | str = StoryLanguage.ENGLISH,
+    ) -> WorldBriefSuggestion:
+        """Refine a prompt without opening a persistence transaction."""
+        if len(prompt) > 20_000:
+            raise ApplicationValidationError("World assist prompt must not exceed 20,000 characters.")
+        normalized_prompt = prompt.strip()
+        if not normalized_prompt:
+            raise ApplicationValidationError("World assist prompt must not be empty.")
+        if self._generator is None:
+            raise ApplicationValidationError("World draft generator is not configured.")
+        template = self._require_template(template_id)
+        effective_tone = tone.strip() if tone is not None else template.defaults.tone
+        effective_language = StoryLanguage(story_language)
+        generator_method = cast(
+            Callable[..., Awaitable[WorldBriefSuggestion]],
+            getattr(self._generator, "assist_world_prompt", None),
+        )
+        if not callable(generator_method):
+            raise ApplicationValidationError("World guide generator is not configured.")
+        requested = {
+            "template_id": template.id,
+            "tone": effective_tone,
+            "player_gender": player_gender,
+            "story_language": effective_language,
+        }
+        parameters = signature(generator_method).parameters
+        kwargs = {key: value for key, value in requested.items() if key in parameters}
+        result = await generator_method(normalized_prompt, **kwargs)
+        if not isinstance(result, WorldBriefSuggestion):
+            raise ApplicationValidationError("World guide generator returned an invalid suggestion.")
+        return result
 
     def validate_world_draft(self, seed: WorldSeed) -> WorldSeed:
         """Re-validate shape and semantic references before review or confirm."""

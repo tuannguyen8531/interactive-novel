@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from src.application.contracts.ai import AIPromptRole, WorldSeed
+from src.application.contracts.ai import AIPromptRole, WorldBriefSuggestion, WorldSeed
 from src.application.contracts.providers import ProviderResponse, StructuredResponse
 from src.domain.language import StoryLanguage
 from src.services.ai.world_builder import ProviderWorldDraftGenerator
@@ -78,3 +78,30 @@ async def test_provider_world_builder_carries_story_language_into_prompt_and_see
     assert result.story_language is StoryLanguage.VIETNAMESE
     assert '"story_language": "vi"' in provider.request.user_prompt
     assert "player-facing story content in natural Vietnamese" in provider.request.user_prompt
+
+
+@pytest.mark.asyncio
+async def test_provider_world_guide_uses_world_builder_route_and_structured_contract() -> None:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_guide"]
+    provider = _Provider(payload)
+    generator = ProviderWorldDraftGenerator(provider)  # type: ignore[arg-type]
+
+    result = await generator.assist_world_prompt(
+        "Một câu chuyện tình cảm trong học viện phép thuật.",
+        template_id="fantasy_adventure",
+        tone="quiet, bittersweet",
+        player_gender="female",
+        story_language=StoryLanguage.VIETNAMESE,
+    )
+
+    assert isinstance(result, WorldBriefSuggestion)
+    assert provider.request.role == AIPromptRole.WORLD_BUILDER
+    assert provider.request.logical_roles == (AIPromptRole.WORLD_GUIDE,)
+    assert provider.request.temperature == 0.5
+    assert provider.request.max_output_tokens == 2_000
+    assert provider.request.metadata["output_schema_version"] == "world-brief-suggestion"
+    assert '"template": "fantasy_adventure"' in provider.request.user_prompt
+    assert '"tone": "quiet, bittersweet"' in provider.request.user_prompt
+    assert '"story_language": "vi"' in provider.request.user_prompt
+    assert '"rating"' not in provider.request.user_prompt
+    assert '"violence_ceiling"' not in provider.request.user_prompt

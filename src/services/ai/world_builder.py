@@ -6,7 +6,13 @@ import json
 from typing import Literal
 from uuid import uuid4
 
-from src.application.contracts.ai import AIPromptRole, RatingValue, ViolenceCeilingValue, WorldSeed
+from src.application.contracts.ai import (
+    AIPromptRole,
+    RatingValue,
+    ViolenceCeilingValue,
+    WorldBriefSuggestion,
+    WorldSeed,
+)
 from src.application.contracts.providers import ProviderRequest
 from src.application.ports.providers import ProviderGateway
 from src.domain.language import StoryLanguage
@@ -131,6 +137,81 @@ class ProviderWorldDraftGenerator:
                 "story_language": effective_language,
             }
         )
+
+    async def assist_world_prompt(
+        self,
+        prompt: str,
+        *,
+        template_id: str = "school_romance",
+        tone: str | None = None,
+        player_gender: Literal["male", "female"] = "male",
+        story_language: StoryLanguage | str = StoryLanguage.ENGLISH,
+    ) -> WorldBriefSuggestion:
+        """Refine a transient world idea without creating canonical records."""
+        definition = self._prompts.get(AIPromptRole.WORLD_GUIDE)
+        template = self._templates.get(template_id)
+        effective_tone = tone.strip() if tone is not None else template.defaults.tone
+        effective_language = StoryLanguage(story_language)
+        run_id = str(uuid4())
+        physical_call_id = str(uuid4())
+        input_envelope = {
+            "schema_version": "world-guide-input",
+            "role": AIPromptRole.WORLD_GUIDE.value,
+            "run_id": run_id,
+            "template": template.id,
+            "prompt": prompt.strip(),
+            "story_language": effective_language.value,
+            "language_instruction": _language_instruction(effective_language),
+            "template_instructions": template.prompt_instructions,
+            "presets": {
+                "tone": effective_tone,
+                "player_gender": player_gender,
+            },
+            "narrative_profile": template.narrative_profile.as_dict(),
+            "opening_guidance": list(template.opening_guidance),
+        }
+        request = ProviderRequest(
+            system_prompt=(
+                "You are the local-first World Guide. Return only a strict JSON object; "
+                "the result is transient writing guidance and has no persistence authority. "
+                f"{_language_instruction(effective_language)}"
+            ),
+            user_prompt=definition.render({"input_json": json.dumps(input_envelope, ensure_ascii=False, sort_keys=True)}),
+            # Route physically through the existing world_builder provider target.
+            role=AIPromptRole.WORLD_BUILDER,
+            physical_call_id=physical_call_id,
+            logical_roles=(AIPromptRole.WORLD_GUIDE,),
+            temperature=0.5,
+            max_output_tokens=2_000,
+            metadata={
+                "logical_role": AIPromptRole.WORLD_GUIDE.value,
+                "prompt_version": definition.semantic_version,
+                "output_schema_version": definition.output_schema_version,
+                "template_hash": definition.template_hash,
+                "story_language": effective_language.value,
+            },
+        )
+        response = await self._provider.generate_structured(
+            request,
+            self._contracts.structured_schema(
+                AIPromptRole.WORLD_GUIDE,
+                authoritative_metadata={
+                    "schema_version": definition.output_schema_version,
+                    "role": AIPromptRole.WORLD_GUIDE.value,
+                    "run_id": run_id,
+                    "prompt_version": definition.semantic_version,
+                    "physical_call_id": physical_call_id,
+                },
+            ),
+        )
+        result = (
+            response.data
+            if isinstance(response.data, WorldBriefSuggestion)
+            else self._contracts.parse(AIPromptRole.WORLD_GUIDE, response.data)
+        )
+        if not isinstance(result, WorldBriefSuggestion):
+            raise TypeError("World guide contract returned a non-WorldBriefSuggestion response.")
+        return result
 
 
 def _language_instruction(language: StoryLanguage) -> str:

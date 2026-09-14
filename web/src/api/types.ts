@@ -144,6 +144,23 @@ export interface WorldSeed {
   opening_scene: WorldSceneSpec
 }
 
+export interface CreativeQuestion {
+  id: string
+  question: string
+  suggestions: string[]
+}
+
+export interface WorldBriefSuggestion {
+  schema_version: 'world-brief-suggestion' | string
+  role: 'world_guide' | string
+  run_id: string
+  prompt_version: string
+  physical_call_id: string | null
+  refined_prompt: string
+  assumptions: string[]
+  questions: CreativeQuestion[]
+}
+
 export interface WorldConfirmation {
   world: WorldRecord
   playthrough: PlaythroughRecord

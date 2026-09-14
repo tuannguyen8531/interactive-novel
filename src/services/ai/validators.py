@@ -18,6 +18,7 @@ from src.application.contracts.ai import (
     SimulationResult,
     StatePatchProposal,
     TurnPlan,
+    WorldBriefSuggestion,
     WorldSeed,
 )
 
@@ -39,7 +40,7 @@ def validate_semantics(value: Any) -> None:
         _validate_world_seed(value)
     elif isinstance(value, StatePatchProposal):
         _validate_state_patch(value)
-    elif isinstance(value, (TurnPlan, ConsistencyReport, NarrativeDraft, CritiqueResult)):
+    elif isinstance(value, (TurnPlan, ConsistencyReport, NarrativeDraft, CritiqueResult, WorldBriefSuggestion)):
         return
     elif isinstance(value, KnowledgeClaimProposal):
         _validate_claim(value, path="claim")

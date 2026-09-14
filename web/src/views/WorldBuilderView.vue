@@ -114,6 +114,27 @@ async function generate(): Promise<void> {
   }
 }
 
+async function assist(): Promise<void> {
+  try {
+    await store.assistPrompt()
+  } catch {
+    // The store exposes a safe error for the form.
+  }
+}
+
+function updateAnswer(questionId: string, event: Event): void {
+  const target = event.target
+  if (target instanceof HTMLInputElement) store.setAnswer(questionId, target.value)
+}
+
+async function refineSelectedSuggestions(): Promise<void> {
+  try {
+    await store.refineSelectedSuggestions()
+  } catch {
+    // The store keeps the previous suggestion and exposes a safe error.
+  }
+}
+
 async function validate(): Promise<void> {
   try {
     await store.validate()
@@ -180,8 +201,90 @@ function getInitials(name: string): string {
             rows="6"
             maxlength="20000"
             placeholder="Describe the setting, heroine archetype, relationship tensions, or the inciting event that begins the story…"
+            @input="store.dismissSuggestion"
           />
         </label>
+
+        <div class="brief-assist-actions">
+          <button
+            class="secondary"
+            type="button"
+            :disabled="store.loading || !store.prompt.trim()"
+            @click="assist"
+          >
+            <span v-if="store.assisting" class="spin-icon">⏳</span>
+            <span v-else>✨</span>
+            <span>{{ store.assisting ? 'Developing idea…' : 'Develop idea' }}</span>
+          </button>
+          <span class="muted small-copy">AI will suggest wording without changing your selected presets.</span>
+        </div>
+
+        <section
+          v-if="store.briefSuggestion"
+          class="brief-assistant-panel"
+          aria-live="polite"
+          aria-labelledby="brief-assistant-title"
+        >
+          <div class="brief-assistant-heading">
+            <div>
+              <p class="eyebrow">Creative Brief</p>
+              <h3 id="brief-assistant-title">A clearer version of your idea</h3>
+            </div>
+            <button class="secondary" type="button" :disabled="store.loading" @click="store.dismissSuggestion">
+              Dismiss
+            </button>
+          </div>
+          <div class="brief-refined-prompt" role="note">
+            {{ store.briefSuggestion.refined_prompt }}
+          </div>
+          <div v-if="store.briefSuggestion.assumptions.length" class="brief-assistant-block">
+            <span class="field-label">Assumptions</span>
+            <ul class="brief-list">
+              <li v-for="assumption in store.briefSuggestion.assumptions" :key="assumption">{{ assumption }}</li>
+            </ul>
+          </div>
+          <div v-if="store.briefSuggestion.questions.length" class="brief-assistant-block">
+            <span class="field-label">Clarify the direction</span>
+            <div v-for="question in store.briefSuggestion.questions" :key="question.id" class="brief-question">
+              <p>{{ question.question }}</p>
+              <div class="brief-suggestion-chips">
+                <button
+                  v-for="answer in question.suggestions"
+                  :key="answer"
+                  class="chip-button"
+                  :class="{ selected: store.selectedAnswers[question.id] === answer }"
+                  type="button"
+                  :disabled="store.loading"
+                  @click="store.selectAnswer(question.id, answer)"
+                >
+                  {{ answer }}
+                </button>
+              </div>
+              <input
+                :value="store.selectedAnswers[question.id] ?? ''"
+                class="brief-answer-input"
+                type="text"
+                maxlength="256"
+                placeholder="Or write your own answer"
+                :disabled="store.loading"
+                @input="updateAnswer(question.id, $event)"
+              />
+            </div>
+          </div>
+          <div class="brief-assistant-footer">
+            <button
+              class="secondary"
+              type="button"
+              :disabled="store.loading || !store.hasSelectedAnswers"
+              @click="refineSelectedSuggestions"
+            >
+              Update with selected answers
+            </button>
+            <button class="submit-btn" type="button" :disabled="store.loading" @click="store.applySuggestion">
+              Apply to description
+            </button>
+          </div>
+        </section>
 
         <div class="preset-grid">
           <div class="preset-row">
@@ -620,6 +723,120 @@ function getInitials(name: string): string {
   margin: 0.2rem 0 0;
   font-size: 0.8rem;
   opacity: 0.85;
+}
+
+.brief-assist-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.brief-assistant-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  border-radius: var(--radius-md);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.brief-assistant-heading,
+.brief-assistant-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.brief-assistant-heading {
+  justify-content: space-between;
+}
+
+.brief-assistant-heading > div {
+  min-width: 0;
+}
+
+.brief-assistant-footer {
+  justify-content: flex-end;
+}
+
+.brief-assistant-footer .submit-btn {
+  width: auto;
+}
+
+.brief-assistant-heading h3 {
+  margin: 0.25rem 0 0;
+  color: #fff;
+  font-size: 1.05rem;
+}
+
+.brief-refined-prompt {
+  display: block;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  margin: 0;
+  border: 1px solid rgba(165, 180, 252, 0.2);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.35);
+  color: #e0e7ff;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.brief-assistant-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.brief-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.brief-question p {
+  margin: 0 0 0.5rem;
+  color: #e2e8f0;
+}
+
+.brief-suggestion-chips {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.chip-button {
+  padding: 0.4rem 0.65rem;
+  border: 1px solid rgba(165, 180, 252, 0.4);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.45);
+  color: #c7d2fe;
+  cursor: pointer;
+}
+
+.chip-button:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.3);
+}
+
+.chip-button.selected {
+  border-color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.45);
+  color: #fff;
+}
+
+.brief-answer-input {
+  width: 100%;
+  margin-top: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(165, 180, 252, 0.25);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.45);
+  color: #e2e8f0;
 }
 
 .submit-btn {

@@ -10,7 +10,7 @@ import httpx
 import pytest
 
 from src.api.factory import create_app
-from src.application.contracts.ai import WorldSeed
+from src.application.contracts.ai import WorldBriefSuggestion, WorldSeed
 from src.application.contracts.persistence import BranchRecord, PlaythroughRecord, TurnRecord, WorldRecord, utc_now
 from src.application.contracts.providers import StructuredOutputError
 from src.application.services.world_drafts import WorldConfirmation
@@ -24,6 +24,25 @@ class _WorldDraftService:
         self.seed = seed
         self.confirmations = 0
         self.generate_options: dict[str, Any] = {}
+        self.assist_options: dict[str, Any] = {}
+
+    async def assist_world_prompt(
+        self,
+        prompt: str,
+        *,
+        template_id: str = "school_romance",
+        tone: str | None = None,
+        player_gender: str = "male",
+        story_language: str = "en",
+    ) -> WorldBriefSuggestion:
+        self.assist_options = {
+            "prompt": prompt,
+            "template_id": template_id,
+            "tone": tone,
+            "player_gender": player_gender,
+            "story_language": story_language,
+        }
+        return WorldBriefSuggestion.model_validate(json.loads(FIXTURE.read_text(encoding="utf-8"))["world_guide"])
 
     async def generate_world_draft(
         self,
@@ -166,6 +185,38 @@ async def test_world_builder_provider_contract_failure_returns_safe_gateway_erro
                 "attempts": 0,
             },
         }
+    }
+
+
+@pytest.mark.asyncio
+async def test_world_guide_endpoint_returns_transient_suggestion_and_preserves_presets() -> None:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]
+    world_drafts = _WorldDraftService(WorldSeed.model_validate(payload))
+    app = create_app(
+        Settings(app_name="world-guide-api-test"),
+        services=SimpleNamespace(world_drafts=world_drafts),  # type: ignore[arg-type]
+    )
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/world-drafts/assist",
+            json={
+                "prompt": "Một ý tưởng ngắn.",
+                "tone": "quiet, bittersweet",
+                "player_gender": "female",
+                "story_language": "vi",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["role"] == "world_guide"
+    assert response.json()["refined_prompt"]
+    assert world_drafts.assist_options == {
+        "prompt": "Một ý tưởng ngắn.",
+        "template_id": "school_romance",
+        "tone": "quiet, bittersweet",
+        "player_gender": "female",
+        "story_language": "vi",
     }
 
 

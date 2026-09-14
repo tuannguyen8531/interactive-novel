@@ -21,6 +21,7 @@ import type {
   TurnJobView,
   ViolenceCeiling,
   WorldConfirmation,
+  WorldBriefSuggestion,
   WorldRecord,
   WorldSeed,
   StoryTemplate,
@@ -136,6 +137,13 @@ export const api = {
     player_gender?: BinaryGender
     story_language?: StoryLanguage
   }): Promise<WorldSeed> => request<WorldSeed>('/api/world-drafts', jsonBody(payload)),
+  assistWorldDraft: (payload: {
+    prompt: string
+    template_id?: string
+    tone?: string
+    player_gender?: BinaryGender
+    story_language?: StoryLanguage
+  }): Promise<WorldBriefSuggestion> => request<WorldBriefSuggestion>('/api/world-drafts/assist', jsonBody(payload)),
   validateWorldDraft: (draft: WorldSeed): Promise<WorldSeed> =>
     request<WorldSeed>('/api/world-drafts/validate', jsonBody({ draft })),
   confirmWorldDraft: (draft: WorldSeed, worldId?: string): Promise<WorldConfirmation> =>

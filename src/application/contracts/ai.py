@@ -18,6 +18,7 @@ from src.domain.language import StoryLanguage
 
 class AIPromptRole(StrEnum):
     WORLD_BUILDER = "world_builder"
+    WORLD_GUIDE = "world_guide"
     PLANNER = "planner"
     SIMULATOR = "simulator"
     VALIDATOR = "validator"
@@ -738,6 +739,24 @@ class ThreadSeed(AIModel):
     stakes: str = Field(min_length=1)
 
 
+class CreativeQuestion(AIModel):
+    """One optional clarification question for a transient world brief."""
+
+    id: str = Field(min_length=1, max_length=64)
+    question: str = Field(min_length=1, max_length=256)
+    suggestions: tuple[str, ...] = Field(default_factory=tuple, max_length=5)
+
+
+class WorldBriefSuggestion(VersionedOutput):
+    """Transient prose guidance; it has no persistence or canonical authority."""
+
+    expected_schema_version: ClassVar[str] = "world-brief-suggestion"
+    expected_role: ClassVar[AIPromptRole] = AIPromptRole.WORLD_GUIDE
+    refined_prompt: str = Field(min_length=1, max_length=20_000)
+    assumptions: tuple[str, ...] = Field(default_factory=tuple, max_length=6)
+    questions: tuple[CreativeQuestion, ...] = Field(default_factory=tuple, max_length=3)
+
+
 class WorldSeed(VersionedOutput):
     """World-builder draft; persistence requires user confirmation later."""
 
@@ -762,7 +781,7 @@ class WorldSeed(VersionedOutput):
     opening_scene: SceneSpec
 
 
-AIOutput = TurnPlan | SimulationResult | ConsistencyReport | NarrativeDraft | CritiqueResult | WorldSeed
+AIOutput = TurnPlan | SimulationResult | ConsistencyReport | NarrativeDraft | CritiqueResult | WorldSeed | WorldBriefSuggestion
 
 
 __all__ = [
@@ -783,6 +802,7 @@ __all__ = [
     "ClaimPolarity",
     "ClaimReference",
     "CharacterSeed",
+    "CreativeQuestion",
     "ConsistencyReport",
     "ConsistencyStatus",
     "ConsistencyViolation",
@@ -834,4 +854,5 @@ __all__ = [
     "VersionedOutput",
     "ViolenceCeilingValue",
     "WorldSeed",
+    "WorldBriefSuggestion",
 ]

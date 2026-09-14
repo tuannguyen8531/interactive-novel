@@ -134,9 +134,29 @@ function charPhysicalCondition(char: CharacterView | undefined): string {
               Protagonist (You)
             </VnBadge>
           </div>
-          <VnBadge v-if="charRole(activeCharacter)" variant="brand" capitalize>
-            {{ charRole(activeCharacter) }}
-          </VnBadge>
+          <div
+            v-if="charRole(activeCharacter)"
+            class="char-role-wrapper"
+            :title="charRole(activeCharacter)"
+          >
+            <VnBadge
+              variant="brand"
+              capitalize
+              truncate
+              class="char-role-badge"
+            >
+              {{ charRole(activeCharacter) }}
+            </VnBadge>
+
+            <!-- Custom Floating Tooltip on Hover -->
+            <div class="char-role-tooltip" role="tooltip">
+              <div class="tooltip-header">
+                <span class="tooltip-kind">Role / Archetype</span>
+                <span class="tooltip-hint">Character role</span>
+              </div>
+              <p class="tooltip-text">{{ charRole(activeCharacter) }}</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -371,6 +391,94 @@ function charPhysicalCondition(char: CharacterView | undefined): string {
   font-size: 1.05rem;
   font-weight: 700;
   color: #f8fafc;
+}
+
+.char-role-wrapper {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  width: fit-content;
+}
+
+.char-role-badge {
+  max-width: min(220px, 100%);
+  min-width: 0;
+  cursor: default;
+}
+
+/* Custom Floating Tooltip on Hover (matching quick moves) */
+.char-role-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  max-width: min(300px, calc(100vw - 40px));
+  width: max-content;
+  padding: 0.6rem 0.8rem;
+  background: rgba(13, 16, 26, 0.96);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  border-radius: 0.65rem;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6), 0 0 16px rgba(99, 102, 241, 0.16);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 160ms;
+  pointer-events: none;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.char-role-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 1.25rem;
+  border-width: 5px;
+  border-style: solid;
+  border-color: transparent transparent rgba(99, 102, 241, 0.5) transparent;
+}
+
+.char-role-wrapper:hover .char-role-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.char-role-tooltip .tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.char-role-tooltip .tooltip-kind {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #a5b4fc;
+}
+
+.char-role-tooltip .tooltip-hint {
+  font-size: 0.66rem;
+  color: var(--muted, #94a3b8);
+}
+
+.char-role-tooltip .tooltip-text {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #f1f5f9;
+  word-break: break-word;
+  white-space: normal;
+  text-transform: capitalize;
 }
 
 /* Structured Status Grid */

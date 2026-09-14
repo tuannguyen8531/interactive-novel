@@ -10,7 +10,7 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
-from src.application.contracts.ai import ClaimReference, WorldSeed
+from src.application.contracts.ai import ClaimReference, WorldBriefSuggestion, WorldSeed
 from src.application.contracts.persistence import BranchRecord, TurnRecord, utc_now
 from src.application.errors import ApplicationValidationError
 from src.application.ports.persistence import UowFactory
@@ -206,9 +206,75 @@ class _Generator:
         assert prompt
         return self.seed
 
+    async def assist_world_prompt(self, prompt: str, **kwargs: Any) -> Any:
+        raise AssertionError("assist is not used by this fixture")
+
+
+class _GuideGenerator:
+    def __init__(self, suggestion: WorldBriefSuggestion) -> None:
+        self.suggestion = suggestion
+        self.options: dict[str, Any] = {}
+
+    async def assist_world_prompt(
+        self,
+        prompt: str,
+        *,
+        template_id: str = "school_romance",
+        tone: str | None = None,
+        player_gender: str = "male",
+        story_language: str = "en",
+    ) -> WorldBriefSuggestion:
+        self.options = {
+            "prompt": prompt,
+            "template_id": template_id,
+            "tone": tone,
+            "player_gender": player_gender,
+            "story_language": story_language,
+        }
+        return self.suggestion
+
 
 def _factory(store: _State, *, fail: bool = False) -> UowFactory:
     return cast(UowFactory, lambda: _Uow(store, fail=fail))
+
+
+def _brief() -> WorldBriefSuggestion:
+    return WorldBriefSuggestion.model_validate(json.loads(FIXTURE.read_text(encoding="utf-8"))["world_guide"])
+
+
+@pytest.mark.asyncio
+async def test_world_assist_is_transient_and_normalizes_authoritative_presets() -> None:
+    store = _State()
+    generator = _GuideGenerator(_brief())
+    service = WorldDraftApplicationService(_factory(store), generator=generator)  # type: ignore[arg-type]
+
+    result = await service.assist_world_prompt(
+        "  Một ý tưởng ngắn.  ",
+        tone="  quiet, bittersweet ",
+        player_gender="female",
+        story_language="vi",
+    )
+
+    assert result.refined_prompt
+    assert generator.options == {
+        "prompt": "Một ý tưởng ngắn.",
+        "template_id": "school_romance",
+        "tone": "quiet, bittersweet",
+        "player_gender": "female",
+        "story_language": "vi",
+    }
+    assert store.worlds == {}
+    assert store.playthroughs == {}
+
+
+@pytest.mark.asyncio
+async def test_world_assist_rejects_empty_and_oversized_prompts() -> None:
+    service = WorldDraftApplicationService(_factory(_State()), generator=_GuideGenerator(_brief()))  # type: ignore[arg-type]
+
+    with pytest.raises(ApplicationValidationError, match="must not be empty"):
+        await service.assist_world_prompt(" \n ")
+    with pytest.raises(ApplicationValidationError, match="20,000"):
+        await service.assist_world_prompt("x" * 20_001)
 
 
 @pytest.mark.asyncio

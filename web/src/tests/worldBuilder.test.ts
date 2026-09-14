@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { api } from '@/api/client'
-import type { WorldConfirmation, WorldSeed } from '@/api/types'
+import type { WorldBriefSuggestion, WorldConfirmation, WorldSeed } from '@/api/types'
 import { useWorldBuilderStore } from '@/stores/worldBuilder'
 
 function seed(): WorldSeed {
@@ -101,6 +101,31 @@ const confirmation = (draft: WorldSeed): WorldConfirmation =>
     opening_turn: { id: 'turn-1' }
   }) as unknown as WorldConfirmation
 
+function brief(overrides: Partial<WorldBriefSuggestion> = {}): WorldBriefSuggestion {
+  return {
+    schema_version: 'world-brief-suggestion',
+    role: 'world_guide',
+    run_id: 'guide-run-1',
+    prompt_version: '1.0.0',
+    physical_call_id: 'guide-call-1',
+    refined_prompt: 'A quiet romance around a festival-bound school club.',
+    assumptions: ['The relationship develops through shared preparation.'],
+    questions: [
+      {
+        id: 'conflict',
+        question: 'What creates the central tension?',
+        suggestions: ['A deadline', 'A hidden secret']
+      },
+      {
+        id: 'relationship',
+        question: 'How should the relationship develop?',
+        suggestions: ['From rivalry to trust', 'Through shared vulnerability']
+      }
+    ],
+    ...overrides
+  }
+}
+
 describe('world builder store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -153,6 +178,80 @@ describe('world builder store', () => {
       violence_ceiling: 'none',
       player_gender: 'male'
     })
+  })
+
+  it('assists a prompt without changing it until the user applies the suggestion', async () => {
+    const suggestion = brief()
+    vi.spyOn(api, 'assistWorldDraft').mockResolvedValue(suggestion)
+    const store = useWorldBuilderStore()
+    store.prompt = 'A rough idea about a school club.'
+    store.tonePreset = 'quiet, bittersweet'
+    store.ratingPreset = 'mature_16_plus'
+    store.violencePreset = 'restrained'
+    store.playerGender = 'female'
+
+    await store.assistPrompt()
+
+    expect(vi.mocked(api.assistWorldDraft).mock.calls[0][0]).toMatchObject({
+      prompt: 'A rough idea about a school club.',
+      tone: 'quiet, bittersweet',
+      player_gender: 'female'
+    })
+    expect(vi.mocked(api.assistWorldDraft).mock.calls[0][0]).not.toHaveProperty('rating')
+    expect(vi.mocked(api.assistWorldDraft).mock.calls[0][0]).not.toHaveProperty('violence_ceiling')
+    expect(store.prompt).toBe('A rough idea about a school club.')
+    expect(store.briefSuggestion?.refined_prompt).toBe(suggestion.refined_prompt)
+
+    store.applySuggestion()
+
+    expect(store.prompt).toBe(suggestion.refined_prompt)
+    expect(store.tonePreset).toBe('quiet, bittersweet')
+    expect(store.briefSuggestion).toBeNull()
+  })
+
+  it('collects answers for multiple questions and makes one refine call', async () => {
+    const first = brief()
+    const second = brief({ refined_prompt: 'A festival deadline forces two guarded students to cooperate.' })
+    vi.spyOn(api, 'assistWorldDraft').mockResolvedValueOnce(first).mockResolvedValueOnce(second)
+    const store = useWorldBuilderStore()
+    store.prompt = 'The rough idea.'
+
+    await store.assistPrompt()
+    store.selectAnswer('conflict', 'A hidden secret')
+    store.selectAnswer('relationship', 'Through shared vulnerability')
+    await store.refineSelectedSuggestions()
+
+    expect(vi.mocked(api.assistWorldDraft).mock.calls[1][0].prompt).toContain(first.refined_prompt)
+    expect(vi.mocked(api.assistWorldDraft).mock.calls[1][0].prompt).toContain('A hidden secret')
+    expect(vi.mocked(api.assistWorldDraft).mock.calls[1][0].prompt).toContain('Through shared vulnerability')
+    expect(store.prompt).toBe('The rough idea.')
+    expect(store.briefSuggestion?.refined_prompt).toBe(second.refined_prompt)
+    expect(store.selectedAnswers).toEqual({})
+  })
+
+  it('allows a custom answer and does not call the API without a selection', async () => {
+    const suggestion = brief()
+    const assistSpy = vi.spyOn(api, 'assistWorldDraft').mockResolvedValue(suggestion)
+    const store = useWorldBuilderStore()
+
+    await store.assistPrompt()
+    await expect(store.refineSelectedSuggestions()).rejects.toThrow('at least one clarification')
+    expect(assistSpy).toHaveBeenCalledTimes(1)
+
+    store.setAnswer('relationship', 'Slowly, after they survive the festival together')
+    expect(store.hasSelectedAnswers).toBe(true)
+  })
+
+  it('dismisses a brief without changing the prompt', async () => {
+    vi.spyOn(api, 'assistWorldDraft').mockResolvedValue(brief())
+    const store = useWorldBuilderStore()
+    store.prompt = 'The rough idea.'
+
+    await store.assistPrompt()
+    store.dismissSuggestion()
+
+    expect(store.prompt).toBe('The rough idea.')
+    expect(store.briefSuggestion).toBeNull()
   })
 
   it('applies data-driven defaults when the selected template changes', () => {

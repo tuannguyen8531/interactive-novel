@@ -6,6 +6,7 @@ import type {
   ContentRating,
   StoryTemplate,
   ViolenceCeiling,
+  WorldBriefSuggestion,
   WorldCharacterSeed,
   WorldConfirmation,
   WorldRecord,
@@ -94,10 +95,16 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
   const generating = ref(false)
   const validating = ref(false)
   const confirming = ref(false)
+  const assisting = ref(false)
+  const briefSuggestion = ref<WorldBriefSuggestion | null>(null)
+  const selectedAnswers = ref<Record<string, string>>({})
   const error = ref<string | null>(null)
   const validationMessages = ref<string[]>([])
 
-  const loading = computed(() => generating.value || validating.value || confirming.value)
+  const loading = computed(() => assisting.value || generating.value || validating.value || confirming.value)
+  const hasSelectedAnswers = computed(() =>
+    Object.values(selectedAnswers.value).some((answer) => answer.trim().length > 0)
+  )
   const createdWorld = computed<WorldRecord | null>(() => confirmation.value?.world ?? null)
   const npcCount = computed(() => draft.value?.npc_profiles.length ?? 0)
   const canAddNpc = computed(() => npcCount.value < MAX_NPC_PROFILES)
@@ -278,6 +285,7 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
   })
 
   async function generate(): Promise<WorldSeed> {
+    if (loading.value) throw new Error('Another world-builder operation is already in progress.')
     generating.value = true
     error.value = null
     validationMessages.value = []
@@ -300,6 +308,73 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     } finally {
       generating.value = false
     }
+  }
+
+  async function assistPrompt(overridePrompt?: string): Promise<WorldBriefSuggestion> {
+    const sourcePrompt = (overridePrompt ?? prompt.value).trim()
+    if (!sourcePrompt) {
+      const cause = new Error('World assist prompt must not be empty.')
+      error.value = cause.message
+      throw cause
+    }
+    if (loading.value) throw new Error('Another world-builder operation is already in progress.')
+    assisting.value = true
+    error.value = null
+    try {
+      const suggestion = await api.assistWorldDraft({
+        prompt: sourcePrompt,
+        template_id: templateId.value,
+        tone: tonePreset.value.trim(),
+        player_gender: playerGender.value
+      })
+      briefSuggestion.value = suggestion
+      selectedAnswers.value = {}
+      return suggestion
+    } catch (cause) {
+      error.value = errorText(cause)
+      throw cause
+    } finally {
+      assisting.value = false
+    }
+  }
+
+  function applySuggestion(): void {
+    if (!briefSuggestion.value) return
+    prompt.value = briefSuggestion.value.refined_prompt
+    briefSuggestion.value = null
+    selectedAnswers.value = {}
+    error.value = null
+  }
+
+  function dismissSuggestion(): void {
+    briefSuggestion.value = null
+    selectedAnswers.value = {}
+  }
+
+  function setAnswer(questionId: string, answer: string): void {
+    selectedAnswers.value = { ...selectedAnswers.value, [questionId]: answer }
+  }
+
+  function selectAnswer(questionId: string, answer: string): void {
+    setAnswer(questionId, answer)
+  }
+
+  async function refineSelectedSuggestions(): Promise<WorldBriefSuggestion> {
+    const suggestion = briefSuggestion.value
+    if (!suggestion) throw new Error('No world brief suggestion is available to refine.')
+    const clarifications = suggestion.questions
+      .filter((question) => selectedAnswers.value[question.id]?.trim())
+      .map((question) => {
+        const answer = selectedAnswers.value[question.id]?.trim() ?? ''
+        return `- ${question.question} → ${answer}`
+      })
+    if (!clarifications.length) {
+      const cause = new Error('Select or write at least one clarification before updating the brief.')
+      error.value = cause.message
+      throw cause
+    }
+    const refinementPrompt = `${suggestion.refined_prompt}\n\n[Clarifications]\n${clarifications.join('\n')}`
+    return assistPrompt(refinementPrompt)
   }
 
   async function validate(): Promise<WorldSeed | null> {
@@ -342,6 +417,8 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
   function cancelDraft(): void {
     draft.value = null
     confirmation.value = null
+    briefSuggestion.value = null
+    selectedAnswers.value = {}
     validationMessages.value = []
     error.value = null
     stage.value = 'prompt'
@@ -362,6 +439,10 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     generating,
     validating,
     confirming,
+    assisting,
+    briefSuggestion,
+    selectedAnswers,
+    hasSelectedAnswers,
     loading,
     npcCount,
     canAddNpc,
@@ -376,6 +457,12 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     addNpc,
     removeNpc,
     generate,
+    assistPrompt,
+    applySuggestion,
+    dismissSuggestion,
+    setAnswer,
+    selectAnswer,
+    refineSelectedSuggestions,
     validate,
     confirm,
     cancelDraft

@@ -339,6 +339,9 @@ class FakeWorldGenerator:
     async def generate_world_draft(self, prompt: str) -> WorldSeed:
         return self.seed
 
+    async def assist_world_prompt(self, prompt: str, **kwargs: Any) -> Any:
+        raise AssertionError("assist is not used by this fixture")
+
 
 async def test_world_draft_generation_validation_and_confirmation_are_explicit() -> None:
     payload = json.loads(

@@ -166,6 +166,22 @@
       "length_target": 300
     }
   },
+  "world_guide": {
+    "schema_version": "world-brief-suggestion",
+    "role": "world_guide",
+    "run_id": "turn-run-1",
+    "prompt_version": "1.0.0",
+    "physical_call_id": "call-guide-1",
+    "refined_prompt": "Một câu chuyện tình cảm chậm rãi trong câu lạc bộ trường học đang chuẩn bị cho lễ hội đầu tiên.",
+    "assumptions": ["Mối quan hệ phát triển qua những công việc chuẩn bị chung."],
+    "questions": [
+      {
+        "id": "central_conflict",
+        "question": "Mâu thuẫn chính bắt nguồn từ đâu?",
+        "suggestions": ["Áp lực lễ hội", "Một bí mật bị che giấu"]
+      }
+    ]
+  },
   "planner": {
     "schema_version": "turn-plan",
     "role": "planner",

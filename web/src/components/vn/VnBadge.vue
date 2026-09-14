@@ -3,6 +3,7 @@ defineProps<{
   variant?: 'brand' | 'accent' | 'neutral' | 'success' | 'warning'
   clickable?: boolean
   capitalize?: boolean
+  truncate?: boolean
 }>()
 </script>
 
@@ -11,7 +12,7 @@ defineProps<{
     class="vn-badge"
     :class="[
       `variant-${variant || 'neutral'}`,
-      { 'is-clickable': clickable, 'is-capitalize': capitalize }
+      { 'is-clickable': clickable, 'is-capitalize': capitalize, 'is-truncate': truncate }
     ]"
   >
     <span v-if="$slots.icon" class="badge-icon">
@@ -41,6 +42,21 @@ defineProps<{
   max-width: 100%;
   align-self: flex-start;
   white-space: nowrap;
+}
+
+.is-truncate {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.is-truncate .badge-content {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .is-capitalize,
