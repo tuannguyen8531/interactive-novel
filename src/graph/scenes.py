@@ -78,7 +78,7 @@ def prepare_scene(state: TurnGraphState, game_state: GameState, guard: DomainGua
         pov="second_person",
         tone=str(tone or "gentle"),
         allowed_claims=claims,
-        length_target=300,
+        length_target=600,
     )
     locations = SceneLocations(
         before={key: game_state.characters[key].state.location_id for key in participants},

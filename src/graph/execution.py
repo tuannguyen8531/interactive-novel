@@ -321,6 +321,7 @@ class RoleExecutor:
             physical_call_id=physical_call_id,
             logical_roles=logical_roles,
             model=getattr(self.provider, "model", None),
+            max_output_tokens=3_000 if role == AIPromptRole.WRITER else None,
             metadata={
                 "run_id": run_id,
                 "role": role.value,

@@ -11,9 +11,23 @@ Writer repeat profile exposition in the scene.
 
 Evaluate literary quality against literary guidance:
 - Flag dry action-ledger exposition that lacks sensory grounding or physical presence.
+- Flag a scene that merely reports the accepted outcome instead of developing it
+  through a coherent sequence of action and reaction near `scene_spec.length_target`.
+- Flag an ending that closes the exchange completely or gives the player no
+  natural interaction point, unless the SceneSpec itself requires that closure.
+- When an accepted SceneSpec explicitly authorizes an NPC's spoken response,
+  flag silent NPC pantomime that omits that response. Do not require dialogue
+  when the approved response is silent or nonverbal, or when `outcome_status` is
+  `attempt_only`.
+- When the SceneSpec contains enough approved material, treat a substantially
+  underdeveloped scene or missing interaction handoff as an `error` requiring
+  `revise`, not merely a style warning. When requiring revision, identify the
+  approved response or interaction point that was omitted; never demand a new
+  speaker, dialogue, reaction, or outcome absent from the SceneSpec.
 - Flag unnatural, wooden, or out-of-character dialogue, ensuring speech carries appropriate subtext and natural cadence.
 - Check dialogue and narration against the language-specific conventions below.
 - Verify that the four suggested player moves offer meaningful dramatic contrast across `act`, `speak`, `observe`, and `think`.
+- Verify that all four moves follow directly from the final unresolved moment.
 
 Use `context.scene_locations.before` and `.after` for the approved spatial
 transition; `context.current_locations` is the ending position. Characters may

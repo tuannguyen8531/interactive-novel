@@ -71,6 +71,24 @@ def test_simulator_prompt_requires_authoritative_ids_and_clock_progress() -> Non
     assert "context.location_catalog" in prompt.content
     assert "context.current_locations" in prompt.content
     assert "same status" in prompt.content
+    assert "two to four causally" in prompt.content
+    assert "directly engages the group" in prompt.content
+
+
+def test_writer_prompt_requires_a_playable_scene_and_interactive_handoff() -> None:
+    prompt = PromptRegistry().get(AIPromptRole.WRITER)
+
+    assert "complete playable scene" in prompt.content
+    assert "approximate word target" in prompt.content
+    assert "unresolved interaction point" in prompt.content
+    assert "final paragraph" in prompt.content
+    assert "never invent dialogue" in prompt.content
+    assert "natural focal point" in prompt.content
+    assert "`attempt_only` boundaries" in prompt.content
+    critic = PromptRegistry().get(AIPromptRole.CRITIC).content
+    assert "missing interaction handoff" in critic
+    assert "when `outcome_status` is\n  `attempt_only`" in critic
+    assert "never demand a new" in critic
 
 
 def test_runtime_prompts_use_public_character_profiles_for_consistency() -> None:

@@ -9,6 +9,23 @@ consistent. Show background through behavior, priorities and selective dialogue;
 do not dump profile prose into narration. Never reveal a private fact merely
 because it is absent from the public character profile.
 
+Write a complete playable scene, not an event log. Treat
+`scene_spec.length_target` as an approximate word target and normally use four
+to seven paragraphs. Develop the approved material as a continuous scene:
+re-establish the immediate sensory situation, enact the player's attempt, show
+the authorized NPC responses through embodied behavior and, when the approved
+material explicitly supports it, active spoken dialogue. Make the resulting
+shift in tension clear and end at an unresolved interaction point where the
+player can naturally act or answer. When `outcome_status` is `accepted` and
+`visible_actions` explicitly include or clearly authorize speech in response to
+the player's greeting or question, render that response as dialogue fitting the
+NPC's voice. Preserve an approved silent or nonverbal response as written, and
+never invent dialogue merely because an NPC was addressed. When approved visible
+actions include multiple NPC reactions, give the exchange a natural focal point
+using only those reactions; one character may lead while the others retain their
+distinct rhythm. Do not pad the scene, repeat the same beat, summarize what was
+just shown, or invent an outcome beyond the SceneSpec.
+
 Use `context.scene_locations.before` and `.after` for the approved spatial
 transition; `context.current_locations` is the ending position. Characters may
 move only along that transition. Historical locations cannot override it.
@@ -49,6 +66,8 @@ dramatic contrast:
 Write each suggestion in first person so it can be submitted as player input. A
 suggestion may express only the player's attempt; it must not decide success,
 control another character, reveal hidden information, or add canonical facts.
+Each suggestion must respond directly to the unresolved interaction point in
+the final paragraph rather than starting an unrelated scene.
 
 Do not include a state patch.
 

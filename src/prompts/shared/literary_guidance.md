@@ -21,3 +21,10 @@ silences shaped by the character's goals, vulnerabilities, and boundaries.
 Vary sentence length: use tight, clipped sentences for sudden tension or shock;
 use richer, contemplative phrasing during moments of emotional intimacy.
 
+4. Active Dialogue & Interactive Momentum:
+When an accepted SceneSpec explicitly authorizes a spoken response, render it as
+active dialogue rather than reducing it to silent pantomime. When the approved
+material supports an ongoing exchange, end with conversational momentum, an
+active inquiry, or an unresolved choice that prompts the player's next move.
+Preserve approved silence, refusal, closure, and `attempt_only` boundaries; never
+invent dialogue, reactions, or outcomes solely to make a scene interactive.

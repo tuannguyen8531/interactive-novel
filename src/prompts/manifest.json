@@ -25,11 +25,11 @@
   },
   "simulator": {
     "template": "simulator.md",
-    "semantic_version": "1.10.0",
+    "semantic_version": "1.11.0",
     "input_contract": "role-input",
     "output_schema_version": "simulation-result",
     "required_variables": ["input_json"],
-    "changelog": "Ground story time in explicit 24-hour clock context and ground reactions in observable behavioral cues."
+    "changelog": "Develop accepted outcomes into visible interactive beats that leave room for the player's next response."
   },
   "validator": {
     "template": "validator.md",
@@ -41,19 +41,19 @@
   },
   "writer": {
     "template": "writer.md",
-    "semantic_version": "1.8.0",
+    "semantic_version": "1.9.0",
     "input_contract": "role-input",
     "output_schema_version": "narrative-draft",
     "required_variables": ["input_json", "language_guidance"],
-    "changelog": "Revise the previous draft using critic feedback within the Guard-approved scene boundaries."
+    "changelog": "Write longer playable scenes with action-reaction progression and an unresolved interaction handoff."
   },
   "critic": {
     "template": "critic.md",
-    "semantic_version": "1.7.0",
+    "semantic_version": "1.8.0",
     "input_contract": "role-input",
     "output_schema_version": "critique-result",
     "required_variables": ["input_json", "language_guidance"],
-    "changelog": "Incorporate shared literary guidance, dynamic language guidance, and evaluate dialogue naturalness."
+    "changelog": "Evaluate scene development, approximate target length, and the final interactive handoff."
   },
   "repair": {
     "semantic_version": "1.1.0",

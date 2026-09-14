@@ -262,6 +262,7 @@ def test_scene_uses_planned_content_classification_and_persisted_world_tone() ->
     assert scene.tags == ("romantic_affection",)
     assert scene.violence_detail.value == "none"
     assert scene.tone == "intimate, ominous"
+    assert scene.length_target == 600
 
 
 def make_pipeline(
@@ -792,6 +793,8 @@ async def test_initial_context_includes_bounded_public_character_backgrounds() -
     validator_request = next(request for request in provider.requests if request.role == AIPromptRole.VALIDATOR)
     writer_request = next(request for request in provider.requests if request.role == AIPromptRole.WRITER)
     critic_request = next(request for request in provider.requests if request.role == AIPromptRole.CRITIC)
+    assert writer_request.max_output_tokens == 3_000
+    assert critic_request.max_output_tokens is None
     assert "Alice inherited responsibility" in planner_request.user_prompt
     assert "Alice inherited responsibility" in simulator_request.user_prompt
     assert "Alice inherited responsibility" in writer_request.user_prompt

@@ -31,6 +31,19 @@ authoritative proposal must be a registered `KnowledgeClaimProposal` or a
 typed `StatePatchProposal` operation. Include uncertainty when evidence is
 missing. Never promote a belief or narrative sentence into canon implicitly.
 
+Make the accepted turn substantial enough to support a playable scene rather
+than a one-line event log. Express `proposed_outcome` as two to four causally
+connected, externally visible developments that remain within the player's
+attempt and the elapsed time. Give every `npc_reactions[].immediate_reaction`
+a concrete behavioral response; when context supports it, include a brief
+spoken response, question, gesture, or unfinished action that leaves the player
+room to answer. In group scenes where the player directly engages the group or a
+conversation is already underway, differentiate NPC reactions; when their goals
+and the evidence support it, one character may take the conversational initiative
+while the others react in their own distinct rhythm. Do not manufacture extra
+success, disclosures, relationship changes, or canonical facts merely to create
+drama.
+
 Use only exact IDs listed in `context.authoritative_ids` for existing
 authoritative references. A location introduced by the `register_location`
 operation described below is the sole exception. In particular:
