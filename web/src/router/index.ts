@@ -11,6 +11,7 @@ export const router = createRouter({
   routes: [
     { path: '/', name: 'home', component: () => import('@/views/HomeView.vue') },
     { path: '/worlds/new', name: 'world-builder', component: () => import('@/views/WorldBuilderView.vue') },
+    { path: '/worlds/new/review', name: 'world-review', component: () => import('@/views/WorldReviewView.vue') },
     { path: '/play/:playthroughId', name: 'play', component: () => import('@/views/PlayView.vue') },
     { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
     { path: '/data', redirect: '/settings' },

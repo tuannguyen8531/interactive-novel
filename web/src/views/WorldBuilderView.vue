@@ -1,29 +1,29 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive } from 'vue'
+import { computed, onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EditableCombobox from '@/components/EditableCombobox.vue'
 import VnBadge from '@/components/vn/VnBadge.vue'
 import VnSelect from '@/components/vn/VnSelect.vue'
 import StepProgress from '@/components/vn/StepProgress.vue'
-import { formatWorldTime } from '@/play/guidance'
-import { useWorldBuilder } from '@/composables/worldBuilder'
+import { useSharedWorldBuilder, resetSharedWorldBuilder } from '@/composables/worldBuilder'
 
 const route = useRoute()
 const router = useRouter()
-const builder = reactive(useWorldBuilder())
-let active = true
-onUnmounted(() => { active = false })
+const builder = reactive(useSharedWorldBuilder())
 const templateQuery = route.query.template
 if (typeof templateQuery === 'string' && templateQuery) builder.templateId = templateQuery
 
 onMounted(async () => {
+  // If we already have a draft and stage is review, redirect to review page
+  if (builder.stage === 'review' && builder.draft) {
+    await router.replace({ name: 'world-review' })
+    return
+  }
+  // Reset to prompt stage when arriving fresh
+  if (builder.stage !== 'prompt') {
+    resetSharedWorldBuilder()
+  }
   await builder.loadTemplates(typeof templateQuery === 'string' && !!templateQuery)
-})
-
-const currentStepIndex = computed(() => {
-  if (builder.stage === 'prompt') return 0
-  if (builder.stage === 'review') return 1
-  return 2
 })
 
 const wizardSteps = [
@@ -32,9 +32,6 @@ const wizardSteps = [
   { id: 'ready', label: '3. Launch Story', description: 'Begin your visual novel' }
 ]
 
-const characters = computed(() =>
-  builder.draft ? [builder.draft.player_character, ...builder.draft.npc_profiles] : []
-)
 const selectedTemplate = computed(() => builder.templates.find((item) => item.id === builder.templateId))
 
 const templateOptions = computed(() => [
@@ -101,13 +98,10 @@ const violenceDescription = computed(() => {
   return 'Violence and its physical consequences may be described directly.'
 })
 
-function characterName(characterId: string): string {
-  return characters.value.find((character) => character.character_id === characterId)?.name ?? characterId
-}
-
 async function generate(): Promise<void> {
   try {
     await builder.generate()
+    await router.push({ name: 'world-review' })
   } catch {
     // The builder exposes a safe error for the form.
   }
@@ -133,39 +127,6 @@ async function refineSelectedSuggestions(): Promise<void> {
     // The builder keeps the previous suggestion and exposes a safe error.
   }
 }
-
-async function validate(): Promise<void> {
-  try {
-    await builder.validate()
-  } catch {
-    // The builder exposes field diagnostics for the review panel.
-  }
-}
-
-async function confirm(): Promise<void> {
-  try {
-    const result = await builder.confirm()
-    if (!active) return
-    await router.push({ name: 'play', params: { playthroughId: result.playthrough.id } })
-  } catch {
-    // Confirmation errors stay on the editable draft.
-  }
-}
-
-function cancel(): void {
-  builder.cancelDraft()
-  void router.push({ name: 'home' })
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((part) => part[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-}
 </script>
 
 <template>
@@ -181,11 +142,11 @@ function getInitials(name: string): string {
 
     <!-- Stepper indicator -->
     <div class="stepper-wrapper">
-      <StepProgress :steps="wizardSteps" :current-step="currentStepIndex" />
+      <StepProgress :steps="wizardSteps" :current-step="0" />
     </div>
 
-    <!-- Mode 1: Initial Generation Prompt Form -->
-    <section v-if="builder.stage === 'prompt'" class="builder-layout">
+    <!-- Prompt Form -->
+    <section class="builder-layout">
       <form class="card builder-card" @submit.prevent="generate">
         <div class="form-title-row">
           <div>
@@ -195,7 +156,7 @@ function getInitials(name: string): string {
         </div>
 
         <label class="input-group">
-          <span class="field-label">World Premise & Story Hook</span>
+          <span class="field-label">World Premise &amp; Story Hook</span>
           <textarea
             v-model="builder.prompt"
             rows="6"
@@ -216,7 +177,7 @@ function getInitials(name: string): string {
             <span v-else>✨</span>
             <span>{{ builder.assisting ? 'Developing idea…' : 'Develop idea' }}</span>
           </button>
-          <span class="muted small-copy">AI will suggest wording without changing your selected presets.</span>
+          <span class="muted small-copy">Suggests wording without changing your selected presets.</span>
         </div>
 
         <section
@@ -353,10 +314,10 @@ function getInitials(name: string): string {
           <span>⚠️ {{ builder.error }}</span>
         </div>
 
-        <button type="submit" class="submit-btn" :disabled="builder.loading || !builder.prompt.trim()">
+        <button type="submit" class="submit-btn" :class="{ generating: builder.generating }" :disabled="builder.loading || !builder.prompt.trim()">
           <span v-if="builder.generating" class="spin-icon">⏳</span>
           <span v-else>🚀</span>
-          <span>{{ builder.generating ? 'Forging World Seed…' : 'Generate World with AI' }}</span>
+          <span>{{ builder.generating ? 'Forging World Seed…' : 'Generate World' }}</span>
         </button>
       </form>
 
@@ -372,235 +333,6 @@ function getInitials(name: string): string {
         </div>
       </aside>
     </section>
-
-    <!-- Mode 2: Detailed Review and Refinement Form -->
-    <form v-else-if="builder.draft" class="review-layout" @submit.prevent="confirm">
-      <section class="review-main">
-        <!-- World Core Information -->
-        <div class="card">
-          <div class="section-heading">
-            <div>
-              <VnBadge variant="brand">Step 2</VnBadge>
-              <h2>World Core & Setting</h2>
-            </div>
-            <button class="secondary" type="button" :disabled="builder.loading" @click="validate">
-              {{ builder.validating ? 'Checking…' : 'Verify Integrity' }}
-            </button>
-          </div>
-
-          <div v-if="builder.contentWarnings.length" class="warning-box" role="alert">
-            <p v-for="warning in builder.contentWarnings" :key="warning">⚠️ {{ warning }}</p>
-          </div>
-          <div v-if="builder.validationMessages.length" class="error-box" role="alert">
-            <p v-for="message in builder.validationMessages" :key="message">❌ {{ message }}</p>
-          </div>
-
-          <div class="field-grid">
-            <label class="input-group">
-              <span class="field-label">Title</span>
-              <input v-model="builder.draft.title" maxlength="160" />
-            </label>
-            <label class="input-group">
-              <span class="field-label">Genre</span>
-              <input v-model="builder.draft.genre" maxlength="80" />
-            </label>
-            <label class="input-group wide-field">
-              <span class="field-label">Premise</span>
-              <textarea v-model="builder.draft.premise" rows="4" maxlength="20000" />
-            </label>
-            <label class="input-group">
-              <span class="field-label">Tone</span>
-              <input v-model="builder.draft.tone" maxlength="80" />
-            </label>
-          </div>
-        </div>
-
-        <!-- Characters Section -->
-        <div class="card">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Dramatis Personae</p>
-              <h2>Character Cast</h2>
-              <p class="muted small-copy">Every character possesses unique traits, motivations, and hidden layers.</p>
-            </div>
-            <div class="section-heading-actions">
-              <span class="muted count-tag">{{ characters.length }} Cast · {{ builder.npcCount }} NPCs</span>
-              <button
-                class="secondary"
-                type="button"
-                :disabled="builder.loading || !builder.canAddNpc"
-                @click="builder.addNpc"
-              >
-                + Add NPC
-              </button>
-            </div>
-          </div>
-
-          <div class="characters-editor-list">
-            <div
-              v-for="character in characters"
-              :key="character.character_id"
-              class="character-card-editor"
-            >
-              <div class="char-card-header">
-                <div class="char-id-meta">
-                  <div class="char-avatar-badge">
-                    <span>{{ getInitials(character.name || 'NN') }}</span>
-                  </div>
-                  <div>
-                    <h4 class="char-name-display">{{ character.name || 'Unnamed Character' }}</h4>
-                    <span class="char-badge-tag">
-                      {{ character.character_id === builder.draft.player_character.character_id ? 'Protagonist (You)' : 'Supporting Heroine / NPC' }}
-                      · {{ character.age }} y/o
-                    </span>
-                  </div>
-                </div>
-                <button
-                  v-if="character.character_id !== builder.draft.player_character.character_id"
-                  class="secondary danger-btn"
-                  type="button"
-                  :disabled="builder.loading || !builder.canRemoveNpc"
-                  @click="builder.removeNpc(character.character_id)"
-                >
-                  Remove
-                </button>
-              </div>
-
-              <div class="field-grid">
-                <label class="input-group">
-                  <span class="field-label">Name</span>
-                  <input v-model="character.name" maxlength="160" @change="builder.syncNpcIdentity(character)" />
-                </label>
-                <label class="input-group">
-                  <span class="field-label">Age</span>
-                  <input
-                    v-model.number="character.age"
-                    type="number"
-                    min="14"
-                    max="120"
-                    @change="builder.syncCharacterAge(character.character_id)"
-                  />
-                </label>
-                <div class="input-group">
-                  <span class="field-label">Gender</span>
-                  <VnSelect
-                    v-model="character.gender"
-                    :options="genderOptions"
-                  />
-                </div>
-                <label class="input-group">
-                  <span class="field-label">Archetype / Role</span>
-                  <input v-model="character.role" maxlength="160" placeholder="e.g. Club President, Childhood Friend" />
-                </label>
-                <label class="input-group">
-                  <span class="field-label">Voice / Demeanor</span>
-                  <input v-model="character.voice" maxlength="300" placeholder="e.g. Warm but guarded, formal cadence" />
-                </label>
-                <label class="input-group wide-field">
-                  <span class="field-label">Background</span>
-                  <textarea
-                    v-model="character.background"
-                    rows="4"
-                    maxlength="6000"
-                    placeholder="Backstory, vulnerabilities, motivations, relationships, and unresolved hooks…"
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Places and Narrative Threads -->
-        <div class="card">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Atmosphere & Lore</p>
-              <h2>Locations & Narrative Threads</h2>
-            </div>
-          </div>
-
-          <div class="compact-editors-grid">
-            <div v-for="location in builder.draft.locations" :key="location.location_id" class="compact-card">
-              <label class="input-group">
-                <span class="field-label">Location Name</span>
-                <input v-model="location.name" maxlength="160" />
-              </label>
-              <label class="input-group">
-                <span class="field-label">Sensory Description</span>
-                <input v-model="location.description" maxlength="2000" />
-              </label>
-            </div>
-            <div v-for="thread in builder.draft.threads" :key="thread.thread_id" class="compact-card">
-              <label class="input-group">
-                <span class="field-label">Plot Thread</span>
-                <input v-model="thread.premise" maxlength="2000" />
-              </label>
-              <label class="input-group">
-                <span class="field-label">Stakes</span>
-                <input v-model="thread.stakes" maxlength="2000" />
-              </label>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Sidebar -->
-      <aside class="review-sidebar">
-        <section class="card">
-          <p class="eyebrow">Safety & Boundaries</p>
-          <h3>Content Limits</h3>
-          <div class="sidebar-inputs">
-            <div class="input-group">
-              <span class="field-label">Rating</span>
-              <VnSelect
-                v-model="builder.draft.content_boundaries.rating"
-                :options="ratingPresetOptions"
-              />
-            </div>
-            <div class="input-group">
-              <span class="field-label">Violence Ceiling</span>
-              <VnSelect
-                v-model="builder.draft.content_boundaries.violence_ceiling"
-                :options="violencePresetOptions"
-              />
-            </div>
-          </div>
-        </section>
-
-        <section class="card opening-card">
-          <p class="eyebrow">The Inciting Incident</p>
-          <h3>Opening Scene</h3>
-          <div class="opening-meta">
-            <VnBadge variant="neutral">
-              ⏰ {{ formatWorldTime(builder.draft.opening_scene.world_time) }}
-            </VnBadge>
-            <p class="opening-actions">{{ builder.draft.opening_scene.visible_actions.join(' · ') }}</p>
-            <div class="participants-list">
-              <span v-for="(age, characterId, index) in builder.draft.opening_scene.participants" :key="characterId">
-                {{ index ? ' · ' : '' }}{{ characterName(characterId) }} ({{ age }})
-              </span>
-            </div>
-          </div>
-        </section>
-
-        <div v-if="builder.error" class="error-box" role="alert">
-          <span>⚠️ {{ builder.error }}</span>
-        </div>
-
-        <div class="review-actions">
-          <button class="secondary" type="button" :disabled="builder.loading" @click="cancel">
-            Start Over
-          </button>
-          <button
-            type="submit"
-            class="submit-btn"
-            :disabled="builder.loading || builder.contentWarnings.length > 0"
-          >
-            {{ builder.confirming ? 'Initializing Session…' : 'Begin Story →' }}
-          </button>
-        </div>
-      </aside>
-    </form>
   </div>
 </template>
 
@@ -630,18 +362,11 @@ function getInitials(name: string): string {
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.builder-layout,
-.review-layout {
+.builder-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 0.75fr);
   gap: 1.5rem;
   align-items: start;
-}
-
-.review-main {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
 }
 
 .builder-card,
@@ -680,8 +405,7 @@ function getInitials(name: string): string {
   gap: 1rem;
 }
 
-.preset-row,
-.field-grid {
+.preset-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
@@ -840,10 +564,65 @@ function getInitials(name: string): string {
 }
 
 .submit-btn {
+  position: relative;
   padding: 0.85rem 1.5rem;
   font-size: 0.95rem;
   font-weight: 700;
   width: 100%;
+  background: transparent;
+  border: 2px solid var(--brand);
+  color: var(--ink);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.15);
+  z-index: 0;
+}
+
+.submit-btn > * {
+  position: relative;
+  z-index: 2;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.08);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.25);
+  filter: none;
+}
+
+.submit-btn.generating {
+  border-color: rgba(99, 102, 241, 0.25);
+  pointer-events: none;
+  background: transparent;
+}
+
+.submit-btn.generating::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2.5px;
+  background: conic-gradient(
+    from var(--border-angle, 0deg),
+    transparent 0%,
+    #6366f1 18%,
+    #f472b6 36%,
+    #ffffff 48%,
+    transparent 52%,
+    #6366f1 68%,
+    #f472b6 86%,
+    #ffffff 98%,
+    transparent 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: spin-border 1.6s linear infinite;
+  z-index: 1;
+}
+
+@keyframes spin-border {
+  to {
+    --border-angle: 360deg;
+  }
 }
 
 .guidance-sidebar {
@@ -873,169 +652,21 @@ function getInitials(name: string): string {
   color: #e2e8f0;
 }
 
-/* Review Section */
-.section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.25rem;
-  gap: 1rem;
-}
-
-.section-heading h2 {
-  margin: 0.25rem 0 0;
-  font-size: 1.35rem;
-}
-
-.section-heading-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.count-tag {
-  font-size: 0.82rem;
-}
-
-.warning-box {
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  color: #fbbf24;
-  font-size: 0.85rem;
-  margin-bottom: 1rem;
-}
-
-.characters-editor-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.character-card-editor {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.char-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.char-id-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.char-avatar-badge {
-  width: 2.4rem;
-  height: 2.4rem;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, #6366f1, #ec4899);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 0.85rem;
-  color: #fff;
-}
-
-.char-name-display {
-  margin: 0;
-  font-size: 1.05rem;
-  color: #fff;
-}
-
-.char-badge-tag {
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.danger-btn {
-  font-size: 0.8rem;
-  padding: 0.35rem 0.7rem;
-}
-
-.compact-editors-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-  gap: 1rem;
-}
-
-.compact-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-}
-
-.review-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  position: sticky;
-  top: 5rem;
-}
-
-.review-sidebar h3 {
-  margin: 0;
-  font-size: 1.15rem;
-  color: #fff;
-}
-
-.sidebar-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  margin-top: 0.85rem;
-}
-
-.opening-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  margin-top: 0.6rem;
-}
-
-.opening-actions {
-  margin: 0;
-  font-size: 0.88rem;
-  color: #cbd5e1;
-  line-height: 1.5;
-}
-
-.participants-list {
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-
-.review-actions {
-  display: flex;
-  gap: 0.75rem;
-}
-
 @media (max-width: 900px) {
-  .builder-layout,
-  .review-layout {
+  .builder-layout {
     grid-template-columns: 1fr;
   }
   .preset-row,
-  .preset-row.three-fields,
-  .field-grid {
+  .preset-row.three-fields {
     grid-template-columns: 1fr;
   }
+}
+</style>
+
+<style>
+@property --border-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
 }
 </style>

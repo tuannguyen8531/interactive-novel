@@ -439,6 +439,16 @@ export function useWorldBuilder() {
     stage.value = 'prompt'
   }
 
+  function reset(): void {
+    prompt.value = ''
+    tonePreset.value = ''
+    ratingPreset.value = 'teen_14_plus'
+    templateId.value = ''
+    violencePreset.value = 'none'
+    playerGender.value = 'male'
+    cancelDraft()
+  }
+
   return {
     prompt,
     tonePreset,
@@ -480,6 +490,28 @@ export function useWorldBuilder() {
     refineSelectedSuggestions,
     validate,
     confirm,
-    cancelDraft
+    cancelDraft,
+    reset
+  }
+}
+
+export type WorldBuilder = ReturnType<typeof useWorldBuilder>
+
+let shared: WorldBuilder | null = null
+
+/**
+ * Returns a module-level singleton of the world builder so state persists
+ * when navigating between the prompt and review pages. Call `resetSharedWorldBuilder()`
+ * to reset the state back to defaults.
+ */
+export function useSharedWorldBuilder(): WorldBuilder {
+  if (!shared) shared = useWorldBuilder()
+  return shared
+}
+
+/** Reset the shared singleton to default blank state. */
+export function resetSharedWorldBuilder(): void {
+  if (shared) {
+    shared.reset()
   }
 }
