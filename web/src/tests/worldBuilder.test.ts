@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
+import { reactive } from 'vue'
 import { api } from '@/api/client'
 import type { WorldBriefSuggestion, WorldConfirmation, WorldSeed } from '@/api/types'
-import { useWorldBuilderStore } from '@/stores/worldBuilder'
+import { useWorldBuilder } from '@/composables/worldBuilder'
 
 function seed(): WorldSeed {
   return {
@@ -126,9 +126,8 @@ function brief(overrides: Partial<WorldBriefSuggestion> = {}): WorldBriefSuggest
   }
 }
 
-describe('world builder store', () => {
+describe('world builder composable', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
     vi.restoreAllMocks()
   })
 
@@ -137,7 +136,7 @@ describe('world builder store', () => {
     vi.spyOn(api, 'generateWorldDraft').mockResolvedValue(draft)
     vi.spyOn(api, 'validateWorldDraft').mockImplementation(async (value) => value)
     vi.spyOn(api, 'confirmWorldDraft').mockImplementation(async (value) => confirmation(value))
-    const store = useWorldBuilderStore()
+    const store = reactive(useWorldBuilder())
 
     await store.generate()
     expect(store.stage).toBe('review')
@@ -152,7 +151,7 @@ describe('world builder store', () => {
   })
 
   it('discards a draft without calling confirmation', () => {
-    const store = useWorldBuilderStore()
+    const store = reactive(useWorldBuilder())
     const confirmSpy = vi.spyOn(api, 'confirmWorldDraft')
     store.draft = seed()
     store.stage = 'review'
@@ -166,24 +165,96 @@ describe('world builder store', () => {
 
   it('sends typed presets for an adult world', async () => {
     vi.spyOn(api, 'generateWorldDraft').mockResolvedValue(seed())
-    const store = useWorldBuilderStore()
+    const store = reactive(useWorldBuilder())
     store.ratingPreset = 'adult_18_plus'
 
     await store.generate()
 
     expect(vi.mocked(api.generateWorldDraft).mock.calls[0][0]).toMatchObject({
-      template_id: 'school_romance',
-      tone: 'warm, reflective',
+      template_id: 'custom',
+      tone: undefined,
       rating: 'adult_18_plus',
       violence_ceiling: 'none',
       player_gender: 'male'
     })
   })
 
+  it('starts a custom world with no previous draft, template, suggestions, or presets', async () => {
+    let store = reactive(useWorldBuilder())
+    store.draft = seed()
+    store.confirmation = confirmation(seed())
+    store.stage = 'confirmed'
+    store.prompt = 'Previous premise'
+    store.templateId = 'mystery'
+    store.tonePreset = 'tense'
+    store.ratingPreset = 'adult_18_plus'
+    store.violencePreset = 'detailed'
+    store.playerGender = 'female'
+    store.briefSuggestion = brief()
+    store.selectedAnswers = { secret: 'Old answer' }
+    store.error = 'Old error'
+    store.validationMessages = ['Old diagnostic']
+
+    store = reactive(useWorldBuilder())
+
+    expect(store.stage).toBe('prompt')
+    expect(store.prompt).toBe('')
+    expect(store.templateId).toBe('')
+    expect(store.draft).toBeNull()
+    expect(store.confirmation).toBeNull()
+    expect(store.briefSuggestion).toBeNull()
+    expect(store.selectedAnswers).toEqual({})
+    expect(store.error).toBeNull()
+    expect(store.validationMessages).toEqual([])
+    expect(store.tonePreset).toBe('')
+    expect(store.ratingPreset).toBe('teen_14_plus')
+    expect(store.violencePreset).toBe('none')
+    expect(store.playerGender).toBe('male')
+    expect(store.loading).toBe(false)
+
+    vi.spyOn(api, 'generateWorldDraft').mockResolvedValue(seed())
+    vi.spyOn(api, 'assistWorldDraft').mockResolvedValue(brief())
+    store.prompt = 'My new world'
+    await store.assistPrompt()
+    await store.generate()
+    expect(api.assistWorldDraft).toHaveBeenCalledWith(expect.objectContaining({ template_id: 'custom', tone: undefined }))
+    expect(api.generateWorldDraft).toHaveBeenCalledWith(expect.objectContaining({ template_id: 'custom', tone: undefined }))
+  })
+
+  it('ignores a previous generation that finishes after starting a new world', async () => {
+    let finish!: (value: WorldSeed) => void
+    vi.spyOn(api, 'generateWorldDraft').mockReturnValue(new Promise((resolve) => { finish = resolve }))
+    let store = reactive(useWorldBuilder())
+    const pending = store.generate()
+
+    store = reactive(useWorldBuilder())
+    finish(seed())
+    await pending
+
+    expect(store.stage).toBe('prompt')
+    expect(store.draft).toBeNull()
+    expect(store.loading).toBe(false)
+  })
+
+  it('keeps custom blank when a previous template catalog request finishes', async () => {
+    let store = reactive(useWorldBuilder())
+    const templates = [...store.templates]
+    let finish!: (value: typeof templates) => void
+    vi.spyOn(api, 'listStoryTemplates').mockReturnValue(new Promise((resolve) => { finish = resolve }))
+    const pending = store.loadTemplates(true)
+
+    store = reactive(useWorldBuilder())
+    finish(templates)
+    await pending
+
+    expect(store.prompt).toBe('')
+    expect(store.templateId).toBe('')
+  })
+
   it('assists a prompt without changing it until the user applies the suggestion', async () => {
     const suggestion = brief()
     vi.spyOn(api, 'assistWorldDraft').mockResolvedValue(suggestion)
-    const store = useWorldBuilderStore()
+    const store = reactive(useWorldBuilder())
     store.prompt = 'A rough idea about a school club.'
     store.tonePreset = 'quiet, bittersweet'
     store.ratingPreset = 'mature_16_plus'
@@ -213,7 +284,7 @@ describe('world builder store', () => {
     const first = brief()
     const second = brief({ refined_prompt: 'A festival deadline forces two guarded students to cooperate.' })
     vi.spyOn(api, 'assistWorldDraft').mockResolvedValueOnce(first).mockResolvedValueOnce(second)
-    const store = useWorldBuilderStore()
+    const store = reactive(useWorldBuilder())
     store.prompt = 'The rough idea.'
 
     await store.assistPrompt()
@@ -232,7 +303,8 @@ describe('world builder store', () => {
   it('allows a custom answer and does not call the API without a selection', async () => {
     const suggestion = brief()
     const assistSpy = vi.spyOn(api, 'assistWorldDraft').mockResolvedValue(suggestion)
-    const store = useWorldBuilderStore()
+    const store = reactive(useWorldBuilder())
+    store.prompt = 'A rough idea about a school club.'
 
     await store.assistPrompt()
     await expect(store.refineSelectedSuggestions()).rejects.toThrow('at least one clarification')
@@ -244,7 +316,7 @@ describe('world builder store', () => {
 
   it('dismisses a brief without changing the prompt', async () => {
     vi.spyOn(api, 'assistWorldDraft').mockResolvedValue(brief())
-    const store = useWorldBuilderStore()
+    const store = reactive(useWorldBuilder())
     store.prompt = 'The rough idea.'
 
     await store.assistPrompt()
@@ -255,11 +327,12 @@ describe('world builder store', () => {
   })
 
   it('applies data-driven defaults when the selected template changes', () => {
-    const store = useWorldBuilderStore()
+    const store = reactive(useWorldBuilder())
     store.templates.push({
       id: 'gothic_romance',
       name: 'Gothic romance',
       description: 'Secrets and dangerous attraction.',
+      starter_prompt: 'A young conservator finds a love letter hidden inside a portrait in a secluded manor.',
       genre: 'gothic_romance',
       prompt_instructions: 'Keep romance central.',
       defaults: {
@@ -276,16 +349,67 @@ describe('world builder store', () => {
       version: '1'
     })
     store.templateId = 'gothic_romance'
+    store.briefSuggestion = brief()
 
     store.applySelectedTemplateDefaults()
 
+    expect(store.prompt).toBe('A young conservator finds a love letter hidden inside a portrait in a secluded manor.')
+    expect(store.briefSuggestion).toBeNull()
     expect(store.tonePreset).toBe('intimate, ominous')
     expect(store.ratingPreset).toBe('adult_18_plus')
     expect(store.violencePreset).toBe('detailed')
   })
 
+  it('preserves a custom premise when refreshing the template catalog', async () => {
+    const store = reactive(useWorldBuilder())
+    vi.spyOn(api, 'listStoryTemplates').mockResolvedValue([...store.templates])
+    store.prompt = 'My own story premise.'
+
+    await store.loadTemplates()
+
+    expect(store.prompt).toBe('My own story premise.')
+  })
+
+  it('loads the selected premise from the API catalog', async () => {
+    const store = reactive(useWorldBuilder())
+    vi.spyOn(api, 'listStoryTemplates').mockResolvedValue([{
+      id: 'school_romance', name: 'School romance', description: 'Catalog description',
+      starter_prompt: 'A new premise supplied by the catalog.', genre: 'school_romance',
+      prompt_instructions: 'Build a romance.',
+      defaults: { tone: 'gentle', rating: 'teen_14_plus', violence_ceiling: 'none' },
+      narrative_profile: { primary_focus: 'romance', romance_priority: 'high', relationship_pacing: 'slow_burn' },
+      opening_guidance: [], version: 'test'
+    }])
+    store.templateId = 'school_romance'
+
+    await store.loadTemplates(true)
+
+    expect(store.prompt).toBe('A new premise supplied by the catalog.')
+    expect(store.tonePreset).toBe('gentle')
+  })
+
+  it('reports an unavailable catalog without inventing fallback templates', async () => {
+    const store = reactive(useWorldBuilder())
+    vi.spyOn(api, 'listStoryTemplates').mockRejectedValue(new Error('Offline'))
+
+    await store.loadTemplates(true)
+
+    expect(store.templates).toEqual([])
+    expect(store.prompt).toBe('')
+    expect(store.error).toContain('Unable to load story templates')
+  })
+
+  it('clears the premise when selecting start from scratch', () => {
+    const store = reactive(useWorldBuilder())
+    store.templateId = ''
+
+    store.applySelectedTemplateDefaults()
+
+    expect(store.prompt).toBe('')
+  })
+
   it('edits character ages and keeps opening participants synchronized', () => {
-    const store = useWorldBuilderStore()
+    const store = reactive(useWorldBuilder())
     store.draft = seed()
 
     store.syncCharacterAge('alice')
@@ -297,7 +421,7 @@ describe('world builder store', () => {
   })
 
   it('adds and removes NPC profiles within the contract bounds', () => {
-    const store = useWorldBuilderStore()
+    const store = reactive(useWorldBuilder())
     store.draft = seed()
 
     store.addNpc()
@@ -320,7 +444,7 @@ describe('world builder store', () => {
   })
 
   it('derives an NPC ID from its name and remaps character references', () => {
-    const store = useWorldBuilderStore()
+    const store = reactive(useWorldBuilder())
     store.draft = seed()
     const alice = store.draft.npc_profiles[0]
     store.draft.initial_relationships = [{ source_id: 'alice', target_id: 'player', values: {} }]

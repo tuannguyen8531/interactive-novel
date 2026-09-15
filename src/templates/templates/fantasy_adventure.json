@@ -2,6 +2,7 @@
   "id": "fantasy_adventure",
   "name": "Fantasy adventure",
   "description": "A character-led journey through a fantastical world with danger, discovery, and consequential choices.",
+  "starter_prompt": "An apprentice cartographer and a guarded relic keeper must cross a chain of floating islands before a dimensional storm reaches their hometown. An ancient compass points toward a sealed astral gate, but each companion has a different reason for wanting it opened. Trust and attraction grow as they choose which secrets to share and whom to protect.",
   "genre": "fantasy_adventure",
   "prompt_instructions": "Build a romance-led fantasy setting with distinct locations, understandable stakes, and a small party of characters with conflicting goals. Develop attraction through companionship, danger, sacrifice, and earned trust. Establish the world's unusual rule or threat through observable details rather than an encyclopedia dump.",
   "defaults": {
@@ -18,5 +19,5 @@
     "Open at the edge of a journey, discovery, or dangerous obligation.",
     "Show one concrete consequence of the world's unusual rule or threat."
   ],
-  "version": "1"
+  "version": "2"
 }

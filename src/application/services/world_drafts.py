@@ -116,6 +116,7 @@ class WorldDraftApplicationService:
                 "violence_ceiling": effective_ceiling,
             }
         )
+        effective_tone = effective_tone if effective_tone is not None else generated.tone
         generated = generated.model_copy(
             update={
                 "template_id": template.id,

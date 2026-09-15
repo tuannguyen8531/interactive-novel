@@ -76,7 +76,11 @@ class StoryTemplateRegistry:
         narrative_data = _mapping(data, "narrative_profile")
         try:
             defaults = StoryTemplateDefaults(
-                tone=str(defaults_data.get("tone", "warm, reflective")),
+                tone=(
+                    None
+                    if defaults_data.get("tone", "warm, reflective") is None
+                    else str(defaults_data.get("tone", "warm, reflective"))
+                ),
                 rating=defaults_data.get("rating", "teen_14_plus"),
                 violence_ceiling=defaults_data.get("violence_ceiling", "none"),
             )
@@ -91,6 +95,7 @@ class StoryTemplateRegistry:
             id=_required_text(data, "id"),
             name=_required_text(data, "name"),
             description=_required_text(data, "description"),
+            starter_prompt=_required_text(data, "starter_prompt" if "starter_prompt" in data else "description"),
             genre=_required_text(data, "genre"),
             prompt_instructions=_required_text(data, "prompt_instructions"),
             defaults=defaults,

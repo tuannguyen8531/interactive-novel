@@ -12,7 +12,7 @@ TEMPLATE_ROOT = Path(__file__).parents[2] / "src" / "templates"
 def test_story_template_registry_loads_the_bundled_catalog() -> None:
     registry = StoryTemplateRegistry()
 
-    assert registry.ids() == ("school_romance", "mystery", "fantasy_adventure")
+    assert registry.ids() == ("school_romance", "mystery", "fantasy_adventure", "custom")
     assert registry.get("MYSTERY").name == "Mystery"
     assert registry.get("fantasy_adventure").defaults.violence_ceiling.value == "restrained"
     assert registry.get("mystery").narrative_profile.primary_focus == "romance"

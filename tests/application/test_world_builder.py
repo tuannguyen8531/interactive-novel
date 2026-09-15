@@ -291,6 +291,16 @@ async def test_world_builder_keeps_generated_draft_transient_until_confirmed() -
 
 
 @pytest.mark.asyncio
+async def test_custom_world_preserves_the_generated_tone_without_a_preset() -> None:
+    seed = _seed().model_copy(update={"tone": "dark, uneasy"})
+    service = WorldDraftApplicationService(_factory(_State()), generator=_Generator(seed))
+
+    draft = await service.generate_world_draft("A love affair amid a bitter feud.", template_id="custom")
+
+    assert draft.tone == draft.opening_scene.tone == "dark, uneasy"
+
+
+@pytest.mark.asyncio
 async def test_world_builder_authoritatively_applies_user_presets_over_ai_output() -> None:
     service = WorldDraftApplicationService(_factory(_State()), generator=_Generator(_seed()))
 

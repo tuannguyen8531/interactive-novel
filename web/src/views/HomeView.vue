@@ -8,30 +8,13 @@ import { FIXTURE_PLAYTHROUGH_ID } from '@/fixtures/fixture'
 import { formatWorldTime } from '@/play/guidance'
 import VnBadge from '@/components/vn/VnBadge.vue'
 import VnConfirmModal from '@/components/vn/VnConfirmModal.vue'
-import type { PlaythroughRecord, WorldRecord } from '@/api/types'
+import type { PlaythroughRecord, StoryTemplate, WorldRecord } from '@/api/types'
 
 const router = useRouter()
 const appStore = useAppStore()
-const DEFAULT_TEMPLATES: Array<{ id: string; name: string; description: string }> = [
-  {
-    id: 'school_romance',
-    name: 'Moonlight High Romance',
-    description: 'A delicate youth romcom centered around club deadlines, hidden confessions, and quiet after-school meetings.'
-  },
-  {
-    id: 'fantasy_adventure',
-    name: 'Chronicles of the Astral Gate',
-    description: 'An expansive high-fantasy journey of ancient relics, reluctant companions, and brewing dimensional storms.'
-  },
-  {
-    id: 'mystery',
-    name: 'Shadows in the Fog',
-    description: 'A tense investigation through rain-slicked cobblestone streets where every suspect conceals an alibi.'
-  }
-]
-
 const library = useLibraryStore()
-const templates = ref<Array<{ id: string; name: string; description: string }>>([...DEFAULT_TEMPLATES])
+const templates = ref<StoryTemplate[]>([])
+const templateError = ref<string | null>(null)
 const loadingTemplates = ref(false)
 
 onMounted(async () => {
@@ -48,11 +31,10 @@ async function loadTemplates(): Promise<void> {
   try {
     const list = await api.listStoryTemplates()
     if (list && list.length > 0) {
-      templates.value = list
+      templates.value = list.filter((template) => template.id !== 'custom')
     }
   } catch {
-    // If backend is unavailable, fallback to bundled template ideas
-    templates.value = DEFAULT_TEMPLATES
+    templateError.value = 'Unable to load story templates. Reload the page to try again.'
   }
 }
 
@@ -161,6 +143,7 @@ function getTemplateIcon(id: string): string {
         </button>
       </div>
 
+      <p v-if="templateError" class="error-box" role="alert">{{ templateError }}</p>
       <div class="templates-grid">
         <article
           v-for="template in templates"

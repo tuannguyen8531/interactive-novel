@@ -1,5 +1,4 @@
 import { computed, ref } from 'vue'
-import { defineStore } from 'pinia'
 import { ApiError, api } from '@/api/client'
 import type {
   BinaryGender,
@@ -61,32 +60,12 @@ function errorText(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
 }
 
-export const useWorldBuilderStore = defineStore('worldBuilder', () => {
-  const prompt = ref('A gentle school romance around a culture club preparing for its first festival.')
-  const tonePreset = ref('warm, reflective')
+export function useWorldBuilder() {
+  const prompt = ref('')
+  const tonePreset = ref('')
   const ratingPreset = ref<ContentRating>('teen_14_plus')
-  const templateId = ref('school_romance')
-  const templates = ref<StoryTemplate[]>([
-    {
-      id: 'school_romance',
-      name: 'School romance',
-      description: 'A character-driven romance around school, class, or club life.',
-      genre: 'school_romance',
-      prompt_instructions: 'Build a grounded, relationship-driven school setting.',
-      defaults: {
-        tone: 'warm, reflective',
-        rating: 'teen_14_plus',
-        violence_ceiling: 'none'
-      },
-      narrative_profile: {
-        primary_focus: 'romance',
-        romance_priority: 'high',
-        relationship_pacing: 'slow_burn'
-      },
-      opening_guidance: [],
-      version: '1'
-    }
-  ])
+  const templateId = ref('')
+  const templates = ref<StoryTemplate[]>([])
   const violencePreset = ref<ViolenceCeiling>('none')
   const playerGender = ref<BinaryGender>('male')
   const stage = ref<WorldBuilderStage>('prompt')
@@ -110,19 +89,26 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
   const canAddNpc = computed(() => npcCount.value < MAX_NPC_PROFILES)
   const canRemoveNpc = computed(() => npcCount.value > MIN_NPC_PROFILES)
 
-  async function loadTemplates(): Promise<void> {
+  async function loadTemplates(updatePrompt = false): Promise<void> {
     try {
       templates.value = await api.listStoryTemplates()
-      applySelectedTemplateDefaults()
+      applySelectedTemplateDefaults(updatePrompt)
     } catch {
-      // Keep the built-in school-romance fallback when the catalog is unavailable.
+      error.value = 'Unable to load story templates. Please reopen the builder to try again.'
     }
   }
 
-  function applySelectedTemplateDefaults(): void {
+  function applySelectedTemplateDefaults(updatePrompt = true): void {
     const selected = templates.value.find((item) => item.id === templateId.value)
-    if (!selected) return
-    tonePreset.value = selected.defaults.tone
+    if (updatePrompt) {
+      prompt.value = selected?.starter_prompt ?? selected?.description ?? ''
+      dismissSuggestion()
+    }
+    if (!selected) {
+      if (!templateId.value) tonePreset.value = ''
+      return
+    }
+    tonePreset.value = selected.defaults.tone ?? ''
     ratingPreset.value = selected.defaults.rating
     violencePreset.value = selected.defaults.violence_ceiling
   }
@@ -292,8 +278,8 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     try {
       const generated = await api.generateWorldDraft({
         prompt: prompt.value.trim(),
-        template_id: templateId.value,
-        tone: tonePreset.value.trim(),
+        template_id: templateId.value || 'custom',
+        tone: tonePreset.value.trim() || undefined,
         rating: ratingPreset.value,
         violence_ceiling: violencePreset.value,
         player_gender: playerGender.value
@@ -323,8 +309,8 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     try {
       const suggestion = await api.assistWorldDraft({
         prompt: sourcePrompt,
-        template_id: templateId.value,
-        tone: tonePreset.value.trim(),
+        template_id: templateId.value || 'custom',
+        tone: tonePreset.value.trim() || undefined,
         player_gender: playerGender.value
       })
       briefSuggestion.value = suggestion
@@ -467,4 +453,4 @@ export const useWorldBuilderStore = defineStore('worldBuilder', () => {
     confirm,
     cancelDraft
   }
-})
+}

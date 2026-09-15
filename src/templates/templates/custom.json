@@ -1,0 +1,21 @@
+{
+  "id": "custom",
+  "name": "Custom world",
+  "description": "Create a world from your own premise.",
+  "genre": "custom",
+  "prompt_instructions": "Build the world from the user's premise. Let their setting, characters, conflicts, and requested genre determine the story. Do not impose a school setting or a predefined plot.",
+  "defaults": {
+    "tone": null,
+    "rating": "teen_14_plus",
+    "violence_ceiling": "none"
+  },
+  "narrative_profile": {
+    "primary_focus": "romance",
+    "romance_priority": "high",
+    "relationship_pacing": "earned_progression"
+  },
+  "opening_guidance": [
+    "Open with a concrete situation grounded in the user's premise."
+  ],
+  "version": "2"
+}

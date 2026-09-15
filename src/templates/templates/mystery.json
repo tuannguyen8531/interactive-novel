@@ -2,6 +2,7 @@
   "id": "mystery",
   "name": "Mystery",
   "description": "A clue-driven story built around secrets, investigation, and competing interpretations.",
+  "starter_prompt": "In a fogbound canal town, a missing archivist leaves behind a rain-soaked letter and a key to a room that supposedly does not exist. A newcomer teams up with the archivist's reserved assistant, following conflicting witness accounts through the night market. Growing attraction is complicated by the suspicion that their partner knows more about the disappearance than they admit.",
   "genre": "mystery",
   "prompt_instructions": "Build a romance-led, clue-driven setting with a clear initial question, suspects or competing explanations, and evidence that can be discovered without making the answer canonical in the opening scene. Develop attraction through trust, secrets, suspicion, and conflicting loyalties. Give central characters distinct motives and knowledge boundaries.",
   "defaults": {
@@ -18,5 +19,5 @@
     "Present an unexplained incident or unanswered question.",
     "Seed at least two plausible lines of inquiry without resolving the mystery."
   ],
-  "version": "1"
+  "version": "2"
 }

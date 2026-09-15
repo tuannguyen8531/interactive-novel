@@ -4,7 +4,7 @@ export type BinaryGender = 'male' | 'female'
 export type StoryLanguage = 'en' | 'vi'
 
 export interface StoryTemplateDefaults {
-  tone: string
+  tone: string | null
   rating: ContentRating
   violence_ceiling: ViolenceCeiling
 }
@@ -25,6 +25,7 @@ export interface StoryTemplate {
   id: string
   name: string
   description: string
+  starter_prompt?: string
   genre: string
   prompt_instructions: string
   defaults: StoryTemplateDefaults

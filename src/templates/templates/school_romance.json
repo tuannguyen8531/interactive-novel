@@ -2,6 +2,7 @@
   "id": "school_romance",
   "name": "School romance",
   "description": "A character-driven romance around school, class, or club life.",
+  "starter_prompt": "A gentle school romance around a culture club preparing for its first festival. A new member teams up with the dependable but quietly overwhelmed club president to save a troubled festival project. Shared errands, late afternoon rehearsals, and a misplaced handwritten note bring them closer, while each hesitates to say what the festival really means to them.",
   "genre": "school_romance",
   "prompt_instructions": "Build a grounded school, class, or club setting. Focus on trust, communication, personal boundaries, and gradual relationship change. Keep one to three central NPCs with independent goals.",
   "defaults": {
@@ -18,5 +19,5 @@
     "Start in a school, classroom, or student club location.",
     "Introduce a small social decision that can develop into a relationship thread."
   ],
-  "version": "1"
+  "version": "3"
 }

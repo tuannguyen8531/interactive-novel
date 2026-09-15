@@ -124,6 +124,7 @@ class ProviderWorldDraftGenerator:
                 "violence_ceiling": effective_ceiling,
             }
         )
+        effective_tone = effective_tone if effective_tone is not None else result.tone
         opening_scene = result.opening_scene.model_copy(update={"tone": effective_tone})
         player_character = result.player_character.model_copy(update={"gender": player_gender})
         return result.model_copy(

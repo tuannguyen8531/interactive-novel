@@ -52,6 +52,20 @@ async def test_provider_world_builder_renders_versioned_school_romance_prompt() 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("tone", [None, "tense, melancholic"])
+async def test_custom_world_tone_is_inferred_unless_explicitly_selected(tone: str | None) -> None:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]
+    payload["tone"] = "dark, uneasy"
+    provider = _Provider(payload)
+    generator = ProviderWorldDraftGenerator(provider)  # type: ignore[arg-type]
+
+    result = await generator.generate_world_draft("A love affair amid a bitter feud.", template_id="custom", tone=tone)
+
+    assert f'"tone": {json.dumps(tone)}' in provider.request.user_prompt
+    assert result.tone == result.opening_scene.tone == (tone or "dark, uneasy")
+
+
+@pytest.mark.asyncio
 async def test_provider_world_builder_applies_selected_story_template() -> None:
     payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]
     provider = _Provider(payload)

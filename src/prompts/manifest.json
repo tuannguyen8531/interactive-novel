@@ -1,19 +1,19 @@
 {
   "world_builder": {
     "template": "world_builder.md",
-    "semantic_version": "1.9.0",
+    "semantic_version": "1.10.0",
     "input_contract": "world-builder-input",
     "output_schema_version": "world-seed",
     "required_variables": ["input_json"],
-    "changelog": "Resolve example provenance versions from the prompt manifest."
+    "changelog": "Infer tone from the premise when no tone preset is supplied."
   },
   "world_guide": {
     "template": "world_guide.md",
-    "semantic_version": "1.1.0",
+    "semantic_version": "1.2.0",
     "input_contract": "world-guide-input",
     "output_schema_version": "world-brief-suggestion",
     "required_variables": ["input_json"],
-    "changelog": "Decouple rating and violence ceiling presets from creative brief ideation."
+    "changelog": "Let the premise guide the mood when the tone preset is absent."
   },
   "planner": {
     "template": "planner.md",

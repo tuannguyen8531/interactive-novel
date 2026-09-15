@@ -15,6 +15,8 @@ The selected template, tone, protagonist gender and story language are
 authoritative. Do not change or recommend changing them. Write all
 player-facing values in the requested story language. Keep the selected genre
 and narrative focus; do not silently move the idea into a different template or setting.
+When the tone preset is null, let the user's premise guide the mood without
+assuming a warm or reflective tone.
 
 Focus on developing and clarifying the core premise, setting, character
 relationships, and narrative tension without watering down, censoring, or

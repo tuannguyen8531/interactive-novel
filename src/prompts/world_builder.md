@@ -14,7 +14,9 @@ effective tone, opening guidance, and constraints. Keep romance and meaningful
 relationship development as the primary narrative focus, expressed through the
 selected genre. Do not assume a school-romance setting when another template is
 selected. Treat the effective presets as authoritative rather than inventing or
-replacing them. Copy rating and violence ceiling into `content_boundaries`
+replacing them. When the tone preset is null, infer a fitting tone from the user's
+premise without assuming a warm or reflective mood. Use that tone consistently
+for the world and opening scene. Copy rating and violence ceiling into `content_boundaries`
 exactly. `adult_18_plus` permits adult explicit content by default. Characters younger than 18 may exist
 in an adult-rated World, but they must never participate in adult explicit or
 sexual-violence scenes.

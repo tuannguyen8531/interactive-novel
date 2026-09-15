@@ -12,18 +12,18 @@ from src.domain.content import Rating, ViolenceCeiling
 class StoryTemplateDefaults:
     """Typed builder defaults that users may override before generation."""
 
-    tone: str = "warm, reflective"
+    tone: str | None = "warm, reflective"
     rating: Rating = Rating.TEEN_14_PLUS
     violence_ceiling: ViolenceCeiling = ViolenceCeiling.NONE
 
     def __post_init__(self) -> None:
-        if not self.tone.strip():
+        if self.tone is not None and not self.tone.strip():
             raise ValueError("Story template default tone cannot be empty.")
-        object.__setattr__(self, "tone", self.tone.strip())
+        object.__setattr__(self, "tone", self.tone.strip() if self.tone is not None else None)
         object.__setattr__(self, "rating", Rating(self.rating))
         object.__setattr__(self, "violence_ceiling", ViolenceCeiling(self.violence_ceiling))
 
-    def as_dict(self) -> dict[str, str]:
+    def as_dict(self) -> dict[str, str | None]:
         return {
             "tone": self.tone,
             "rating": self.rating.value,
@@ -61,6 +61,7 @@ class StoryTemplate:
     id: str
     name: str
     description: str
+    starter_prompt: str
     genre: str
     prompt_instructions: str
     defaults: StoryTemplateDefaults
@@ -73,6 +74,7 @@ class StoryTemplate:
             "id": self.id,
             "name": self.name,
             "description": self.description,
+            "starter_prompt": self.starter_prompt,
             "genre": self.genre,
             "prompt_instructions": self.prompt_instructions,
             "defaults": self.defaults.as_dict(),

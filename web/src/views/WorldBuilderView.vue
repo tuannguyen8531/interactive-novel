@@ -1,29 +1,28 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EditableCombobox from '@/components/EditableCombobox.vue'
 import VnBadge from '@/components/vn/VnBadge.vue'
 import VnSelect from '@/components/vn/VnSelect.vue'
 import StepProgress from '@/components/vn/StepProgress.vue'
 import { formatWorldTime } from '@/play/guidance'
-import { useWorldBuilderStore } from '@/stores/worldBuilder'
+import { useWorldBuilder } from '@/composables/worldBuilder'
 
 const route = useRoute()
 const router = useRouter()
-const store = useWorldBuilderStore()
+const builder = reactive(useWorldBuilder())
+let active = true
+onUnmounted(() => { active = false })
+const templateQuery = route.query.template
+if (typeof templateQuery === 'string' && templateQuery) builder.templateId = templateQuery
 
 onMounted(async () => {
-  await store.loadTemplates()
-  const templateQuery = route.query.template
-  if (typeof templateQuery === 'string' && templateQuery) {
-    store.templateId = templateQuery
-    store.applySelectedTemplateDefaults()
-  }
+  await builder.loadTemplates(typeof templateQuery === 'string' && !!templateQuery)
 })
 
 const currentStepIndex = computed(() => {
-  if (store.stage === 'prompt') return 0
-  if (store.stage === 'review') return 1
+  if (builder.stage === 'prompt') return 0
+  if (builder.stage === 'review') return 1
   return 2
 })
 
@@ -34,13 +33,13 @@ const wizardSteps = [
 ]
 
 const characters = computed(() =>
-  store.draft ? [store.draft.player_character, ...store.draft.npc_profiles] : []
+  builder.draft ? [builder.draft.player_character, ...builder.draft.npc_profiles] : []
 )
-const selectedTemplate = computed(() => store.templates.find((item) => item.id === store.templateId))
+const selectedTemplate = computed(() => builder.templates.find((item) => item.id === builder.templateId))
 
 const templateOptions = computed(() => [
   { value: '', label: 'Start from scratch' },
-  ...store.templates.map((tpl) => ({ value: tpl.id, label: tpl.name })),
+  ...builder.templates.filter((tpl) => tpl.id !== 'custom').map((tpl) => ({ value: tpl.id, label: tpl.name })),
 ])
 
 const genderOptions = [
@@ -72,8 +71,8 @@ const toneOptions = computed(() => {
     'warm, reflective',
     'playful, hopeful',
     'quiet, bittersweet',
-    ...store.templates.map((template) => template.defaults.tone),
-    store.tonePreset
+    ...builder.templates.map((template) => template.defaults.tone ?? ''),
+    builder.tonePreset
   ]
   return [...new Set(values.filter(Boolean))].map((value) => ({
     value,
@@ -82,23 +81,23 @@ const toneOptions = computed(() => {
 })
 
 const ratingLabel = computed(() => {
-  if (store.ratingPreset === 'teen_14_plus') return 'Teen 14+'
-  if (store.ratingPreset === 'mature_16_plus') return 'Mature 16+'
+  if (builder.ratingPreset === 'teen_14_plus') return 'Teen 14+'
+  if (builder.ratingPreset === 'mature_16_plus') return 'Mature 16+'
   return 'Adult 18+'
 })
 const ratingDescription = computed(() => {
-  if (store.ratingPreset === 'teen_14_plus') return 'Keeps themes suitable for ages 14 and up.'
-  if (store.ratingPreset === 'mature_16_plus') return 'Allows heavier emotional and relationship themes.'
+  if (builder.ratingPreset === 'teen_14_plus') return 'Keeps themes suitable for ages 14 and up.'
+  if (builder.ratingPreset === 'mature_16_plus') return 'Allows heavier emotional and relationship themes.'
   return 'Allows adult themes and explicit adult content.'
 })
 const violenceLabel = computed(() => {
-  if (store.violencePreset === 'none') return 'No violence'
-  if (store.violencePreset === 'restrained') return 'Restrained violence'
+  if (builder.violencePreset === 'none') return 'No violence'
+  if (builder.violencePreset === 'restrained') return 'Restrained violence'
   return 'Detailed violence'
 })
 const violenceDescription = computed(() => {
-  if (store.violencePreset === 'none') return 'Violent actions are not depicted.'
-  if (store.violencePreset === 'restrained') return 'Violence may occur without vivid physical detail.'
+  if (builder.violencePreset === 'none') return 'Violent actions are not depicted.'
+  if (builder.violencePreset === 'restrained') return 'Violence may occur without vivid physical detail.'
   return 'Violence and its physical consequences may be described directly.'
 })
 
@@ -108,44 +107,45 @@ function characterName(characterId: string): string {
 
 async function generate(): Promise<void> {
   try {
-    await store.generate()
+    await builder.generate()
   } catch {
-    // The store exposes a safe error for the form.
+    // The builder exposes a safe error for the form.
   }
 }
 
 async function assist(): Promise<void> {
   try {
-    await store.assistPrompt()
+    await builder.assistPrompt()
   } catch {
-    // The store exposes a safe error for the form.
+    // The builder exposes a safe error for the form.
   }
 }
 
 function updateAnswer(questionId: string, event: Event): void {
   const target = event.target
-  if (target instanceof HTMLInputElement) store.setAnswer(questionId, target.value)
+  if (target instanceof HTMLInputElement) builder.setAnswer(questionId, target.value)
 }
 
 async function refineSelectedSuggestions(): Promise<void> {
   try {
-    await store.refineSelectedSuggestions()
+    await builder.refineSelectedSuggestions()
   } catch {
-    // The store keeps the previous suggestion and exposes a safe error.
+    // The builder keeps the previous suggestion and exposes a safe error.
   }
 }
 
 async function validate(): Promise<void> {
   try {
-    await store.validate()
+    await builder.validate()
   } catch {
-    // The store exposes field diagnostics for the review panel.
+    // The builder exposes field diagnostics for the review panel.
   }
 }
 
 async function confirm(): Promise<void> {
   try {
-    const result = await store.confirm()
+    const result = await builder.confirm()
+    if (!active) return
     await router.push({ name: 'play', params: { playthroughId: result.playthrough.id } })
   } catch {
     // Confirmation errors stay on the editable draft.
@@ -153,7 +153,7 @@ async function confirm(): Promise<void> {
 }
 
 function cancel(): void {
-  store.cancelDraft()
+  builder.cancelDraft()
   void router.push({ name: 'home' })
 }
 
@@ -185,7 +185,7 @@ function getInitials(name: string): string {
     </div>
 
     <!-- Mode 1: Initial Generation Prompt Form -->
-    <section v-if="store.stage === 'prompt'" class="builder-layout">
+    <section v-if="builder.stage === 'prompt'" class="builder-layout">
       <form class="card builder-card" @submit.prevent="generate">
         <div class="form-title-row">
           <div>
@@ -197,11 +197,11 @@ function getInitials(name: string): string {
         <label class="input-group">
           <span class="field-label">World Premise & Story Hook</span>
           <textarea
-            v-model="store.prompt"
+            v-model="builder.prompt"
             rows="6"
             maxlength="20000"
             placeholder="Describe the setting, heroine archetype, relationship tensions, or the inciting event that begins the story…"
-            @input="store.dismissSuggestion"
+            @input="builder.dismissSuggestion"
           />
         </label>
 
@@ -209,18 +209,18 @@ function getInitials(name: string): string {
           <button
             class="secondary"
             type="button"
-            :disabled="store.loading || !store.prompt.trim()"
+            :disabled="builder.loading || !builder.prompt.trim()"
             @click="assist"
           >
-            <span v-if="store.assisting" class="spin-icon">⏳</span>
+            <span v-if="builder.assisting" class="spin-icon">⏳</span>
             <span v-else>✨</span>
-            <span>{{ store.assisting ? 'Developing idea…' : 'Develop idea' }}</span>
+            <span>{{ builder.assisting ? 'Developing idea…' : 'Develop idea' }}</span>
           </button>
           <span class="muted small-copy">AI will suggest wording without changing your selected presets.</span>
         </div>
 
         <section
-          v-if="store.briefSuggestion"
+          v-if="builder.briefSuggestion"
           class="brief-assistant-panel"
           aria-live="polite"
           aria-labelledby="brief-assistant-title"
@@ -230,43 +230,43 @@ function getInitials(name: string): string {
               <p class="eyebrow">Creative Brief</p>
               <h3 id="brief-assistant-title">A clearer version of your idea</h3>
             </div>
-            <button class="secondary" type="button" :disabled="store.loading" @click="store.dismissSuggestion">
+            <button class="secondary" type="button" :disabled="builder.loading" @click="builder.dismissSuggestion">
               Dismiss
             </button>
           </div>
           <div class="brief-refined-prompt" role="note">
-            {{ store.briefSuggestion.refined_prompt }}
+            {{ builder.briefSuggestion.refined_prompt }}
           </div>
-          <div v-if="store.briefSuggestion.assumptions.length" class="brief-assistant-block">
+          <div v-if="builder.briefSuggestion.assumptions.length" class="brief-assistant-block">
             <span class="field-label">Assumptions</span>
             <ul class="brief-list">
-              <li v-for="assumption in store.briefSuggestion.assumptions" :key="assumption">{{ assumption }}</li>
+              <li v-for="assumption in builder.briefSuggestion.assumptions" :key="assumption">{{ assumption }}</li>
             </ul>
           </div>
-          <div v-if="store.briefSuggestion.questions.length" class="brief-assistant-block">
+          <div v-if="builder.briefSuggestion.questions.length" class="brief-assistant-block">
             <span class="field-label">Clarify the direction</span>
-            <div v-for="question in store.briefSuggestion.questions" :key="question.id" class="brief-question">
+            <div v-for="question in builder.briefSuggestion.questions" :key="question.id" class="brief-question">
               <p>{{ question.question }}</p>
               <div class="brief-suggestion-chips">
                 <button
                   v-for="answer in question.suggestions"
                   :key="answer"
                   class="chip-button"
-                  :class="{ selected: store.selectedAnswers[question.id] === answer }"
+                  :class="{ selected: builder.selectedAnswers[question.id] === answer }"
                   type="button"
-                  :disabled="store.loading"
-                  @click="store.selectAnswer(question.id, answer)"
+                  :disabled="builder.loading"
+                  @click="builder.selectAnswer(question.id, answer)"
                 >
                   {{ answer }}
                 </button>
               </div>
               <input
-                :value="store.selectedAnswers[question.id] ?? ''"
+                :value="builder.selectedAnswers[question.id] ?? ''"
                 class="brief-answer-input"
                 type="text"
                 maxlength="256"
                 placeholder="Or write your own answer"
-                :disabled="store.loading"
+                :disabled="builder.loading"
                 @input="updateAnswer(question.id, $event)"
               />
             </div>
@@ -275,12 +275,12 @@ function getInitials(name: string): string {
             <button
               class="secondary"
               type="button"
-              :disabled="store.loading || !store.hasSelectedAnswers"
+              :disabled="builder.loading || !builder.hasSelectedAnswers"
               @click="refineSelectedSuggestions"
             >
               Update with selected answers
             </button>
-            <button class="submit-btn" type="button" :disabled="store.loading" @click="store.applySuggestion">
+            <button class="submit-btn" type="button" :disabled="builder.loading" @click="builder.applySuggestion">
               Apply to description
             </button>
           </div>
@@ -291,18 +291,18 @@ function getInitials(name: string): string {
             <div class="input-group">
               <span class="field-label">Curated Template</span>
               <VnSelect
-                v-model="store.templateId"
+                v-model="builder.templateId"
                 :options="templateOptions"
-                @change="store.applySelectedTemplateDefaults"
+                @change="builder.applySelectedTemplateDefaults()"
               />
             </div>
 
             <div class="input-group">
               <span class="field-label">Atmospheric Tone</span>
               <EditableCombobox
-                v-model="store.tonePreset"
+                v-model="builder.tonePreset"
                 label="Tone"
-                placeholder="Choose or type a tone"
+                placeholder="Leave blank to infer from your premise"
                 :options="toneOptions"
               />
             </div>
@@ -320,21 +320,21 @@ function getInitials(name: string): string {
             <div class="input-group">
               <span class="field-label">Protagonist Gender</span>
               <VnSelect
-                v-model="store.playerGender"
+                v-model="builder.playerGender"
                 :options="genderOptions"
               />
             </div>
             <div class="input-group">
               <span class="field-label">Content Rating</span>
               <VnSelect
-                v-model="store.ratingPreset"
+                v-model="builder.ratingPreset"
                 :options="ratingPresetOptions"
               />
             </div>
             <div class="input-group">
               <span class="field-label">Violence Ceiling</span>
               <VnSelect
-                v-model="store.violencePreset"
+                v-model="builder.violencePreset"
                 :options="violencePresetOptions"
               />
             </div>
@@ -349,14 +349,14 @@ function getInitials(name: string): string {
           </div>
         </div>
 
-        <div v-if="store.error" class="error-box" role="alert">
-          <span>⚠️ {{ store.error }}</span>
+        <div v-if="builder.error" class="error-box" role="alert">
+          <span>⚠️ {{ builder.error }}</span>
         </div>
 
-        <button type="submit" class="submit-btn" :disabled="store.loading || !store.prompt.trim()">
-          <span v-if="store.generating" class="spin-icon">⏳</span>
+        <button type="submit" class="submit-btn" :disabled="builder.loading || !builder.prompt.trim()">
+          <span v-if="builder.generating" class="spin-icon">⏳</span>
           <span v-else>🚀</span>
-          <span>{{ store.generating ? 'Forging World Seed…' : 'Generate World with AI' }}</span>
+          <span>{{ builder.generating ? 'Forging World Seed…' : 'Generate World with AI' }}</span>
         </button>
       </form>
 
@@ -374,7 +374,7 @@ function getInitials(name: string): string {
     </section>
 
     <!-- Mode 2: Detailed Review and Refinement Form -->
-    <form v-else-if="store.draft" class="review-layout" @submit.prevent="confirm">
+    <form v-else-if="builder.draft" class="review-layout" @submit.prevent="confirm">
       <section class="review-main">
         <!-- World Core Information -->
         <div class="card">
@@ -383,34 +383,34 @@ function getInitials(name: string): string {
               <VnBadge variant="brand">Step 2</VnBadge>
               <h2>World Core & Setting</h2>
             </div>
-            <button class="secondary" type="button" :disabled="store.loading" @click="validate">
-              {{ store.validating ? 'Checking…' : 'Verify Integrity' }}
+            <button class="secondary" type="button" :disabled="builder.loading" @click="validate">
+              {{ builder.validating ? 'Checking…' : 'Verify Integrity' }}
             </button>
           </div>
 
-          <div v-if="store.contentWarnings.length" class="warning-box" role="alert">
-            <p v-for="warning in store.contentWarnings" :key="warning">⚠️ {{ warning }}</p>
+          <div v-if="builder.contentWarnings.length" class="warning-box" role="alert">
+            <p v-for="warning in builder.contentWarnings" :key="warning">⚠️ {{ warning }}</p>
           </div>
-          <div v-if="store.validationMessages.length" class="error-box" role="alert">
-            <p v-for="message in store.validationMessages" :key="message">❌ {{ message }}</p>
+          <div v-if="builder.validationMessages.length" class="error-box" role="alert">
+            <p v-for="message in builder.validationMessages" :key="message">❌ {{ message }}</p>
           </div>
 
           <div class="field-grid">
             <label class="input-group">
               <span class="field-label">Title</span>
-              <input v-model="store.draft.title" maxlength="160" />
+              <input v-model="builder.draft.title" maxlength="160" />
             </label>
             <label class="input-group">
               <span class="field-label">Genre</span>
-              <input v-model="store.draft.genre" maxlength="80" />
+              <input v-model="builder.draft.genre" maxlength="80" />
             </label>
             <label class="input-group wide-field">
               <span class="field-label">Premise</span>
-              <textarea v-model="store.draft.premise" rows="4" maxlength="20000" />
+              <textarea v-model="builder.draft.premise" rows="4" maxlength="20000" />
             </label>
             <label class="input-group">
               <span class="field-label">Tone</span>
-              <input v-model="store.draft.tone" maxlength="80" />
+              <input v-model="builder.draft.tone" maxlength="80" />
             </label>
           </div>
         </div>
@@ -424,12 +424,12 @@ function getInitials(name: string): string {
               <p class="muted small-copy">Every character possesses unique traits, motivations, and hidden layers.</p>
             </div>
             <div class="section-heading-actions">
-              <span class="muted count-tag">{{ characters.length }} Cast · {{ store.npcCount }} NPCs</span>
+              <span class="muted count-tag">{{ characters.length }} Cast · {{ builder.npcCount }} NPCs</span>
               <button
                 class="secondary"
                 type="button"
-                :disabled="store.loading || !store.canAddNpc"
-                @click="store.addNpc"
+                :disabled="builder.loading || !builder.canAddNpc"
+                @click="builder.addNpc"
               >
                 + Add NPC
               </button>
@@ -450,17 +450,17 @@ function getInitials(name: string): string {
                   <div>
                     <h4 class="char-name-display">{{ character.name || 'Unnamed Character' }}</h4>
                     <span class="char-badge-tag">
-                      {{ character.character_id === store.draft.player_character.character_id ? 'Protagonist (You)' : 'Supporting Heroine / NPC' }}
+                      {{ character.character_id === builder.draft.player_character.character_id ? 'Protagonist (You)' : 'Supporting Heroine / NPC' }}
                       · {{ character.age }} y/o
                     </span>
                   </div>
                 </div>
                 <button
-                  v-if="character.character_id !== store.draft.player_character.character_id"
+                  v-if="character.character_id !== builder.draft.player_character.character_id"
                   class="secondary danger-btn"
                   type="button"
-                  :disabled="store.loading || !store.canRemoveNpc"
-                  @click="store.removeNpc(character.character_id)"
+                  :disabled="builder.loading || !builder.canRemoveNpc"
+                  @click="builder.removeNpc(character.character_id)"
                 >
                   Remove
                 </button>
@@ -469,7 +469,7 @@ function getInitials(name: string): string {
               <div class="field-grid">
                 <label class="input-group">
                   <span class="field-label">Name</span>
-                  <input v-model="character.name" maxlength="160" @change="store.syncNpcIdentity(character)" />
+                  <input v-model="character.name" maxlength="160" @change="builder.syncNpcIdentity(character)" />
                 </label>
                 <label class="input-group">
                   <span class="field-label">Age</span>
@@ -478,7 +478,7 @@ function getInitials(name: string): string {
                     type="number"
                     min="14"
                     max="120"
-                    @change="store.syncCharacterAge(character.character_id)"
+                    @change="builder.syncCharacterAge(character.character_id)"
                   />
                 </label>
                 <div class="input-group">
@@ -520,7 +520,7 @@ function getInitials(name: string): string {
           </div>
 
           <div class="compact-editors-grid">
-            <div v-for="location in store.draft.locations" :key="location.location_id" class="compact-card">
+            <div v-for="location in builder.draft.locations" :key="location.location_id" class="compact-card">
               <label class="input-group">
                 <span class="field-label">Location Name</span>
                 <input v-model="location.name" maxlength="160" />
@@ -530,7 +530,7 @@ function getInitials(name: string): string {
                 <input v-model="location.description" maxlength="2000" />
               </label>
             </div>
-            <div v-for="thread in store.draft.threads" :key="thread.thread_id" class="compact-card">
+            <div v-for="thread in builder.draft.threads" :key="thread.thread_id" class="compact-card">
               <label class="input-group">
                 <span class="field-label">Plot Thread</span>
                 <input v-model="thread.premise" maxlength="2000" />
@@ -553,14 +553,14 @@ function getInitials(name: string): string {
             <div class="input-group">
               <span class="field-label">Rating</span>
               <VnSelect
-                v-model="store.draft.content_boundaries.rating"
+                v-model="builder.draft.content_boundaries.rating"
                 :options="ratingPresetOptions"
               />
             </div>
             <div class="input-group">
               <span class="field-label">Violence Ceiling</span>
               <VnSelect
-                v-model="store.draft.content_boundaries.violence_ceiling"
+                v-model="builder.draft.content_boundaries.violence_ceiling"
                 :options="violencePresetOptions"
               />
             </div>
@@ -572,31 +572,31 @@ function getInitials(name: string): string {
           <h3>Opening Scene</h3>
           <div class="opening-meta">
             <VnBadge variant="neutral">
-              ⏰ {{ formatWorldTime(store.draft.opening_scene.world_time) }}
+              ⏰ {{ formatWorldTime(builder.draft.opening_scene.world_time) }}
             </VnBadge>
-            <p class="opening-actions">{{ store.draft.opening_scene.visible_actions.join(' · ') }}</p>
+            <p class="opening-actions">{{ builder.draft.opening_scene.visible_actions.join(' · ') }}</p>
             <div class="participants-list">
-              <span v-for="(age, characterId, index) in store.draft.opening_scene.participants" :key="characterId">
+              <span v-for="(age, characterId, index) in builder.draft.opening_scene.participants" :key="characterId">
                 {{ index ? ' · ' : '' }}{{ characterName(characterId) }} ({{ age }})
               </span>
             </div>
           </div>
         </section>
 
-        <div v-if="store.error" class="error-box" role="alert">
-          <span>⚠️ {{ store.error }}</span>
+        <div v-if="builder.error" class="error-box" role="alert">
+          <span>⚠️ {{ builder.error }}</span>
         </div>
 
         <div class="review-actions">
-          <button class="secondary" type="button" :disabled="store.loading" @click="cancel">
+          <button class="secondary" type="button" :disabled="builder.loading" @click="cancel">
             Start Over
           </button>
           <button
             type="submit"
             class="submit-btn"
-            :disabled="store.loading || store.contentWarnings.length > 0"
+            :disabled="builder.loading || builder.contentWarnings.length > 0"
           >
-            {{ store.confirming ? 'Initializing Session…' : 'Begin Story →' }}
+            {{ builder.confirming ? 'Initializing Session…' : 'Begin Story →' }}
           </button>
         </div>
       </aside>
