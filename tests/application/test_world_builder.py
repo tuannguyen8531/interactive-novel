@@ -27,8 +27,23 @@ def _seed() -> WorldSeed:
 
 
 def _current_seed_payload() -> dict[str, Any]:
-    content = PromptRegistry().get("world_builder").content
-    return json.loads(content.split("```json", 1)[1].split("```", 1)[0])
+    payload = copy.deepcopy(json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"])
+    payload["prompt_version"] = PromptRegistry().get("world_builder").semantic_version
+    private_claim = copy.deepcopy(payload["initial_claims"][0])
+    private_claim.update(
+        {
+            "proposal_id": "claim_aiko_resignation",
+            "subject_id": "alice",
+            "predicate": "secret_exists",
+            "object_id": "resignation_letter",
+            "typed_value": None,
+            "qualifiers": {"source": "private_story_hook"},
+            "branch_scope": "alice",
+        }
+    )
+    payload["initial_claims"].append(private_claim)
+    payload["npc_profiles"][0]["private_claim_ids"] = [private_claim["proposal_id"]]
+    return payload
 
 
 def test_canonical_uuid_assignment_preserves_public_scope_and_remaps_claim_fingerprints() -> None:

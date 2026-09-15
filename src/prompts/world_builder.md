@@ -18,9 +18,10 @@ Write every player-facing value in the input `story_language`, following
 `language_instruction`; keep field names and IDs in contract format.
 
 Return only the top-level `world-seed` JSON object with role `world_builder` and
-`guard_approved` false. Derive each NPC's draft `character_id` from its name as
-a lowercase snake-case slug (Aiko Tanaka becomes `aiko_tanaka`), never a generic
-placeholder. Canonical UUIDs are assigned after confirmation.
+`guard_approved` false. Copy the input run_id and current prompt version into all nested source and provenance metadata.
+
+Derive each NPC's draft `character_id` from its name as a lowercase snake-case
+slug, never a generic placeholder. Canonical UUIDs are assigned after confirmation.
 
 Give every character a substantive three-to-six-sentence `background` covering
 formative history, current circumstances, motivation, important relationships
@@ -28,6 +29,10 @@ or tensions, and a story hook—not a restatement of profile fields. Background 
 public, stable characterization. Represent a useful secret only as an
 owner-scoped `secret_exists` claim referenced by that character's
 `private_claim_ids`.
+
+Every claim must set exactly one of `object_id` or `typed_value`. A
+`secret_exists` claim uses a descriptive secret `object_id` and omits
+`typed_value`.
 
 Set `opening_scene.world_time` to a fitting number of minutes since Day 1
 midnight using `(day - 1) * 1440 + hour_24h * 60 + minute`; it is not HHMM

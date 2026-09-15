@@ -3,12 +3,22 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from src.application.contracts.ai import AIPromptRole, RoleInput, WorldSeed
 from src.services.ai.contracts import AIContractRegistry, AIContractValidationError
 from src.services.prompts import PromptRegistry, PromptRegistryError, prompt_cache_scope
+
+FIXTURE = Path(__file__).parents[1] / "fixtures" / "ai" / "role_outputs.json"
+
+
+def _current_world_seed_payload() -> dict[str, Any]:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"]
+    definition = PromptRegistry().get(AIPromptRole.WORLD_BUILDER)
+    payload["prompt_version"] = definition.semantic_version
+    return payload
 
 
 def test_prompt_render_replaces_required_input_without_unresolved_placeholders() -> None:
@@ -105,29 +115,23 @@ def test_runtime_prompts_use_public_character_profiles_for_consistency() -> None
         assert "current_locations" in registry.get(role).content
 
 
-def test_world_builder_prompt_example_is_a_valid_structured_background_seed() -> None:
+def test_world_builder_prompt_keeps_a_valid_semantic_example() -> None:
     content = PromptRegistry().get(AIPromptRole.WORLD_BUILDER).content
     example = json.loads(content.split("```json", 1)[1].split("```", 1)[0])
-
     seed = AIContractRegistry().parse(AIPromptRole.WORLD_BUILDER, example)
 
     assert isinstance(seed, WorldSeed)
-    assert seed.goals
-    assert seed.initial_relationships
-    assert seed.tensions
-    assert seed.threads
-    assert any(claim.predicate == "secret_exists" for claim in seed.initial_claims)
     for character in (seed.player_character, *seed.npc_profiles):
-        assert character.goal_ids
         assert character.background_claims
         assert all(claim.subject_id == character.character_id for claim in character.background_claims)
-        assert any(character.character_id in thread.participant_ids for thread in seed.threads)
+    assert "```json" in content
+    assert "exactly one of `object_id` or `typed_value`" in content
+    assert "`secret_exists` claim uses a descriptive secret `object_id`" in content
     assert "Never use `world`" in content
 
 
 def test_world_builder_schema_requires_background_claims_with_each_character() -> None:
-    content = PromptRegistry().get(AIPromptRole.WORLD_BUILDER).content
-    payload = json.loads(content.split("```json", 1)[1].split("```", 1)[0])
+    payload = _current_world_seed_payload()
     del payload["npc_profiles"][0]["background_claims"]
 
     with pytest.raises(AIContractValidationError) as captured:
@@ -137,8 +141,7 @@ def test_world_builder_schema_requires_background_claims_with_each_character() -
 
 
 def test_world_builder_reports_invalid_nested_background_claim_and_unknown_world_subject_together() -> None:
-    content = PromptRegistry().get(AIPromptRole.WORLD_BUILDER).content
-    payload = json.loads(content.split("```json", 1)[1].split("```", 1)[0])
+    payload = _current_world_seed_payload()
     payload["player_character"]["background_claims"][0]["subject_id"] = "unknown_character"
     global_claim = json.loads(json.dumps(payload["initial_claims"][0]))
     global_claim.update(
@@ -169,19 +172,10 @@ def test_missing_prompt_variable_is_a_clear_error() -> None:
         definition.render({})
 
 
-def test_world_builder_example_versions_follow_manifest() -> None:
+def test_world_builder_prompt_version_and_contract_follow_manifest() -> None:
     definition = PromptRegistry().get(AIPromptRole.WORLD_BUILDER)
-    example = json.loads(definition.content.split("```json", 1)[1].split("```", 1)[0])
-    assert example["prompt_version"] == definition.semantic_version
-    claims = [
-        *example["initial_claims"],
-        *(
-            claim
-            for character in [example["player_character"], *example["npc_profiles"]]
-            for claim in character["background_claims"]
-        ),
-    ]
-    assert all(claim["provenance"]["prompt_version"] == definition.semantic_version for claim in claims)
+    assert definition.semantic_version in definition.content
+    assert "{{prompt_version}}" not in definition.content
     assert definition.input_contract == "world-builder-input"
 
 

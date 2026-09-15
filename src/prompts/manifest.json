@@ -1,11 +1,11 @@
 {
   "world_builder": {
     "template": "world_builder.md",
-    "semantic_version": "1.12.0",
+    "semantic_version": "1.14.0",
     "input_contract": "world-builder-input",
     "output_schema_version": "world-seed",
     "required_variables": ["input_json"],
-    "changelog": "Nest required public background claims with their owning characters."
+    "changelog": "Restore the semantic JSON example required by the configured cloud model."
   },
   "world_guide": {
     "template": "world_guide.md",
