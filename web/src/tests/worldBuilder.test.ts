@@ -28,6 +28,7 @@ function seed(): WorldSeed {
       gender: 'female',
       role: 'student',
       background: 'New to the club.',
+      background_claims: [],
       voice: 'curious',
       traits: ['observant'],
       values: ['honesty'],
@@ -43,6 +44,7 @@ function seed(): WorldSeed {
         gender: 'female',
         role: 'club president',
         background: 'Organized.',
+        background_claims: [],
         voice: 'precise',
         traits: ['diligent'],
         values: ['reliability'],
@@ -57,6 +59,7 @@ function seed(): WorldSeed {
         gender: 'male',
         role: 'treasurer',
         background: 'Practical.',
+        background_claims: [],
         voice: 'dry',
         traits: ['careful'],
         values: ['fairness'],
@@ -447,6 +450,30 @@ describe('world builder composable', () => {
     const store = reactive(useWorldBuilder())
     store.draft = seed()
     const alice = store.draft.npc_profiles[0]
+    alice.background_claims = [
+      {
+        schema_version: 'knowledge-claim-proposal',
+        proposal_id: 'claim_alice_background',
+        source_role: 'world_builder',
+        source_run_id: store.draft.run_id,
+        claim_type: 'knowledge_claim',
+        subject_id: 'alice',
+        predicate: 'public_fact',
+        object_id: null,
+        typed_value: 'Alice leads the club.',
+        polarity: 'positive',
+        qualifiers: { source: 'character_background' },
+        valid_time: { start: 0, end: null },
+        branch_scope: 'public',
+        provenance: {
+          source_type: 'world_seed',
+          source_id: store.draft.run_id,
+          run_id: store.draft.run_id,
+          prompt_version: store.draft.prompt_version,
+          model_metadata: {}
+        }
+      }
+    ]
     store.draft.initial_relationships = [{ source_id: 'alice', target_id: 'player', values: {} }]
     store.draft.goals = [{ goal_id: 'alice_goal', owner_id: 'alice', description: 'Help the club.', priority: 0.8 }]
     store.draft.threads = [
@@ -459,6 +486,7 @@ describe('world builder composable', () => {
     store.syncNpcIdentity(alice)
 
     expect(alice.character_id).toBe('lam_nhu_nguyet')
+    expect(alice.background_claims[0].subject_id).toBe('lam_nhu_nguyet')
     expect(store.draft.opening_scene.participants).toEqual({ player: 17, lam_nhu_nguyet: 17 })
     expect(store.draft.opening_scene.consent).toEqual({ 'lam_nhu_nguyet:explicit': 'granted' })
     expect(store.draft.opening_scene.pov).toBe('lam_nhu_nguyet')

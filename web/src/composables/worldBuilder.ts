@@ -138,6 +138,11 @@ export function useWorldBuilder() {
 
     const remap = (value: string): string => (value === oldId ? newId : value)
     character.character_id = newId
+    character.background_claims.forEach((claim) => {
+      claim.subject_id = remap(claim.subject_id)
+      if (claim.object_id !== null) claim.object_id = remap(claim.object_id)
+      claim.branch_scope = remap(claim.branch_scope)
+    })
     draft.value.initial_claims.forEach((claim) => {
       claim.subject_id = remap(claim.subject_id)
       if (claim.object_id !== null) claim.object_id = remap(claim.object_id)
@@ -200,6 +205,30 @@ export function useWorldBuilder() {
       gender: 'male',
       role: 'supporting character',
       background: 'Describe this character’s history, current circumstances, motivations, important relationships, and a story-relevant hook.',
+      background_claims: [
+        {
+          schema_version: 'knowledge-claim-proposal',
+          proposal_id: 'claim_' + characterId + '_background',
+          source_role: 'world_builder',
+          source_run_id: draft.value.run_id,
+          claim_type: 'knowledge_claim',
+          subject_id: characterId,
+          predicate: 'public_fact',
+          object_id: null,
+          typed_value: name + ' is a supporting character.',
+          polarity: 'positive',
+          qualifiers: { source: 'character_background' },
+          valid_time: { start: draft.value.opening_scene.world_time, end: null },
+          branch_scope: 'public',
+          provenance: {
+            source_type: 'world_seed',
+            source_id: draft.value.run_id,
+            run_id: draft.value.run_id,
+            prompt_version: draft.value.prompt_version,
+            model_metadata: {}
+          }
+        }
+      ],
       voice: 'Natural speaking style',
       traits: ['curious'],
       values: [],

@@ -198,7 +198,7 @@ def _apply_world_seed(state: GameState, seed: WorldSeed) -> None:
         state.relationships[(relationship.source_id, relationship.target_id)] = RelationshipVector(
             {str(dimension): float(value) for dimension, value in relationship.values.items()}
         )
-    for proposal in seed.initial_claims:
+    for proposal in seed.all_claims():
         claim = KnowledgeClaim(
             claim_id=proposal.proposal_id,
             subject_id=proposal.subject_id,

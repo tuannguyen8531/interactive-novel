@@ -25,6 +25,29 @@
       "gender": "female",
       "role": "student",
       "background": "Mina recently transferred after a difficult year at her previous school and joined the culture club in search of a fresh start. She notices small details but hesitates to rely on unfamiliar people. Helping with the festival gives her a reason to build trust with the other members, while her fear of exclusion remains an unresolved source of tension.",
+      "background_claims": [
+        {
+          "schema_version": "knowledge-claim-proposal",
+          "proposal_id": "claim-player-transfer",
+          "source_role": "world_builder",
+          "source_run_id": "world-run-1",
+          "claim_type": "knowledge_claim",
+          "subject_id": "player",
+          "predicate": "public_fact",
+          "typed_value": "Mina transferred schools after a difficult year.",
+          "polarity": "positive",
+          "qualifiers": {"source": "character_background"},
+          "valid_time": {"start": 0},
+          "branch_scope": "public",
+          "provenance": {
+            "source_type": "world_seed",
+            "source_id": "world-run-1",
+            "run_id": "world-run-1",
+            "prompt_version": "1.0.0",
+            "model_metadata": {}
+          }
+        }
+      ],
       "voice": "curious and direct",
       "traits": ["observant"],
       "values": ["honesty"],
@@ -40,6 +63,29 @@
         "gender": "female",
         "role": "club president",
         "background": "Alice inherited responsibility for the club shortly before its most important festival. Her family taught her to equate reliability with self-worth, so she conceals how overwhelmed she feels. She wants the exhibition to protect the club's future, but learning to delegate may matter more than executing a flawless plan.",
+        "background_claims": [
+          {
+            "schema_version": "knowledge-claim-proposal",
+            "proposal_id": "claim-alice-responsibility",
+            "source_role": "world_builder",
+            "source_run_id": "world-run-1",
+            "claim_type": "knowledge_claim",
+            "subject_id": "alice",
+            "predicate": "public_fact",
+            "typed_value": "Alice inherited responsibility for the club before its most important festival.",
+            "polarity": "positive",
+            "qualifiers": {"source": "character_background"},
+            "valid_time": {"start": 0},
+            "branch_scope": "public",
+            "provenance": {
+              "source_type": "world_seed",
+              "source_id": "world-run-1",
+              "run_id": "world-run-1",
+              "prompt_version": "1.0.0",
+              "model_metadata": {}
+            }
+          }
+        ],
         "voice": "warm but precise",
         "traits": ["diligent", "reserved"],
         "values": ["reliability"],
@@ -54,6 +100,29 @@
         "gender": "male",
         "role": "club treasurer",
         "background": "Bob became treasurer after discovering that the club's records were badly neglected. He uses dry humor to keep arguments from becoming personal, although others sometimes mistake it for indifference. He wants the festival budget to remain honest and may uncover discrepancies that place him between loyalty and fairness.",
+        "background_claims": [
+          {
+            "schema_version": "knowledge-claim-proposal",
+            "proposal_id": "claim-bob-treasurer",
+            "source_role": "world_builder",
+            "source_run_id": "world-run-1",
+            "claim_type": "knowledge_claim",
+            "subject_id": "bob",
+            "predicate": "public_fact",
+            "typed_value": "Bob became treasurer after finding neglected club records.",
+            "polarity": "positive",
+            "qualifiers": {"source": "character_background"},
+            "valid_time": {"start": 0},
+            "branch_scope": "public",
+            "provenance": {
+              "source_type": "world_seed",
+              "source_id": "world-run-1",
+              "run_id": "world-run-1",
+              "prompt_version": "1.0.0",
+              "model_metadata": {}
+            }
+          }
+        ],
         "voice": "dry and thoughtful",
         "traits": ["practical"],
         "values": ["fairness"],
@@ -64,57 +133,15 @@
     "initial_claims": [
       {
         "schema_version": "knowledge-claim-proposal",
-        "proposal_id": "claim-player-transfer",
-        "source_role": "world_builder",
-        "source_run_id": "world-run-1",
-        "claim_type": "knowledge_claim",
-        "subject_id": "player",
-        "predicate": "public_fact",
-        "typed_value": "Mina transferred schools after a difficult year.",
-        "polarity": "positive",
-        "qualifiers": {"source": "character_background"},
-        "valid_time": {"start": 0},
-        "branch_scope": "public",
-        "provenance": {
-          "source_type": "world_seed",
-          "source_id": "world-run-1",
-          "run_id": "world-run-1",
-          "prompt_version": "1.0.0",
-          "model_metadata": {}
-        }
-      },
-      {
-        "schema_version": "knowledge-claim-proposal",
         "proposal_id": "claim-alice-tea",
         "source_role": "world_builder",
         "source_run_id": "world-run-1",
         "claim_type": "knowledge_claim",
         "subject_id": "alice",
         "predicate": "public_fact",
-        "typed_value": "prefers tea",
+        "typed_value": "Alice prefers tea.",
         "polarity": "positive",
-        "qualifiers": {"source": "character_background"},
-        "valid_time": {"start": 0},
-        "branch_scope": "public",
-        "provenance": {
-          "source_type": "world_seed",
-          "source_id": "world-run-1",
-          "run_id": "world-run-1",
-          "prompt_version": "1.0.0",
-          "model_metadata": {}
-        }
-      },
-      {
-        "schema_version": "knowledge-claim-proposal",
-        "proposal_id": "claim-bob-treasurer",
-        "source_role": "world_builder",
-        "source_run_id": "world-run-1",
-        "claim_type": "knowledge_claim",
-        "subject_id": "bob",
-        "predicate": "public_fact",
-        "typed_value": "Bob became treasurer after finding neglected club records.",
-        "polarity": "positive",
-        "qualifiers": {"source": "character_background"},
+        "qualifiers": {"source": "character_detail"},
         "valid_time": {"start": 0},
         "branch_scope": "public",
         "provenance": {

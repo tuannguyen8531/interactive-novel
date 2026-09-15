@@ -60,6 +60,7 @@ export interface WorldCharacterSeed {
   gender: BinaryGender
   role: string
   background: string
+  background_claims: WorldClaimProposal[]
   voice: string
   traits: string[]
   values: string[]
@@ -68,7 +69,11 @@ export interface WorldCharacterSeed {
 }
 
 export interface WorldClaimProposal {
+  schema_version: 'knowledge-claim-proposal' | string
   proposal_id: string
+  source_role: string
+  source_run_id: string
+  claim_type: 'knowledge_claim' | string
   subject_id: string
   predicate: string
   object_id: string | null
@@ -77,6 +82,13 @@ export interface WorldClaimProposal {
   qualifiers: Record<string, unknown>
   valid_time: { start: number; end: number | null }
   branch_scope: string
+  provenance: {
+    source_type: string
+    source_id: string
+    run_id: string
+    prompt_version: string
+    model_metadata: Record<string, unknown>
+  }
 }
 
 export interface WorldBeliefProposal {

@@ -1,11 +1,11 @@
 {
   "world_builder": {
     "template": "world_builder.md",
-    "semantic_version": "1.10.0",
+    "semantic_version": "1.12.0",
     "input_contract": "world-builder-input",
     "output_schema_version": "world-seed",
     "required_variables": ["input_json"],
-    "changelog": "Infer tone from the premise when no tone preset is supplied."
+    "changelog": "Nest required public background claims with their owning characters."
   },
   "world_guide": {
     "template": "world_guide.md",

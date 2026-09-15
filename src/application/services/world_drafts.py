@@ -249,7 +249,7 @@ class WorldDraftApplicationService:
         )
 
     def _validate_scene_fingerprint_references(self, seed: WorldSeed) -> None:
-        fingerprints = {claim_fingerprint(claim) for claim in seed.initial_claims}
+        fingerprints = {claim_fingerprint(claim) for claim in seed.all_claims()}
         for reference in (*seed.opening_scene.allowed_claims, *seed.opening_scene.forbidden_claims):
             if reference.fingerprint is not None and reference.fingerprint not in fingerprints:
                 raise ApplicationValidationError("Opening scene references an unknown claim fingerprint.")
@@ -310,7 +310,7 @@ def _build_opening_bundle(
             turn_id=turn_id,
             source_event_id=event_id,
         )
-        for claim in seed.initial_claims
+        for claim in seed.all_claims()
     )
     location_claims = tuple(
         _opening_location_claim(

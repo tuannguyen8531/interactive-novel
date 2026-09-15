@@ -103,7 +103,14 @@ async def test_confirmed_world_builder_seed_round_trips_all_opening_artifacts(da
     assert hooks == 1
     assert stored_relationships == 1
     assert character_states == len(payload["opening_scene"]["participants"])
-    assert claims == canon_facts == len(payload["initial_claims"]) + len(payload["opening_scene"]["participants"])
+    background_claims = sum(
+        len(character["background_claims"]) for character in (payload["player_character"], *payload["npc_profiles"])
+    )
+    assert (
+        claims
+        == canon_facts
+        == len(payload["initial_claims"]) + background_claims + len(payload["opening_scene"]["participants"])
+    )
 
 
 async def test_two_worlds_may_share_a_name_and_character_ids_remain_globally_unique(database) -> None:
@@ -160,7 +167,7 @@ async def test_game_state_hydrates_seed_replays_turn_and_builds_snapshot(databas
         canonical_seed.player_character.character_id,
         *(character.character_id for character in canonical_seed.npc_profiles),
     }
-    assert {claim.proposal_id for claim in canonical_seed.initial_claims}.issubset(opening.claims)
+    assert {claim.proposal_id for claim in canonical_seed.all_claims()}.issubset(opening.claims)
     assert {
         (claim.subject_id, claim.predicate, claim.object_id)
         for claim in opening.claims.values()

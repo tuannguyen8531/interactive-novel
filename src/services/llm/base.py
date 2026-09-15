@@ -345,17 +345,17 @@ class BaseProvider(ABC):
             data = parse_structured_text(response.text, schema, provider=self.provider_name)
             return StructuredResponse(response=response, data=data)
         except StructuredOutputError as first_error:
-            log_error(
-                "Structured provider output failed validation",
-                first_error,
-                provider=self.provider_name,
-                model=self.model,
-                role=str(request.role),
-                physical_call_id=request.physical_call_id,
-                schema=schema.name,
-                repair_attempt=request.repair_attempt,
-            )
             if request.repair_attempt >= 1:
+                log_error(
+                    "Structured provider output failed validation",
+                    first_error,
+                    provider=self.provider_name,
+                    model=self.model,
+                    role=str(request.role),
+                    physical_call_id=request.physical_call_id,
+                    schema=schema.name,
+                    repair_attempt=request.repair_attempt,
+                )
                 raise first_error
             repair = self._prompts.get_repair()
             repair_request = replace(

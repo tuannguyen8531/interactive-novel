@@ -497,12 +497,12 @@ function getInitials(name: string): string {
                   <input v-model="character.voice" maxlength="300" placeholder="e.g. Warm but guarded, formal cadence" />
                 </label>
                 <label class="input-group wide-field">
-                  <span class="field-label">Background & Secrets</span>
+                  <span class="field-label">Background</span>
                   <textarea
                     v-model="character.background"
                     rows="4"
                     maxlength="6000"
-                    placeholder="Backstory, vulnerabilities, underlying motivations, and personal secrets…"
+                    placeholder="Backstory, vulnerabilities, motivations, relationships, and unresolved hooks…"
                   />
                 </label>
               </div>

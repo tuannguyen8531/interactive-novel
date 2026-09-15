@@ -119,27 +119,34 @@ def test_world_builder_prompt_example_is_a_valid_structured_background_seed() ->
     assert any(claim.predicate == "secret_exists" for claim in seed.initial_claims)
     for character in (seed.player_character, *seed.npc_profiles):
         assert character.goal_ids
-        assert any(
-            claim.subject_id == character.character_id
-            and claim.predicate == "public_fact"
-            and claim.qualifiers.get("source") == "character_background"
-            for claim in seed.initial_claims
-        )
+        assert character.background_claims
+        assert all(claim.subject_id == character.character_id for claim in character.background_claims)
         assert any(character.character_id in thread.participant_ids for thread in seed.threads)
     assert "Never use `world`" in content
 
 
-def test_world_builder_reports_missing_background_claim_and_unknown_world_subject_together() -> None:
+def test_world_builder_schema_requires_background_claims_with_each_character() -> None:
     content = PromptRegistry().get(AIPromptRole.WORLD_BUILDER).content
     payload = json.loads(content.split("```json", 1)[1].split("```", 1)[0])
-    payload["initial_claims"] = [
-        claim for claim in payload["initial_claims"] if claim["subject_id"] != payload["player_character"]["character_id"]
-    ]
+    del payload["npc_profiles"][0]["background_claims"]
+
+    with pytest.raises(AIContractValidationError) as captured:
+        AIContractRegistry().parse(AIPromptRole.WORLD_BUILDER, payload)
+
+    assert any(item.path == "npc_profiles.0.background_claims" and item.code == "missing" for item in captured.value.diagnostics)
+
+
+def test_world_builder_reports_invalid_nested_background_claim_and_unknown_world_subject_together() -> None:
+    content = PromptRegistry().get(AIPromptRole.WORLD_BUILDER).content
+    payload = json.loads(content.split("```json", 1)[1].split("```", 1)[0])
+    payload["player_character"]["background_claims"][0]["subject_id"] = "unknown_character"
     global_claim = json.loads(json.dumps(payload["initial_claims"][0]))
     global_claim.update(
         {
             "proposal_id": "claim_global_world_rule",
             "subject_id": "world",
+            "predicate": "public_fact",
+            "object_id": None,
             "typed_value": "Memories can be harvested into crystals.",
             "qualifiers": {"source": "world_rules"},
         }
@@ -150,7 +157,7 @@ def test_world_builder_reports_missing_background_claim_and_unknown_world_subjec
         AIContractRegistry().parse(AIPromptRole.WORLD_BUILDER, payload)
 
     codes = {item.code for item in captured.value.diagnostics}
-    assert "structured_background_claim_missing" in codes
+    assert "background_claim_subject_mismatch" in codes
     assert "unknown_entity_reference" in codes
     assert "omit global world-rule claims" in str(captured.value)
 
@@ -166,7 +173,15 @@ def test_world_builder_example_versions_follow_manifest() -> None:
     definition = PromptRegistry().get(AIPromptRole.WORLD_BUILDER)
     example = json.loads(definition.content.split("```json", 1)[1].split("```", 1)[0])
     assert example["prompt_version"] == definition.semantic_version
-    assert all(claim["provenance"]["prompt_version"] == definition.semantic_version for claim in example["initial_claims"])
+    claims = [
+        *example["initial_claims"],
+        *(
+            claim
+            for character in [example["player_character"], *example["npc_profiles"]]
+            for claim in character["background_claims"]
+        ),
+    ]
+    assert all(claim["provenance"]["prompt_version"] == definition.semantic_version for claim in claims)
     assert definition.input_contract == "world-builder-input"
 
 

@@ -1,83 +1,57 @@
 # Role: World Builder
 
-Create a structured draft for the selected story template. The draft is shown
-to the user for editing and confirmation; it must not imply that persistence or
-canonical authority has already been granted.
+Create an editable, non-canonical draft for the selected story template.
 
 Input envelope (JSON):
 
 {{input_json}}
 
-The input envelope contains the selected story template's instructions, presets,
-opening guidance, and narrative profile. Apply the selected template's genre,
-effective tone, opening guidance, and constraints. Keep romance and meaningful
-relationship development as the primary narrative focus, expressed through the
-selected genre. Do not assume a school-romance setting when another template is
-selected. Treat the effective presets as authoritative rather than inventing or
-replacing them. When the tone preset is null, infer a fitting tone from the user's
-premise without assuming a warm or reflective mood. Use that tone consistently
-for the world and opening scene. Copy rating and violence ceiling into `content_boundaries`
-exactly. `adult_18_plus` permits adult explicit content by default. Characters younger than 18 may exist
-in an adult-rated World, but they must never participate in adult explicit or
-sexual-violence scenes.
+Follow the input template's genre, instructions, opening guidance, narrative
+profile, and presets. Keep romance and meaningful relationship development
+central within the selected genre; do not assume a school setting. If tone is
+null, infer it from the premise and apply it consistently to the world and
+opening scene. Copy rating and violence ceiling into `content_boundaries`
+exactly. `adult_18_plus` permits adult explicit content, but characters under 18
+must never participate in explicit adult or sexual-violence scenes.
 
-Treat `story_language` and `language_instruction` in the input envelope as
-authoritative. Write every player-facing value in that language: the title,
-premise, location names and descriptions, character names and backgrounds,
-opening-scene prose, thread text, dialogue-oriented guidance, and suggested
-actions. Keep JSON field names and persistence IDs in the contract format. Do
-not silently switch to English because the schema or this instruction is in
-English.
+Write every player-facing value in the input `story_language`, following
+`language_instruction`; keep field names and IDs in contract format.
 
-Return only JSON matching `world-seed` with role `world_builder`. Include
-versioned run and prompt metadata. The top-level object itself must be the
-WorldSeed: do not wrap it in `world_seed`, `metadata`, `result` or another
-envelope. Every structured record in this editable draft is only a proposal;
-it gains canonical authority only after user confirmation and deterministic
-validation. Keep the opening scene `guard_approved` false. Use one to three NPC profiles.
-Derive every NPC `character_id` from its name as a lowercase snake-case slug
-(for example, Aiko Tanaka becomes `aiko_tanaka`); never use placeholders such
-as `npc_one` or `npc_two`. Give every character a gender and a substantive
-three-to-six-sentence background. Cover formative history, current
-circumstances, motivations, important relationships or tensions, and at least
-one story-relevant hook. Do not merely repeat the character's name, role, voice,
-or trait list. Treat `background` as public, stable characterization. Do not
-place a hidden secret in background. If a secret is useful, propose it as a
-`secret_exists` claim scoped to its owning character and add that claim ID to
-the character's `private_claim_ids`.
-Treat `opening_scene.world_time` as minutes since midnight on Day 1. Choose a
-time that fits the opening scene; do not default to midnight unless the
-requested premise actually begins there. Convert explicitly using
-`(day - 1) * 1440 + hour_24h * 60 + minute`. Never encode HHMM as minutes:
-Day 1 at 15:30 is 930, NOT 1530 (which means Day 2 at 01:30).
-Day 1 at 08:00 is 480; Day 1 at 13:30 is 810. Before returning the draft,
-convert the chosen value back to day and 24-hour time and check that opening
-prose, lighting and activities agree. Unless an explicit world rule establishes
-unusual daylight, a scene at 01:30 is at night, not a sunny afternoon.
+Return only the top-level `world-seed` JSON object with role `world_builder` and
+`guard_approved` false. Derive each NPC's draft `character_id` from its name as
+a lowercase snake-case slug (Aiko Tanaka becomes `aiko_tanaka`), never a generic
+placeholder. Canonical UUIDs are assigned after confirmation.
 
-Translate each background into the structures that make it matter during play:
+Give every character a substantive three-to-six-sentence `background` covering
+formative history, current circumstances, motivation, important relationships
+or tensions, and a story hook—not a restatement of profile fields. Background is
+public, stable characterization. Represent a useful secret only as an
+owner-scoped `secret_exists` claim referenced by that character's
+`private_claim_ids`.
 
-- put durable, explicit background facts in a small set of typed
-  `initial_claims`; use `public_fact` for public prose facts and set
-  `qualifiers.source` to `character_background`. Every claim `subject_id` must
-  exactly equal a declared `character_id` or `location_id`. Never use `world`,
-  `setting`, `universe`, a faction name or another undeclared ID as a claim
-  subject; keep global rules in the premise, location descriptions or other
-  world prose instead of `initial_claims`;
-- give every character at least one current motivation in `goals`, reference
-  only goals owned by that character from `goal_ids`, and leave no character's
-  `goal_ids` empty;
+Set `opening_scene.world_time` to a fitting number of minutes since Day 1
+midnight using `(day - 1) * 1440 + hour_24h * 60 + minute`; it is not HHMM
+(15:30 is 930, not 1530). Check that the prose, lighting, and activities match.
+
+Translate each background into structures that matter during play:
+
+- put at least one atomic, durable `public_fact` in that character's
+  `background_claims`, with the same `subject_id`, public scope, and
+  `qualifiers.source` set to `character_background`. Never use `world`,
+  `setting`, `universe`, a faction, or another undeclared ID; keep global rules
+  in prose. Reserve top-level `initial_claims` for non-background claims;
+- give every character a current motivation in `goals` and reference only its
+  own goals from its nonempty `goal_ids`;
 - encode established attitudes as directed `initial_relationships`;
 - add `tensions` only when a genuine three-person appraisal exists;
-- create actionable `threads` from unresolved background hooks and include
-  every character in at least one relevant thread;
-- use `initial_beliefs` only for a meaningful perspective difference about an
-  existing claim; never duplicate objective facts as beliefs.
+- create actionable `threads` from unresolved hooks, with every character in at
+  least one relevant thread;
+- use `initial_beliefs` only for meaningful disagreement about an existing
+  claim, never to duplicate objective facts.
 
-Do not invent structured data merely to fill every array. All IDs and references
-must resolve, and private claims must never be quoted or implied by public
-background. Follow this exact shape, replace example prose and IDs with values
-appropriate to the input, and keep participant ages equal to character ages:
+Leave optional arrays empty rather than inventing data. Resolve every reference,
+keep private claims out of public background, and make participant ages match
+character ages. Follow this shape with input-appropriate values:
 
 ```json
 {
@@ -109,6 +83,29 @@ appropriate to the input, and keep participant ages equal to character ages:
     "gender": "female",
     "role": "new club member",
     "background": "The player recently transferred after a difficult year at their previous school and hopes the culture club will offer a fresh start. They notice details others overlook but hesitate to trust unfamiliar people. Preparing for the festival gives them a practical reason to approach the club president. Their unresolved fear of being excluded can become either a source of empathy or a barrier to intimacy.",
+    "background_claims": [
+      {
+        "schema_version": "knowledge-claim-proposal",
+        "proposal_id": "claim_player_transferred",
+        "source_role": "world_builder",
+        "source_run_id": "copy the input run_id",
+        "claim_type": "knowledge_claim",
+        "subject_id": "player",
+        "predicate": "public_fact",
+        "typed_value": "The player recently transferred after a difficult year at their previous school.",
+        "polarity": "positive",
+        "qualifiers": {"source": "character_background"},
+        "valid_time": {"start": 480},
+        "branch_scope": "public",
+        "provenance": {
+          "source_type": "world_seed",
+          "source_id": "copy the input run_id",
+          "run_id": "copy the input run_id",
+          "prompt_version": "{{prompt_version}}",
+          "model_metadata": {}
+        }
+      }
+    ],
     "voice": "Natural speaking style",
     "traits": ["curious"],
     "goal_ids": ["goal_player_belonging"]
@@ -121,6 +118,29 @@ appropriate to the input, and keep participant ages equal to character ages:
       "gender": "female",
       "role": "club president",
       "background": "Aiko became club president after the previous leader graduated unexpectedly, leaving her responsible for an underfunded festival exhibition. Her family values reliability, so she hides how overwhelmed she feels and rarely delegates important work. She wants the festival to prove the club deserves to survive another year. The player's arrival offers needed help, but accepting it requires Aiko to risk showing vulnerability.",
+      "background_claims": [
+        {
+          "schema_version": "knowledge-claim-proposal",
+          "proposal_id": "claim_aiko_became_president",
+          "source_role": "world_builder",
+          "source_run_id": "copy the input run_id",
+          "claim_type": "knowledge_claim",
+          "subject_id": "aiko_tanaka",
+          "predicate": "public_fact",
+          "typed_value": "Aiko became club president after the previous leader graduated unexpectedly.",
+          "polarity": "positive",
+          "qualifiers": {"source": "character_background"},
+          "valid_time": {"start": 480},
+          "branch_scope": "public",
+          "provenance": {
+            "source_type": "world_seed",
+            "source_id": "copy the input run_id",
+            "run_id": "copy the input run_id",
+            "prompt_version": "{{prompt_version}}",
+            "model_metadata": {}
+          }
+        }
+      ],
       "voice": "Earnest speaking style",
       "traits": ["earnest"],
       "goal_ids": ["goal_aiko_save_club"],
@@ -133,54 +153,35 @@ appropriate to the input, and keep participant ages equal to character ages:
       "gender": "male",
       "role": "club artist",
       "background": "Ren joined the club to find a quiet place to draw after repeated conflicts with a demanding art teacher. He observes interpersonal tension accurately but often mistakes silence for safety. He wants the festival display to preserve the club's identity without attracting unwanted scrutiny. His private sketches reveal details about the other members that could deepen trust or cause painful misunderstandings.",
+      "background_claims": [
+        {
+          "schema_version": "knowledge-claim-proposal",
+          "proposal_id": "claim_ren_teacher_conflicts",
+          "source_role": "world_builder",
+          "source_run_id": "copy the input run_id",
+          "claim_type": "knowledge_claim",
+          "subject_id": "ren_mori",
+          "predicate": "public_fact",
+          "typed_value": "Ren joined the club after repeated conflicts with a demanding art teacher.",
+          "polarity": "positive",
+          "qualifiers": {"source": "character_background"},
+          "valid_time": {"start": 480},
+          "branch_scope": "public",
+          "provenance": {
+            "source_type": "world_seed",
+            "source_id": "copy the input run_id",
+            "run_id": "copy the input run_id",
+            "prompt_version": "{{prompt_version}}",
+            "model_metadata": {}
+          }
+        }
+      ],
       "voice": "Quiet speaking style",
       "traits": ["observant"],
       "goal_ids": ["goal_ren_preserve_club"]
     }
   ],
   "initial_claims": [
-    {
-      "schema_version": "knowledge-claim-proposal",
-      "proposal_id": "claim_player_transferred",
-      "source_role": "world_builder",
-      "source_run_id": "copy the input run_id",
-      "claim_type": "knowledge_claim",
-      "subject_id": "player",
-      "predicate": "public_fact",
-      "typed_value": "The player recently transferred after a difficult year at their previous school.",
-      "polarity": "positive",
-      "qualifiers": {"source": "character_background"},
-      "valid_time": {"start": 480},
-      "branch_scope": "public",
-      "provenance": {
-        "source_type": "world_seed",
-        "source_id": "copy the input run_id",
-        "run_id": "copy the input run_id",
-        "prompt_version": "{{prompt_version}}",
-        "model_metadata": {}
-      }
-    },
-    {
-      "schema_version": "knowledge-claim-proposal",
-      "proposal_id": "claim_aiko_became_president",
-      "source_role": "world_builder",
-      "source_run_id": "copy the input run_id",
-      "claim_type": "knowledge_claim",
-      "subject_id": "aiko_tanaka",
-      "predicate": "public_fact",
-      "typed_value": "Aiko became club president after the previous leader graduated unexpectedly.",
-      "polarity": "positive",
-      "qualifiers": {"source": "character_background"},
-      "valid_time": {"start": 480},
-      "branch_scope": "public",
-      "provenance": {
-        "source_type": "world_seed",
-        "source_id": "copy the input run_id",
-        "run_id": "copy the input run_id",
-        "prompt_version": "{{prompt_version}}",
-        "model_metadata": {}
-      }
-    },
     {
       "schema_version": "knowledge-claim-proposal",
       "proposal_id": "claim_aiko_resignation",
@@ -194,27 +195,6 @@ appropriate to the input, and keep participant ages equal to character ages:
       "qualifiers": {"source": "private_story_hook"},
       "valid_time": {"start": 480},
       "branch_scope": "aiko_tanaka",
-      "provenance": {
-        "source_type": "world_seed",
-        "source_id": "copy the input run_id",
-        "run_id": "copy the input run_id",
-        "prompt_version": "{{prompt_version}}",
-        "model_metadata": {}
-      }
-    },
-    {
-      "schema_version": "knowledge-claim-proposal",
-      "proposal_id": "claim_ren_teacher_conflicts",
-      "source_role": "world_builder",
-      "source_run_id": "copy the input run_id",
-      "claim_type": "knowledge_claim",
-      "subject_id": "ren_mori",
-      "predicate": "public_fact",
-      "typed_value": "Ren joined the club after repeated conflicts with a demanding art teacher.",
-      "polarity": "positive",
-      "qualifiers": {"source": "character_background"},
-      "valid_time": {"start": 480},
-      "branch_scope": "public",
       "provenance": {
         "source_type": "world_seed",
         "source_id": "copy the input run_id",

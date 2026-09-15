@@ -114,10 +114,12 @@ private claims are joined directly into the internal context of Simulator and
 Validator so they influence choices without appearing in public
 initial context, Planner, Writer, or Critic context.
 
-The current WorldSeed format passes validation only when each character has at
-least one owned goal, one public typed claim with
-`source=character_background`, and participation in at least one narrative
-thread. Every private claim must be linked by its owner through
+The current WorldSeed format nests at least one public typed
+`background_claim` under each character, alongside that character's background,
+and also requires an owned goal and participation in a narrative thread. Each
+background claim must name its owning character as subject and use
+`source=character_background`; top-level `initial_claims` are reserved for
+non-background claims. Every private claim must be linked by its owner through
 `private_claim_ids`. After confirmation, typed claims become CanonFacts; prose
 background remains a public profile and has no mutation authority by itself.
 Validation also rejects public background that directly contains a private

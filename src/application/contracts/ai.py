@@ -690,6 +690,7 @@ class CharacterSeed(AIModel):
     gender: Literal["male", "female"] = "male"
     role: str = Field(min_length=1)
     background: str = Field(min_length=1, max_length=6000)
+    background_claims: tuple[KnowledgeClaimProposal, ...] = Field(min_length=1)
     voice: str = Field(min_length=1)
     traits: tuple[str, ...] = Field(min_length=1)
     values: tuple[str, ...] = Field(default_factory=tuple)
@@ -779,6 +780,54 @@ class WorldSeed(VersionedOutput):
     tensions: tuple[TensionSeed, ...] = Field(default_factory=tuple)
     threads: tuple[ThreadSeed, ...] = Field(default_factory=tuple)
     opening_scene: SceneSpec
+
+    @model_validator(mode="before")
+    @classmethod
+    def nest_legacy_background_claims(cls, value: Any) -> Any:
+        """Keep confirmed worlds from the former top-level claim layout readable."""
+
+        if not isinstance(value, Mapping):
+            return value
+        normalized = dict(value)
+        remaining_claims = list(normalized.get("initial_claims", ()))
+        moved_ids: set[str] = set()
+        for key in ("player_character", "npc_profiles"):
+            raw_characters = [normalized.get(key)] if key == "player_character" else normalized.get(key, ())
+            characters = []
+            for raw_character in raw_characters or ():
+                if not isinstance(raw_character, Mapping) or "background_claims" in raw_character:
+                    characters.append(raw_character)
+                    continue
+                character = dict(raw_character)
+                character_id = character.get("character_id")
+                background_claims = [
+                    claim
+                    for claim in remaining_claims
+                    if isinstance(claim, Mapping)
+                    and claim.get("subject_id") == character_id
+                    and claim.get("predicate") == "public_fact"
+                    and isinstance(claim.get("qualifiers"), Mapping)
+                    and claim["qualifiers"].get("source") == "character_background"
+                ]
+                if background_claims:
+                    character["background_claims"] = background_claims
+                    moved_ids.update(str(claim.get("proposal_id")) for claim in background_claims)
+                characters.append(character)
+            normalized[key] = characters[0] if key == "player_character" and characters else characters
+        normalized["initial_claims"] = [
+            claim
+            for claim in remaining_claims
+            if not isinstance(claim, Mapping) or str(claim.get("proposal_id")) not in moved_ids
+        ]
+        return normalized
+
+    def all_claims(self) -> tuple[KnowledgeClaimProposal, ...]:
+        """Return character-owned background claims and other world claims."""
+
+        background_claims = tuple(
+            claim for character in (self.player_character, *self.npc_profiles) for claim in character.background_claims
+        )
+        return (*background_claims, *self.initial_claims)
 
 
 AIOutput = TurnPlan | SimulationResult | ConsistencyReport | NarrativeDraft | CritiqueResult | WorldSeed | WorldBriefSuggestion

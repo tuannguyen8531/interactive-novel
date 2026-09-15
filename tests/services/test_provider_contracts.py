@@ -208,8 +208,13 @@ async def test_gemini_structured_output_uses_json_schema_field() -> None:
 
 
 @pytest.mark.parametrize("provider", [name for name, _ in PROVIDERS])
-async def test_all_adapters_parse_and_repair_structured_output(provider: str) -> None:
+async def test_all_adapters_parse_and_repair_structured_output(provider: str, monkeypatch: pytest.MonkeyPatch) -> None:
     calls = 0
+    logged_errors: list[str] = []
+    monkeypatch.setattr(
+        "src.services.llm.base.log_error",
+        lambda context, _error, **_metadata: logged_errors.append(context),
+    )
     schema = StructuredSchema(
         name="fixture_output",
         json_schema={"type": "object", "properties": {"ok": {"type": "boolean"}}},
@@ -229,6 +234,7 @@ async def test_all_adapters_parse_and_repair_structured_output(provider: str) ->
     assert result.repaired is True
     assert result.validation_attempts == 2
     assert calls == 2
+    assert logged_errors == []
 
 
 @pytest.mark.parametrize("provider", [name for name, _ in PROVIDERS])

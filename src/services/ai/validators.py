@@ -82,9 +82,10 @@ def _validate_world_seed(seed: WorldSeed) -> None:
     character_ids = [seed.player_character.character_id, *(item.character_id for item in seed.npc_profiles)]
     character_seeds = (seed.player_character, *seed.npc_profiles)
     character_aliases = [alias for item in character_seeds for alias in item.aliases]
-    claim_ids = [item.proposal_id for item in seed.initial_claims]
+    claims = seed.all_claims()
+    claim_ids = [item.proposal_id for item in claims]
     _require_unique(character_ids, "characters")
-    _require_unique(claim_ids, "initial_claims")
+    _require_unique(claim_ids, "claims")
     _require_unique((item.belief_id for item in seed.initial_beliefs), "initial_beliefs")
     _require_unique((item.location_id for item in seed.locations), "locations")
     _require_unique((item.goal_id for item in seed.goals), "goals")
@@ -121,7 +122,7 @@ def _validate_world_seed(seed: WorldSeed) -> None:
             f"character, location, and goal identifier namespaces overlap: {joined_ids}",
         )
     goals_by_id = {item.goal_id: item for item in seed.goals}
-    claims_by_id = {item.proposal_id: item for item in seed.initial_claims}
+    claims_by_id = {item.proposal_id: item for item in claims}
     known_entities = known_characters | known_locations
     requires_structured_background = _semantic_version_at_least(seed.prompt_version, (1, 4, 0))
     if requires_structured_background:
@@ -197,27 +198,14 @@ def _validate_world_seed(seed: WorldSeed) -> None:
                     "private_claim_leaked_to_background",
                     "public background directly exposes an owner-scoped private claim",
                 )
-        if requires_structured_background:
-            background_claims = [
-                claim
-                for claim in seed.initial_claims
-                if claim.subject_id == character.character_id
-                and claim.predicate == "public_fact"
-                and claim.branch_scope == "public"
-                and claim.qualifiers.get("source") == "character_background"
-            ]
-            if not background_claims:
-                _raise(
-                    f"characters.{index}.background",
-                    "structured_background_claim_missing",
-                    "every current-format background needs a public_fact claim marked source=character_background",
-                )
-            if not any(character.character_id in thread.participant_ids for thread in seed.threads):
-                _raise(
-                    f"characters.{index}.background",
-                    "background_thread_missing",
-                    "every current-format background needs an actionable thread involving that character",
-                )
+        if requires_structured_background and not any(
+            character.character_id in thread.participant_ids for thread in seed.threads
+        ):
+            _raise(
+                f"characters.{index}.background",
+                "background_thread_missing",
+                "every current-format background needs an actionable thread involving that character",
+            )
     for index, relationship in enumerate(seed.initial_relationships):
         if relationship.source_id == relationship.target_id:
             _raise(f"initial_relationships.{index}", "relationship_self_edge", "relationship source and target must differ")
@@ -233,9 +221,9 @@ def _validate_world_seed(seed: WorldSeed) -> None:
     for index, thread in enumerate(seed.threads):
         if not set(thread.participant_ids).issubset(known_characters):
             _raise(f"threads.{index}.participant_ids", "unknown_character_reference", "thread participant is unknown")
-    _validate_claims(seed.initial_claims, path="initial_claims")
-    _validate_claim_conflicts(seed.initial_claims)
-    for index, claim in enumerate(seed.initial_claims):
+    _validate_claims(claims, path="claims")
+    _validate_claim_conflicts(claims)
+    for index, claim in enumerate(claims):
         if claim.branch_scope != "public" and claim.branch_scope not in known_characters:
             _raise(
                 f"initial_claims.{index}.branch_scope",
@@ -291,7 +279,7 @@ def _validate_world_seed(seed: WorldSeed) -> None:
                     "unlinked_private_claim",
                     "every current-format private claim must be referenced by its owner's private_claim_ids",
                 )
-    claim_fingerprints = {item.proposal_id for item in seed.initial_claims}
+    claim_fingerprints = {item.proposal_id for item in claims}
     for index, belief in enumerate(seed.initial_beliefs):
         if belief.believer_id not in known_characters:
             _raise(f"initial_beliefs.{index}.believer_id", "unknown_character_reference", "belief owner is unknown")
@@ -363,23 +351,20 @@ def _current_world_seed_diagnostics(
                     f"goal {goal_id!r} is not owned by {character.character_id!r}",
                 )
 
-        background_claims = [
-            claim
-            for claim in seed.initial_claims
-            if claim.subject_id == character.character_id
-            and claim.predicate == "public_fact"
-            and claim.branch_scope == "public"
-            and claim.qualifiers.get("source") == "character_background"
-        ]
-        if not background_claims:
-            add(
-                f"characters.{index}.background",
-                "structured_background_claim_missing",
-                (
-                    f"character {character.character_id!r} needs a public_fact claim whose subject_id exactly matches "
-                    "that character_id and whose qualifiers.source is character_background"
-                ),
-            )
+        for claim_index, claim in enumerate(character.background_claims):
+            path = f"characters.{index}.background_claims.{claim_index}"
+            if claim.subject_id != character.character_id:
+                add(path, "background_claim_subject_mismatch", "background claim subject must match its character")
+            if claim.predicate != "public_fact":
+                add(path, "background_claim_predicate_invalid", "background claims must use public_fact")
+            if claim.branch_scope != "public":
+                add(path, "background_claim_visibility_invalid", "background claims must be public")
+            if claim.qualifiers.get("source") != "character_background":
+                add(
+                    path,
+                    "background_claim_source_invalid",
+                    "background claim qualifiers.source must be character_background",
+                )
         if not any(character.character_id in thread.participant_ids for thread in seed.threads):
             add(
                 f"characters.{index}.background",
@@ -415,7 +400,7 @@ def _current_world_seed_diagnostics(
                     "public background directly exposes an owner-scoped private claim",
                 )
 
-    for index, claim in enumerate(seed.initial_claims):
+    for index, claim in enumerate(seed.all_claims()):
         if claim.branch_scope != "public" and claim.branch_scope not in known_characters:
             add(
                 f"initial_claims.{index}.branch_scope",
@@ -467,6 +452,14 @@ def _current_world_seed_diagnostics(
                     "unlinked_private_claim",
                     "every current-format private claim must be referenced by its owner's private_claim_ids",
                 )
+
+    for index, claim in enumerate(seed.initial_claims):
+        if claim.predicate == "public_fact" and claim.qualifiers.get("source") == "character_background":
+            add(
+                f"initial_claims.{index}",
+                "background_claim_not_nested",
+                "character background claims must be nested with their owning character",
+            )
 
     return tuple(diagnostics)
 

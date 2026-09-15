@@ -47,6 +47,7 @@ def test_canonical_uuid_assignment_preserves_public_scope_and_remaps_claim_finge
 
     canonical = assign_canonical_uuids(seed)
 
+    assert all(UUID(claim.proposal_id).version == 4 for claim in canonical.all_claims())
     for draft_claim, canonical_claim in zip(seed.initial_claims, canonical.initial_claims, strict=True):
         if draft_claim.branch_scope == "public":
             assert canonical_claim.branch_scope == "public"
@@ -57,6 +58,18 @@ def test_canonical_uuid_assignment_preserves_public_scope_and_remaps_claim_finge
     location_claims = [c for c in canonical.initial_claims if c.predicate == "located_at"]
     assert all(c.object_id == seed.locations[0].location_id for c in location_claims)
     assert canonical.opening_scene.allowed_claims[0].fingerprint == claim_fingerprint(canonical.initial_claims[0])
+
+
+def test_world_seed_nests_legacy_character_background_claims() -> None:
+    payload = copy.deepcopy(json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"])
+    legacy_claims = payload["initial_claims"]
+    for character in (payload["player_character"], *payload["npc_profiles"]):
+        legacy_claims.extend(character.pop("background_claims"))
+
+    seed = WorldSeed.model_validate(payload)
+
+    assert all(character.background_claims for character in (seed.player_character, *seed.npc_profiles))
+    assert all(claim.qualifiers.get("source") != "character_background" for claim in seed.initial_claims)
 
 
 def test_world_draft_rejects_character_ids_that_collide_with_other_entity_namespaces() -> None:
@@ -367,7 +380,7 @@ async def test_confirm_creates_playable_opening_bundle_with_canonical_artifacts(
     assert result.playthrough.root_branch_id == result.branch.id
     assert result.branch.head_revision == 1
     assert bundle is not None
-    expected_claim_count = len(_seed().initial_claims) + len(_seed().opening_scene.participants)
+    expected_claim_count = len(_seed().all_claims()) + len(_seed().opening_scene.participants)
     assert len(bundle.claims) == len(bundle.canon_facts) == expected_claim_count
     assert len(bundle.character_states) == len(_seed().opening_scene.participants)
     assert {
@@ -419,8 +432,8 @@ def test_world_builder_rejects_obvious_opposite_canon_claims() -> None:
     (
         (lambda payload: payload["player_character"].update({"goal_ids": []}), "at least one owned goal"),
         (
-            lambda payload: payload["initial_claims"][0]["qualifiers"].update({"source": "other"}),
-            "public_fact claim",
+            lambda payload: payload["player_character"]["background_claims"][0]["qualifiers"].update({"source": "other"}),
+            "qualifiers.source",
         ),
         (
             lambda payload: [
@@ -496,6 +509,8 @@ def test_world_builder_derives_npc_ids_from_names_and_remaps_references() -> Non
     npc = payload["npc_profiles"][0]
     npc["character_id"] = "npc_one"
     npc["name"] = "Lâm Như Nguyệt"
+    for claim in npc["background_claims"]:
+        claim["subject_id"] = "npc_one"
     npc["private_claim_ids"] = ["claim-alice-tea"]
     private_claim = next(item for item in payload["initial_claims"] if item["proposal_id"] == "claim-alice-tea")
     private_claim["subject_id"] = "npc_one"
@@ -551,8 +566,24 @@ def test_world_builder_derives_npc_ids_from_names_and_remaps_references() -> Non
 def test_world_builder_preserves_stable_suffixes_for_duplicate_npc_names() -> None:
     seed = _seed()
     duplicate_names = (
-        seed.npc_profiles[0].model_copy(update={"character_id": "alice_2", "name": "Alice"}),
-        seed.npc_profiles[1].model_copy(update={"character_id": "alice", "name": "Alice"}),
+        seed.npc_profiles[0].model_copy(
+            update={
+                "character_id": "alice_2",
+                "name": "Alice",
+                "background_claims": tuple(
+                    claim.model_copy(update={"subject_id": "alice_2"}) for claim in seed.npc_profiles[0].background_claims
+                ),
+            }
+        ),
+        seed.npc_profiles[1].model_copy(
+            update={
+                "character_id": "alice",
+                "name": "Alice",
+                "background_claims": tuple(
+                    claim.model_copy(update={"subject_id": "alice"}) for claim in seed.npc_profiles[1].background_claims
+                ),
+            }
+        ),
     )
     service = WorldDraftApplicationService(_factory(_State()))
     seed = seed.model_copy(

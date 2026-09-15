@@ -50,16 +50,12 @@ def normalize_npc_character_ids(seed: WorldSeed) -> WorldSeed:
 def assign_canonical_uuids(seed: WorldSeed) -> WorldSeed:
     """Assign UUIDs to seed entities that become global persistence records."""
 
-    draft_claims = seed.initial_claims
+    draft_claims = seed.all_claims()
     seed = remap_character_ids(
         seed,
         {character.character_id: str(uuid4()) for character in (seed.player_character, *seed.npc_profiles)},
     )
-    claim_ids = {claim.proposal_id: str(uuid4()) for claim in seed.initial_claims}
-    claim_fingerprints = {
-        claim_fingerprint(draft): claim_fingerprint(canonical)
-        for draft, canonical in zip(draft_claims, seed.initial_claims, strict=True)
-    }
+    claim_ids = {claim.proposal_id: str(uuid4()) for claim in seed.all_claims()}
 
     def remap_claim(value: str) -> str:
         return claim_ids.get(value, value)
@@ -72,22 +68,21 @@ def assign_canonical_uuids(seed: WorldSeed) -> WorldSeed:
             return reference
         return reference.model_copy(update={"fingerprint": claim_fingerprints.get(fingerprint, fingerprint)})
 
-    opening_scene = seed.opening_scene.model_copy(
-        update={
-            "allowed_claims": tuple(remap_reference(item) for item in seed.opening_scene.allowed_claims),
-            "forbidden_claims": tuple(remap_reference(item) for item in seed.opening_scene.forbidden_claims),
-        }
-    )
-
-    def remap_private_claims(character: CharacterSeed) -> CharacterSeed:
+    def remap_character_claim_ids(character: CharacterSeed) -> CharacterSeed:
         return character.model_copy(
-            update={"private_claim_ids": tuple(remap_claim(item) for item in character.private_claim_ids)}
+            update={
+                "background_claims": tuple(
+                    claim.model_copy(update={"proposal_id": remap_claim(claim.proposal_id)})
+                    for claim in character.background_claims
+                ),
+                "private_claim_ids": tuple(remap_claim(item) for item in character.private_claim_ids),
+            }
         )
 
-    return seed.model_copy(
+    seed = seed.model_copy(
         update={
-            "player_character": remap_private_claims(seed.player_character),
-            "npc_profiles": tuple(remap_private_claims(item) for item in seed.npc_profiles),
+            "player_character": remap_character_claim_ids(seed.player_character),
+            "npc_profiles": tuple(remap_character_claim_ids(item) for item in seed.npc_profiles),
             "initial_claims": tuple(
                 claim.model_copy(update={"proposal_id": remap_claim(claim.proposal_id)}) for claim in seed.initial_claims
             ),
@@ -97,9 +92,19 @@ def assign_canonical_uuids(seed: WorldSeed) -> WorldSeed:
             ),
             "tensions": tuple(tension.model_copy(update={"tension_id": str(uuid4())}) for tension in seed.tensions),
             "threads": tuple(thread.model_copy(update={"thread_id": str(uuid4())}) for thread in seed.threads),
-            "opening_scene": opening_scene,
         }
     )
+    claim_fingerprints = {
+        claim_fingerprint(draft): claim_fingerprint(canonical)
+        for draft, canonical in zip(draft_claims, seed.all_claims(), strict=True)
+    }
+    opening_scene = seed.opening_scene.model_copy(
+        update={
+            "allowed_claims": tuple(remap_reference(item) for item in seed.opening_scene.allowed_claims),
+            "forbidden_claims": tuple(remap_reference(item) for item in seed.opening_scene.forbidden_claims),
+        }
+    )
+    return seed.model_copy(update={"opening_scene": opening_scene})
 
 
 def remap_character_ids(seed: WorldSeed, remapped_ids: dict[str, str]) -> WorldSeed:
@@ -117,24 +122,29 @@ def remap_character_ids(seed: WorldSeed, remapped_ids: dict[str, str]) -> WorldS
             "pov": remap(seed.opening_scene.pov),
         }
     )
+
+    def remap_claim(claim: KnowledgeClaimProposal) -> KnowledgeClaimProposal:
+        return claim.model_copy(
+            update={
+                "subject_id": remap(claim.subject_id),
+                "object_id": remap(claim.object_id) if claim.object_id in known_character_ids else claim.object_id,
+                "branch_scope": remap(claim.branch_scope) if claim.branch_scope in known_character_ids else claim.branch_scope,
+            }
+        )
+
+    def remap_character(character: CharacterSeed) -> CharacterSeed:
+        return character.model_copy(
+            update={
+                "character_id": remap(character.character_id),
+                "background_claims": tuple(remap_claim(claim) for claim in character.background_claims),
+            }
+        )
+
     return seed.model_copy(
         update={
-            "player_character": seed.player_character.model_copy(
-                update={"character_id": remap(seed.player_character.character_id)}
-            ),
-            "npc_profiles": tuple(npc.model_copy(update={"character_id": remap(npc.character_id)}) for npc in seed.npc_profiles),
-            "initial_claims": tuple(
-                claim.model_copy(
-                    update={
-                        "subject_id": remap(claim.subject_id),
-                        "object_id": remap(claim.object_id) if claim.object_id in known_character_ids else claim.object_id,
-                        "branch_scope": (
-                            remap(claim.branch_scope) if claim.branch_scope in known_character_ids else claim.branch_scope
-                        ),
-                    }
-                )
-                for claim in seed.initial_claims
-            ),
+            "player_character": remap_character(seed.player_character),
+            "npc_profiles": tuple(remap_character(npc) for npc in seed.npc_profiles),
+            "initial_claims": tuple(remap_claim(claim) for claim in seed.initial_claims),
             "initial_relationships": tuple(
                 relationship.model_copy(
                     update={"source_id": remap(relationship.source_id), "target_id": remap(relationship.target_id)}
