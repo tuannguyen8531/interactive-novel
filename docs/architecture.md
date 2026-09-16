@@ -207,13 +207,15 @@ Guard. Quality/Fast is an execution policy, not two domain semantics.
 
 ```text
 runtime/
-├── game.db          # canonical product data
-├── checkpoints.db   # LangGraph execution checkpoint
+├── db/
+│   ├── game.db          # canonical product data
+│   └── checkpoints.db   # LangGraph execution checkpoint
 ├── logs/
 │   ├── telemetry.jsonl  # opt-in, secret-free profiling
 │   └── feedback.jsonl   # explicit alpha feedback
-└── exports/
-settings.json       # non-secret UI/provider choices
+├── exports/
+├── presets/          # named provider settings
+└── settings.json     # active non-secret UI/provider choices
 ```
 
 SQLite uses WAL, foreign keys, a busy timeout, and one active turn per branch.

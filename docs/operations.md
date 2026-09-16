@@ -13,8 +13,8 @@ uv run serve
 ```
 
 `doctor` only creates the runtime directories and checks readiness; it does not
-call a provider. Canonical data lives in `runtime/game.db`, while LangGraph
-checkpoints are kept separately in `runtime/checkpoints.db`. After `uv run
+call a provider. Canonical data lives in `runtime/db/game.db`, while LangGraph
+checkpoints are kept separately in `runtime/db/checkpoints.db`. After `uv run
 build`, the backend serves the built SPA at `http://127.0.0.1:8000`; `/api`,
 `/docs`, and `/openapi.json` remain separate backend routes.
 
@@ -60,7 +60,7 @@ Restore to an explicitly selected path:
 ```bash
 uv run backup restore \
   --input runtime/exports/game.db.backup \
-  --database runtime/game.db
+  --database runtime/db/game.db
 ```
 
 The restore command checks the source integrity, writes to a temporary file,
@@ -147,3 +147,15 @@ uv run test -- --ignore=tests/api
 Do not repeatedly retry the same sandbox-only hang or download new packages
 without permission. Do not treat the hang as an application failure unless it
 also reproduces outside the sandbox.
+
+### Named settings presets
+
+In Settings, use **Save Current as Preset** to name and save the current form
+without changing the running configuration. Select a saved name and **Apply**
+to switch all model targets, role routes and fallbacks, generation mode, cloud
+access, and story language immediately. Applying replaces unsaved form edits;
+save those as another preset first if needed. Duplicate names are rejected.
+Each preset persists as its own file under `runtime/presets/`; for example,
+`Local 1` becomes `runtime/presets/local-1.json`. Include this directory with
+`runtime/settings.json` when backing up configuration. Credentials remain in
+environment variables; presets contain only their variable names.

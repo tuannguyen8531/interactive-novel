@@ -143,3 +143,54 @@ async def test_ollama_account_endpoint_returns_safe_status(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"signed_in": True, "username": "fixture-user", "detail": None}
+
+
+@pytest.mark.asyncio
+async def test_named_presets_persist_and_apply_without_changing_settings_on_save(tmp_path) -> None:
+    from unittest.mock import AsyncMock
+
+    from src.application.services.provider_settings import ProviderSettingsApplicationService
+    from src.services.provider_settings import JsonProviderPresetStore, JsonProviderSettingsStore
+
+    gateway = AsyncMock()
+    store = JsonProviderSettingsStore(tmp_path / "settings.json")
+    presets = JsonProviderPresetStore(tmp_path / "presets")
+    service = ProviderSettingsApplicationService(store, presets_store=presets, gateway=gateway)
+    app = create_app(
+        Settings(app_name="preset-test"),
+        services=SimpleNamespace(provider_settings=service),  # type: ignore[arg-type]
+    )
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        original = _payload()
+        await client.put("/api/providers/settings", json=original)
+        assert (await client.post("/api/providers/presets", json={"name": "Local", "settings": original})).status_code == 200
+        cloud = _payload()
+        cloud["targets"]["cloud"] = {
+            "name": "cloud",
+            "provider": "gemini",
+            "model": "test-model",
+            "api_key_env": "GEMINI_API_KEY",
+        }
+        cloud["role_routes"]["writer"] = {"primary_target": "cloud", "fallback_targets": ["local"]}
+        cloud.update(mode="fast", allow_cloud=True, story_language="vi")
+        response = await client.post("/api/providers/presets", json={"name": " Gemini ", "settings": cloud})
+        assert response.json() == ["Gemini", "Local"]
+        assert gateway.reconfigure.await_count == 1
+        assert (await client.get("/api/providers/settings")).json()["allow_cloud"] is False
+        assert (await client.post("/api/providers/presets", json={"name": "Gemini", "settings": original})).status_code == 409
+        assert (await client.post("/api/providers/presets", json={"name": "   ", "settings": original})).status_code == 422
+        cloud["targets"]["cloud"]["api_key"] = "secret"
+        assert (await client.post("/api/providers/presets", json={"name": "Secret", "settings": cloud})).status_code == 422
+        applied = await client.post("/api/providers/presets/apply", json={"name": "Gemini"})
+        assert applied.status_code == 200
+        assert applied.json()["role_routes"]["writer"] == cloud["role_routes"]["writer"]
+        assert applied.json()["story_language"] == "vi"
+        assert applied.json()["allow_cloud"] is True
+        assert (await store.get()) == applied.json()
+        restored = await client.post("/api/providers/presets/apply", json={"name": "Local"})
+        assert restored.json()["allow_cloud"] is False
+        assert "cloud" not in restored.json()["targets"]
+        assert (await client.post("/api/providers/presets/apply", json={"name": "Missing"})).status_code == 404
+    restarted = ProviderSettingsApplicationService(store, presets_store=presets)
+    assert await restarted.list_presets() == ["Gemini", "Local"]
+    assert (await restarted.apply_preset("Gemini")).as_dict()["mode"] == "fast"

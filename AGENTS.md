@@ -8,8 +8,8 @@ mirror the backend layers under `tests/` while frontend tests live under
 `web/src/tests/`.
 
 Canonical world, playthrough, branch, turn, event, and memory data belongs in
-`runtime/game.db`. LangGraph execution checkpoints belong in the separate
-`runtime/checkpoints.db`. Settings, exports, logs, telemetry, and feedback are
+`runtime/db/game.db`. LangGraph execution checkpoints belong in the separate
+`runtime/db/checkpoints.db`. Settings, exports, logs, telemetry, and feedback are
 also runtime data and must not be committed.
 
 ## Implementation conventions

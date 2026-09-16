@@ -9,6 +9,13 @@ import VnSelect from '@/components/vn/VnSelect.vue'
 import VnConfirmModal from '@/components/vn/VnConfirmModal.vue'
 
 const settings = useSettingsStore()
+const presetNames = ref<string[]>([])
+const selectedPreset = ref('')
+const presetName = ref('')
+const presetBusy = ref(false)
+const presetError = ref<string | null>(null)
+const presetMessage = ref<string | null>(null)
+const presetDisabled = computed(() => presetBusy.value || settings.loading || settings.testing || saving.value)
 const saved = ref(false)
 const saving = ref(false)
 const newProvider = ref<ProviderTarget['provider']>('ollama')
@@ -94,10 +101,52 @@ const ollamaAccountText = computed(() => {
 onMounted(async () => {
   await Promise.all([
     settings.load(),
+    loadPresets(),
     refreshOllamaAccount(),
     refreshData()
   ])
 })
+
+async function loadPresets(): Promise<void> {
+  try {
+    presetNames.value = await api.listSettingsPresets()
+  } catch (cause) {
+    presetError.value = errorText(cause)
+  }
+}
+
+async function savePreset(): Promise<void> {
+  presetBusy.value = true
+  presetError.value = null
+  presetMessage.value = null
+  const name = presetName.value.trim()
+  try {
+    presetNames.value = await settings.savePreset(name)
+    selectedPreset.value = name
+    presetName.value = ''
+    presetMessage.value = `Saved “${name}”. Your running settings have not changed.`
+  } catch (cause) {
+    presetError.value = errorText(cause)
+  } finally {
+    presetBusy.value = false
+  }
+}
+
+async function applyPreset(): Promise<void> {
+  presetBusy.value = true
+  presetError.value = null
+  presetMessage.value = null
+  try {
+    await settings.applyPreset(selectedPreset.value)
+    saved.value = false
+    presetMessage.value = `Applied “${selectedPreset.value}”.`
+    await refreshOllamaAccount()
+  } catch (cause) {
+    presetError.value = errorText(cause)
+  } finally {
+    presetBusy.value = false
+  }
+}
 
 async function refreshData(): Promise<void> {
   dataBusy.value = true
@@ -284,7 +333,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
         <button
           type="button"
           class="secondary test-btn"
-          :disabled="settings.testing || settings.loading || saving"
+          :disabled="presetDisabled"
           @click="testConnection"
         >
           <span v-if="settings.testing" class="spin-dot" />
@@ -295,7 +344,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
           type="button"
           class="save-btn"
           :class="{ 'is-saved': saved }"
-          :disabled="settings.loading || saving || !settings.providerSettings"
+          :disabled="presetDisabled || !settings.providerSettings"
           @click="save"
         >
           <span v-if="saving" class="spin-dot" />
@@ -326,6 +375,22 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
     </div>
 
     <div v-else-if="settings.providerSettings" class="settings-content-flow">
+      <section class="card settings-card">
+        <div>
+          <h3>Settings Presets</h3>
+          <p class="muted small-copy">Save the current form: models, role routes, fallbacks, generation mode, cloud access, and story language. Apply replaces current edits and switches the running configuration immediately.</p>
+        </div>
+        <div class="preset-controls">
+          <VnSelect v-model="selectedPreset" :options="presetNames" placeholder="Choose a preset" aria-label="Settings preset" :disabled="presetDisabled" />
+          <button type="button" :disabled="presetDisabled || !selectedPreset" @click="applyPreset">Apply</button>
+        </div>
+        <form class="preset-controls" @submit.prevent="savePreset">
+          <input v-model="presetName" aria-label="New preset name" placeholder="Preset name, e.g. Gemini" maxlength="80" required :disabled="presetDisabled" />
+          <button type="submit" class="secondary" :disabled="presetDisabled || !presetName.trim()">Save Current as Preset</button>
+        </form>
+        <p v-if="presetError" class="error-box" role="alert">{{ presetError }}</p>
+        <p v-if="presetMessage" class="notice-box" role="status">{{ presetMessage }}</p>
+      </section>
       <!-- SECTION 1: Narrative & Privacy Policy -->
       <section class="card settings-card policy-section">
         <div class="card-header-row">
@@ -772,6 +837,17 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
 </template>
 
 <style scoped>
+.preset-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.preset-controls > :first-child {
+  flex: 1;
+  min-width: 12rem;
+}
+
 .providers-page {
   display: flex;
   flex-direction: column;

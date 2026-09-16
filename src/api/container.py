@@ -31,7 +31,7 @@ from src.services.llm.factory import ProviderRouter
 from src.services.persistence.database import Database, create_database
 from src.services.persistence.migrations import upgrade_database
 from src.services.persistence.uow import make_uow_factory
-from src.services.provider_settings import JsonProviderSettingsStore
+from src.services.provider_settings import JsonProviderPresetStore, JsonProviderSettingsStore
 from src.services.telemetry import TelemetryRecorder, build_telemetry_recorder
 
 
@@ -138,6 +138,7 @@ def build_application_container(settings: Settings) -> ApplicationContainer:
         ),
         provider_settings=ProviderSettingsApplicationService(
             JsonProviderSettingsStore(paths.settings),
+            presets_store=JsonProviderPresetStore(paths.presets),
             gateway=provider,
         ),
         derived_jobs=derived_jobs,

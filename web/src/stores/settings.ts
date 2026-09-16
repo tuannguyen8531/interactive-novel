@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { api } from '@/api/client'
 import { defineStore } from 'pinia'
 import { useProviderStore } from './provider'
 import type { StoryLanguage } from '@/api/types'
@@ -24,11 +25,27 @@ export const useSettingsStore = defineStore('settings', () => {
     await provider.save(mode.value, allowCloud.value, storyLanguage.value)
   }
 
+  async function savePreset(name: string): Promise<string[]> {
+    return api.saveSettingsPreset(name, provider.draftPayload(mode.value, allowCloud.value, storyLanguage.value))
+  }
+
+  async function applyPreset(name: string): Promise<void> {
+    const applied = await api.applySettingsPreset(name)
+    provider.settings = applied
+    provider.connectivity = []
+    provider.error = null
+    mode.value = applied.mode
+    allowCloud.value = applied.allow_cloud
+    storyLanguage.value = applied.story_language ?? 'en'
+  }
+
   async function testProvider(): Promise<void> {
     await provider.test()
   }
 
   return {
+    savePreset,
+    applyPreset,
     mode,
     allowCloud,
     storyLanguage,

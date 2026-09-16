@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from asyncio import Lock
 from collections.abc import Mapping
 from typing import Any
 
@@ -13,8 +14,8 @@ from src.application.contracts.providers import (
     ProviderRoutingConfig,
     ProviderTarget,
 )
-from src.application.errors import ApplicationValidationError
-from src.application.ports.providers import ProviderGateway, ProviderSettingsStore
+from src.application.errors import ApplicationValidationError, ResourceConflictError, ResourceNotFoundError
+from src.application.ports.providers import ProviderGateway, ProviderPresetStore, ProviderSettingsStore
 from src.domain.language import StoryLanguage
 
 
@@ -31,6 +32,23 @@ class InMemoryProviderSettingsStore:
         self._snapshot = dict(snapshot)
 
 
+class InMemoryProviderPresetStore:
+    def __init__(self) -> None:
+        self._presets: dict[str, dict[str, object]] = {}
+
+    async def list_names(self) -> list[str]:
+        return sorted(self._presets)
+
+    async def get(self, name: str) -> dict[str, object] | None:
+        snapshot = self._presets.get(name)
+        return None if snapshot is None else dict(snapshot)
+
+    async def put(self, name: str, snapshot: dict[str, object]) -> None:
+        if name in self._presets:
+            raise FileExistsError(name)
+        self._presets[name] = dict(snapshot)
+
+
 class ProviderSettingsApplicationService:
     """Validate and expose routing metadata without returning credentials."""
 
@@ -39,9 +57,12 @@ class ProviderSettingsApplicationService:
         store: ProviderSettingsStore | None = None,
         *,
         gateway: ProviderGateway | None = None,
+        presets_store: ProviderPresetStore | None = None,
     ) -> None:
         self._store = store or InMemoryProviderSettingsStore()
         self._gateway = gateway
+        self._presets_store = presets_store or InMemoryProviderPresetStore()
+        self._presets_lock = Lock()
 
     async def get_provider_settings(self) -> dict[str, object] | None:
         return await self._store.get()
@@ -61,6 +82,35 @@ class ProviderSettingsApplicationService:
             await self._gateway.reconfigure(config)
         await self._store.put(snapshot.as_dict())
         return snapshot
+
+    async def list_presets(self) -> list[str]:
+        return await self._presets_store.list_names()
+
+    async def save_preset(self, name: str, config: ProviderRoutingConfig) -> list[str]:
+        name = name.strip()
+        if not name or len(name) > 80:
+            raise ApplicationValidationError("Preset name must contain 1–80 characters.")
+        async with self._presets_lock:
+            if name in await self._presets_store.list_names():
+                raise ResourceConflictError("A preset with this name already exists. Choose another name.")
+            try:
+                await self._presets_store.put(name, config.snapshot().as_dict())
+            except FileExistsError as error:
+                raise ResourceConflictError("Another preset produces the same file name. Choose another name.") from error
+            except ValueError as error:
+                raise ApplicationValidationError(str(error)) from error
+            return await self._presets_store.list_names()
+
+    async def apply_preset(self, name: str) -> ProviderConfigSnapshot:
+        try:
+            snapshot = await self._presets_store.get(name)
+        except ValueError as error:
+            raise ApplicationValidationError(str(error)) from error
+        if snapshot is None:
+            raise ResourceNotFoundError("Settings preset not found.")
+        if not isinstance(snapshot, dict):
+            raise ApplicationValidationError("Stored preset is malformed.")
+        return await self.update_provider_settings(_config_from_snapshot(snapshot))
 
     async def test_provider_connection(self) -> tuple[ConnectivityResult, ...]:
         if self._gateway is None:
@@ -108,4 +158,4 @@ def _config_from_snapshot(snapshot: Mapping[str, Any]) -> ProviderRoutingConfig:
         raise ApplicationValidationError("Stored provider settings are invalid.") from error
 
 
-__all__ = ["InMemoryProviderSettingsStore", "ProviderSettingsApplicationService"]
+__all__ = ["InMemoryProviderPresetStore", "InMemoryProviderSettingsStore", "ProviderSettingsApplicationService"]

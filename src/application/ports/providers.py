@@ -89,4 +89,14 @@ class ProviderSettingsStore(Protocol):
     async def put(self, snapshot: dict[str, object]) -> None: ...
 
 
-__all__ = ["ProviderGateway", "ProviderPort", "ProviderSettingsStore"]
+class ProviderPresetStore(Protocol):
+    """Secret-free storage for named provider routing snapshots."""
+
+    async def list_names(self) -> list[str]: ...
+
+    async def get(self, name: str) -> dict[str, object] | None: ...
+
+    async def put(self, name: str, snapshot: dict[str, object]) -> None: ...
+
+
+__all__ = ["ProviderGateway", "ProviderPort", "ProviderPresetStore", "ProviderSettingsStore"]

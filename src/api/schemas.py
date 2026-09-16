@@ -159,6 +159,10 @@ class ProviderRouteRequest(BaseModel):
     fallback_targets: list[str] = Field(default_factory=list, max_length=8)
 
 
+class ProviderPresetNameRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
 class ProviderSettingsRequest(BaseModel):
     targets: dict[str, ProviderTargetRequest]
     role_routes: dict[str, ProviderRouteRequest]
@@ -195,6 +199,10 @@ class ProviderSettingsRequest(BaseModel):
             if len(set(route.fallback_targets)) != len(route.fallback_targets):
                 raise ValueError(f"Provider route {role} contains duplicate fallbacks.")
         return self
+
+
+class ProviderPresetRequest(ProviderPresetNameRequest):
+    settings: ProviderSettingsRequest
 
 
 class ProviderModelsRequest(BaseModel):

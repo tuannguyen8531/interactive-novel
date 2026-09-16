@@ -2,10 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { api } from '@/api/client'
 import type { ProviderSettings } from '@/api/types'
+import { useSettingsStore } from '@/stores/settings'
 import { useProviderStore } from '@/stores/provider'
 
 vi.mock('@/api/client', () => ({
   api: {
+    saveSettingsPreset: vi.fn(),
+    applySettingsPreset: vi.fn(),
     getProviderSettings: vi.fn(),
     updateProviderSettings: vi.fn(),
     testProviderConnection: vi.fn(),
@@ -41,6 +44,28 @@ describe('provider store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+  })
+
+  it('saves form presets without applying and updates every setting only after apply succeeds', async () => {
+    vi.mocked(api.getProviderSettings).mockResolvedValue(fixture())
+    vi.mocked(api.saveSettingsPreset).mockResolvedValue(['Gemini'])
+    const store = useSettingsStore()
+    await store.load()
+    store.mode = 'fast'
+    store.allowCloud = true
+    store.storyLanguage = 'vi'
+    await store.savePreset('Gemini')
+    expect(api.updateProviderSettings).not.toHaveBeenCalled()
+    expect(api.saveSettingsPreset).toHaveBeenCalledWith('Gemini', expect.objectContaining({ mode: 'fast', allow_cloud: true, story_language: 'vi' }))
+    vi.mocked(api.applySettingsPreset).mockRejectedValueOnce(new Error('Unavailable'))
+    await expect(store.applyPreset('Local')).rejects.toThrow('Unavailable')
+    expect(store.mode).toBe('fast')
+    vi.mocked(api.applySettingsPreset).mockResolvedValue(fixture())
+    await store.applyPreset('Local')
+    expect(store.mode).toBe('quality')
+    expect(store.allowCloud).toBe(false)
+    expect(store.storyLanguage).toBe('en')
+    expect(store.providerSettings).toEqual(fixture())
   })
 
   it('edits targets and role routing while keeping secrets environment-only', async () => {

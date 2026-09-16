@@ -26,12 +26,16 @@ class RuntimePaths:
     @property
     def game_db(self) -> Path:
         """Canonical product database path."""
-        return self.root / "game.db"
+        return self.db / "game.db"
 
     @property
     def checkpoints_db(self) -> Path:
         """LangGraph checkpoint database path, separate from game data."""
-        return self.root / "checkpoints.db"
+        return self.db / "checkpoints.db"
+
+    @property
+    def db(self) -> Path:
+        return self.root / "db"
 
     @property
     def logs(self) -> Path:
@@ -46,6 +50,10 @@ class RuntimePaths:
         return self.root / "settings.json"
 
     @property
+    def presets(self) -> Path:
+        return self.root / "presets"
+
+    @property
     def telemetry(self) -> Path:
         return self.logs / "telemetry.jsonl"
 
@@ -55,9 +63,22 @@ class RuntimePaths:
 
     def ensure_directories(self) -> RuntimePaths:
         """Create only the runtime directories owned by this application."""
-        for directory in (self.root, self.logs, self.exports):
+        for directory in (self.root, self.db, self.logs, self.exports):
             directory.mkdir(parents=True, exist_ok=True)
+        for name in ("game.db", "checkpoints.db"):
+            self._move_legacy_database(name)
         return self
+
+    def _move_legacy_database(self, name: str) -> None:
+        legacy = self.root / name
+        destination = self.db / name
+        if not legacy.is_file() or destination.exists():
+            return
+        legacy.replace(destination)
+        for suffix in ("-wal", "-shm"):
+            sidecar = legacy.with_name(f"{name}{suffix}")
+            if sidecar.is_file():
+                sidecar.replace(destination.with_name(f"{name}{suffix}"))
 
 
 def get_runtime_paths(runtime_dir: Path | str | None = None) -> RuntimePaths:

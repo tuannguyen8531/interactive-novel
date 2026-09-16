@@ -63,8 +63,8 @@ Open <http://127.0.0.1:8000>. The health endpoint is
 local run, or configure a provider before creating a server-backed playthrough.
 
 `uv run doctor` creates the runtime directories and checks readiness without
-calling a provider. The canonical database is `runtime/game.db`; LangGraph
-execution checkpoints are kept separately in `runtime/checkpoints.db`.
+calling a provider. The canonical database is `runtime/db/game.db`; LangGraph
+execution checkpoints are kept separately in `runtime/db/checkpoints.db`.
 
 ## Use the web GUI
 

@@ -42,34 +42,39 @@ export const useProviderStore = defineStore('provider', () => {
     }
   }
 
-  async function save(mode: 'quality' | 'fast', allowCloud: boolean, storyLanguage?: StoryLanguage): Promise<void> {
-    if (!settings.value) return
+  function draftPayload(mode: 'quality' | 'fast', allowCloud: boolean, storyLanguage?: StoryLanguage): Record<string, unknown> {
+    if (!settings.value) throw new Error('Settings have not loaded.')
     ensureRoutes()
     normalizeRoutes()
+    return {
+      targets: Object.fromEntries(
+        Object.entries(settings.value.targets).map(([name, target]) => [
+          name,
+          {
+            name: target.name,
+            provider: target.provider,
+            model: target.model.trim(),
+            base_url: target.base_url?.trim() || null,
+            api_key_env: target.api_key_env?.trim() || null,
+            timeout_seconds: target.timeout_seconds,
+            max_retries: target.max_retries,
+            backoff_base_seconds: target.backoff_base_seconds
+          }
+        ])
+      ),
+      role_routes: settings.value.role_routes,
+      mode,
+      allow_cloud: allowCloud,
+      story_language: storyLanguage ?? settings.value.story_language ?? 'en'
+    }
+  }
+
+  async function save(mode: 'quality' | 'fast', allowCloud: boolean, storyLanguage?: StoryLanguage): Promise<void> {
+    if (!settings.value) return
     loading.value = true
     error.value = null
     try {
-      settings.value = await api.updateProviderSettings({
-        targets: Object.fromEntries(
-          Object.entries(settings.value.targets).map(([name, target]) => [
-            name,
-            {
-              name: target.name,
-              provider: target.provider,
-              model: target.model.trim(),
-              base_url: target.base_url?.trim() || null,
-              api_key_env: target.api_key_env?.trim() || null,
-              timeout_seconds: target.timeout_seconds,
-              max_retries: target.max_retries,
-              backoff_base_seconds: target.backoff_base_seconds
-            }
-          ])
-        ),
-        role_routes: settings.value.role_routes,
-        mode,
-        allow_cloud: allowCloud,
-        story_language: storyLanguage ?? settings.value.story_language ?? 'en'
-      })
+      settings.value = await api.updateProviderSettings(draftPayload(mode, allowCloud, storyLanguage))
     } catch (cause) {
       error.value = errorText(cause)
       throw cause
@@ -200,6 +205,7 @@ export const useProviderStore = defineStore('provider', () => {
 
   return {
     settings,
+    draftPayload,
     connectivity,
     loading,
     testing,

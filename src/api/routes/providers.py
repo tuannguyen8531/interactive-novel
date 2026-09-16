@@ -11,6 +11,8 @@ from src.api.schemas import (
     OllamaAccountResponse,
     ProviderModelsRequest,
     ProviderModelsResponse,
+    ProviderPresetNameRequest,
+    ProviderPresetRequest,
     ProviderSettingsRequest,
 )
 from src.api.serialization import public_json
@@ -31,7 +33,27 @@ async def update_provider_settings(
     payload: ProviderSettingsRequest,
     services: ApplicationContainer = _services_dependency,
 ):
-    config = ProviderRoutingConfig(
+    snapshot = await services.provider_settings.update_provider_settings(_routing_config(payload))
+    return public_json(snapshot)
+
+
+@router.get("/presets")
+async def list_presets(services: ApplicationContainer = _services_dependency):
+    return await services.provider_settings.list_presets()
+
+
+@router.post("/presets")
+async def save_preset(payload: ProviderPresetRequest, services: ApplicationContainer = _services_dependency):
+    return await services.provider_settings.save_preset(payload.name, _routing_config(payload.settings))
+
+
+@router.post("/presets/apply")
+async def apply_preset(payload: ProviderPresetNameRequest, services: ApplicationContainer = _services_dependency):
+    return public_json(await services.provider_settings.apply_preset(payload.name))
+
+
+def _routing_config(payload: ProviderSettingsRequest) -> ProviderRoutingConfig:
+    return ProviderRoutingConfig(
         targets={name: ProviderTarget(**target.model_dump()) for name, target in payload.targets.items()},
         role_routes={
             role: ProviderRoute(
@@ -44,8 +66,6 @@ async def update_provider_settings(
         allow_cloud=payload.allow_cloud,
         story_language=payload.story_language,
     )
-    snapshot = await services.provider_settings.update_provider_settings(config)
-    return public_json(snapshot)
 
 
 @router.post("/test")

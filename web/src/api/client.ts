@@ -239,6 +239,11 @@ export const api = {
     request<TurnJobView>(`/api/jobs/${encodeURIComponent(jobId)}/retry`, { method: 'POST' }),
   jobEventsUrl: (jobId: string): string =>
     `${BASE_URL}/api/jobs/${encodeURIComponent(jobId)}/events`,
+  listSettingsPresets: (): Promise<string[]> => request<string[]>('/api/providers/presets'),
+  saveSettingsPreset: (name: string, settings: Record<string, unknown>): Promise<string[]> =>
+    request<string[]>('/api/providers/presets', jsonBody({ name, settings })),
+  applySettingsPreset: (name: string): Promise<ProviderSettings> =>
+    request<ProviderSettings>('/api/providers/presets/apply', jsonBody({ name })),
   getProviderSettings: (): Promise<ProviderSettings | null> => request<ProviderSettings | null>('/api/providers/settings'),
   updateProviderSettings: (payload: Record<string, unknown>): Promise<ProviderSettings> =>
     request<ProviderSettings>('/api/providers/settings', jsonPut(payload)),

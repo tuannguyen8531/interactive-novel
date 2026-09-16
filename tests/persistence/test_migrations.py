@@ -70,7 +70,21 @@ def test_runtime_paths_are_project_anchored_and_test_overridable(tmp_path) -> No
     paths.ensure_directories()
 
     assert paths.root == (tmp_path / "runtime").resolve()
-    assert paths.game_db == paths.root / "game.db"
-    assert paths.checkpoints_db == paths.root / "checkpoints.db"
+    assert paths.game_db == paths.root / "db" / "game.db"
+    assert paths.checkpoints_db == paths.root / "db" / "checkpoints.db"
+    assert paths.db.is_dir()
     assert paths.logs.is_dir()
     assert paths.exports.is_dir()
+
+
+def test_runtime_paths_move_legacy_databases_and_sidecars(tmp_path) -> None:
+    root = tmp_path / "runtime"
+    root.mkdir()
+    for name in ("game.db", "game.db-wal", "game.db-shm", "checkpoints.db"):
+        (root / name).write_bytes(name.encode())
+
+    paths = RuntimePaths(root).ensure_directories()
+
+    assert not list(root.glob("*.db*"))
+    for name in ("game.db", "game.db-wal", "game.db-shm", "checkpoints.db"):
+        assert (paths.db / name).read_bytes() == name.encode()
