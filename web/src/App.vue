@@ -360,8 +360,15 @@ input, textarea, select {
   border-radius: var(--radius-md);
   color: #fff;
   padding: 0.65rem 0.9rem;
-  transition: all 180ms ease;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 4.5rem;
 }
 
 input:focus, textarea:focus, select:focus {

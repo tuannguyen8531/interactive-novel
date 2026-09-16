@@ -139,7 +139,7 @@ function getInitials(name: string): string {
             </label>
             <label class="input-group wide-field">
               <span class="field-label">Premise</span>
-              <textarea v-model="builder.draft.premise" rows="4" maxlength="20000" />
+              <textarea v-model="builder.draft.premise" class="review-premise-input" rows="8" maxlength="20000" />
             </label>
             <label class="input-group">
               <span class="field-label">Tone</span>
@@ -233,7 +233,8 @@ function getInitials(name: string): string {
                   <span class="field-label">Background</span>
                   <textarea
                     v-model="character.background"
-                    rows="4"
+                    class="character-background-input"
+                    rows="6"
                     maxlength="6000"
                     placeholder="Backstory, vulnerabilities, motivations, relationships, and unresolved hooks…"
                   />
@@ -399,6 +400,16 @@ function getInitials(name: string): string {
   grid-column: 1 / -1;
 }
 
+.review-premise-input {
+  min-height: 10rem;
+  line-height: 1.6;
+}
+
+.character-background-input {
+  min-height: 7.5rem;
+  line-height: 1.6;
+}
+
 .submit-btn {
   position: relative;
   padding: 0.85rem 1.5rem;
@@ -424,9 +435,10 @@ function getInitials(name: string): string {
 }
 
 .submit-btn.generating {
-  border-color: rgba(99, 102, 241, 0.25);
+  border-color: rgba(0, 240, 255, 0.25);
   pointer-events: none;
-  background: transparent;
+  background: rgba(13, 16, 26, 0.85);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.35), 0 0 32px rgba(255, 0, 127, 0.25);
 }
 
 .submit-btn.generating::before {
@@ -437,21 +449,18 @@ function getInitials(name: string): string {
   padding: 2.5px;
   background: conic-gradient(
     from var(--border-angle, 0deg),
-    transparent 0%,
-    #6366f1 18%,
-    #f472b6 36%,
-    #ffffff 48%,
-    transparent 52%,
-    #6366f1 68%,
-    #f472b6 86%,
-    #ffffff 98%,
-    transparent 100%
+    #00f0ff 0%,
+    #7000ff 20%,
+    #ff007f 40%,
+    #ffbe0b 60%,
+    #00ff87 80%,
+    #00f0ff 100%
   );
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
-  animation: spin-border 1.6s linear infinite;
+  animation: spin-border 3.6s linear infinite;
   z-index: 1;
 }
 

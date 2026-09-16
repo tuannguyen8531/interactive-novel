@@ -155,97 +155,33 @@ async function refineSelectedSuggestions(): Promise<void> {
           </div>
         </div>
 
-        <label class="input-group">
-          <span class="field-label">World Premise &amp; Story Hook</span>
+        <div class="input-group premise-input-group">
+          <div class="premise-header">
+            <label for="world-premise-input" class="field-label">World Premise &amp; Story Hook</label>
+            <button
+              class="secondary develop-idea-btn"
+              type="button"
+              :disabled="builder.loading || !builder.prompt.trim()"
+              title="Suggests wording without changing your selected presets."
+              @click="assist"
+            >
+              <span v-if="builder.assisting" class="spin-icon">⏳</span>
+              <span v-else>✨</span>
+              <span>{{ builder.assisting ? 'Developing idea…' : 'Develop idea' }}</span>
+            </button>
+          </div>
           <textarea
+            id="world-premise-input"
             v-model="builder.prompt"
-            rows="6"
+            class="builder-prompt-input"
+            rows="10"
             maxlength="20000"
             placeholder="Describe the setting, heroine archetype, relationship tensions, or the inciting event that begins the story…"
             @input="builder.dismissSuggestion"
           />
-        </label>
-
-        <div class="brief-assist-actions">
-          <button
-            class="secondary"
-            type="button"
-            :disabled="builder.loading || !builder.prompt.trim()"
-            @click="assist"
-          >
-            <span v-if="builder.assisting" class="spin-icon">⏳</span>
-            <span v-else>✨</span>
-            <span>{{ builder.assisting ? 'Developing idea…' : 'Develop idea' }}</span>
-          </button>
-          <span class="muted small-copy">Suggests wording without changing your selected presets.</span>
         </div>
 
-        <section
-          v-if="builder.briefSuggestion"
-          class="brief-assistant-panel"
-          aria-live="polite"
-          aria-labelledby="brief-assistant-title"
-        >
-          <div class="brief-assistant-heading">
-            <div>
-              <p class="eyebrow">Creative Brief</p>
-              <h3 id="brief-assistant-title">A clearer version of your idea</h3>
-            </div>
-            <button class="secondary" type="button" :disabled="builder.loading" @click="builder.dismissSuggestion">
-              Dismiss
-            </button>
-          </div>
-          <div class="brief-refined-prompt" role="note">
-            {{ builder.briefSuggestion.refined_prompt }}
-          </div>
-          <div v-if="builder.briefSuggestion.assumptions.length" class="brief-assistant-block">
-            <span class="field-label">Assumptions</span>
-            <ul class="brief-list">
-              <li v-for="assumption in builder.briefSuggestion.assumptions" :key="assumption">{{ assumption }}</li>
-            </ul>
-          </div>
-          <div v-if="builder.briefSuggestion.questions.length" class="brief-assistant-block">
-            <span class="field-label">Clarify the direction</span>
-            <div v-for="question in builder.briefSuggestion.questions" :key="question.id" class="brief-question">
-              <p>{{ question.question }}</p>
-              <div class="brief-suggestion-chips">
-                <button
-                  v-for="answer in question.suggestions"
-                  :key="answer"
-                  class="chip-button"
-                  :class="{ selected: builder.selectedAnswers[question.id] === answer }"
-                  type="button"
-                  :disabled="builder.loading"
-                  @click="builder.selectAnswer(question.id, answer)"
-                >
-                  {{ answer }}
-                </button>
-              </div>
-              <input
-                :value="builder.selectedAnswers[question.id] ?? ''"
-                class="brief-answer-input"
-                type="text"
-                maxlength="256"
-                placeholder="Or write your own answer"
-                :disabled="builder.loading"
-                @input="updateAnswer(question.id, $event)"
-              />
-            </div>
-          </div>
-          <div class="brief-assistant-footer">
-            <button
-              class="secondary"
-              type="button"
-              :disabled="builder.loading || !builder.hasSelectedAnswers"
-              @click="refineSelectedSuggestions"
-            >
-              Update with selected answers
-            </button>
-            <button class="submit-btn" type="button" :disabled="builder.loading" @click="builder.applySuggestion">
-              Apply to description
-            </button>
-          </div>
-        </section>
+
 
         <div class="preset-grid">
           <div class="preset-row">
@@ -333,6 +269,130 @@ async function refineSelectedSuggestions(): Promise<void> {
         </div>
       </aside>
     </section>
+
+    <!-- Creative Brief Modal Dialog -->
+    <Teleport to="body">
+      <Transition name="brief-modal">
+        <div
+          v-if="builder.briefSuggestion"
+          class="brief-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="brief-modal-title"
+          @click.self="builder.dismissSuggestion"
+        >
+          <div class="brief-modal-card">
+            <!-- Modal Header -->
+            <div class="brief-modal-header">
+              <div class="brief-modal-title-wrap">
+                <span class="brief-modal-icon">✨</span>
+                <div>
+                  <p class="eyebrow">Creative Brief</p>
+                  <h3 id="brief-modal-title">Develop Your World Idea</h3>
+                </div>
+              </div>
+              <button
+                class="brief-modal-close"
+                type="button"
+                :disabled="builder.loading"
+                aria-label="Close dialog"
+                @click="builder.dismissSuggestion"
+              >
+                ✕
+              </button>
+            </div>
+
+            <!-- Modal Scrollable Body -->
+            <div class="brief-modal-body">
+              <div v-if="builder.prompt.trim()" class="brief-modal-section">
+                <span class="field-label">Original Premise</span>
+                <p class="brief-original-prompt">{{ builder.prompt }}</p>
+              </div>
+
+              <div class="brief-modal-section">
+                <span class="field-label">Refined Story Premise</span>
+                <div class="brief-refined-prompt" role="note">
+                  {{ builder.briefSuggestion.refined_prompt }}
+                </div>
+              </div>
+
+              <div v-if="builder.briefSuggestion.assumptions.length" class="brief-modal-section">
+                <span class="field-label">Assumptions &amp; Setting</span>
+                <ul class="brief-list">
+                  <li v-for="assumption in builder.briefSuggestion.assumptions" :key="assumption">
+                    {{ assumption }}
+                  </li>
+                </ul>
+              </div>
+
+              <div v-if="builder.briefSuggestion.questions.length" class="brief-modal-section">
+                <span class="field-label">Clarify the Narrative Direction</span>
+                <div
+                  v-for="question in builder.briefSuggestion.questions"
+                  :key="question.id"
+                  class="brief-question"
+                >
+                  <p>{{ question.question }}</p>
+                  <div class="brief-suggestion-chips">
+                    <button
+                      v-for="answer in question.suggestions"
+                      :key="answer"
+                      class="chip-button"
+                      :class="{ selected: builder.selectedAnswers[question.id] === answer }"
+                      type="button"
+                      :disabled="builder.loading"
+                      @click="builder.selectAnswer(question.id, answer)"
+                    >
+                      {{ answer }}
+                    </button>
+                  </div>
+                  <input
+                    :value="builder.selectedAnswers[question.id] ?? ''"
+                    class="brief-answer-input"
+                    type="text"
+                    maxlength="256"
+                    placeholder="Or write your own answer…"
+                    :disabled="builder.loading"
+                    @input="updateAnswer(question.id, $event)"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="brief-modal-footer">
+              <button
+                class="secondary"
+                type="button"
+                :disabled="builder.loading"
+                @click="builder.dismissSuggestion"
+              >
+                Dismiss
+              </button>
+              <button
+                v-if="builder.briefSuggestion.questions.length"
+                class="secondary"
+                type="button"
+                :disabled="builder.loading || !builder.hasSelectedAnswers"
+                @click="refineSelectedSuggestions"
+              >
+                <span v-if="builder.assisting" class="spin-icon">⏳</span>
+                <span v-else>🔄</span>
+                <span>{{ builder.assisting ? 'Updating…' : 'Update with answers' }}</span>
+              </button>
+              <button
+                class="primary apply-brief-btn"
+                type="button"
+                :disabled="builder.loading"
+                @click="builder.applySuggestion"
+              >
+                <span>✨ Apply to Description</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -393,10 +453,46 @@ async function refineSelectedSuggestions(): Promise<void> {
   gap: 0.4rem;
 }
 
+.premise-input-group {
+  position: relative;
+}
+
+.premise-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.premise-header .field-label {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.develop-idea-btn {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 0.45rem 1rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .field-label {
   font-size: 0.8rem;
   font-weight: 600;
   color: #cbd5e1;
+}
+
+.builder-prompt-input {
+  min-height: 12rem;
+  line-height: 1.6;
 }
 
 .preset-grid {
@@ -422,12 +518,19 @@ async function refineSelectedSuggestions(): Promise<void> {
 .template-notice,
 .policy-notice {
   display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 0.85rem;
   padding: 0.85rem 1rem;
   border-radius: var(--radius-md);
   font-size: 0.85rem;
   line-height: 1.45;
+}
+
+.template-notice-icon,
+.policy-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .template-notice {
@@ -449,51 +552,149 @@ async function refineSelectedSuggestions(): Promise<void> {
   opacity: 0.85;
 }
 
-.brief-assist-actions {
+
+
+/* Creative Brief Modal Dialog */
+.brief-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(5, 7, 13, 0.82);
+  backdrop-filter: blur(12px);
 }
 
-.brief-assistant-panel {
+.brief-modal-card {
+  position: relative;
+  width: min(100%, 46rem);
+  max-height: min(90vh, 52rem);
+  background: linear-gradient(145deg, rgba(20, 24, 38, 0.98), rgba(13, 16, 26, 0.96));
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 35px rgba(99, 102, 241, 0.18);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
-  border: 1px solid rgba(129, 140, 248, 0.35);
-  border-radius: var(--radius-md);
-  background: rgba(99, 102, 241, 0.08);
+  overflow: hidden;
 }
 
-.brief-assistant-heading,
-.brief-assistant-footer {
+.brief-modal-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.brief-modal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.brief-modal-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-md);
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.brief-modal-title-wrap h3 {
+  margin: 0.2rem 0 0;
+  font-size: 1.15rem;
+  color: #fff;
+}
+
+.brief-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  transition: all 160ms ease;
+}
+
+.brief-modal-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.brief-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.brief-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.brief-original-prompt {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.9rem;
+  line-height: 1.5;
+}
+
+.brief-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 0.75rem;
+  padding: 1.1rem 1.5rem;
+  border-top: 1px solid var(--border-subtle);
+  background: rgba(10, 13, 22, 0.65);
   flex-wrap: wrap;
 }
 
-.brief-assistant-heading {
-  justify-content: space-between;
+.apply-brief-btn {
+  padding: 0.55rem 1.35rem;
+  font-size: 0.9rem;
 }
 
-.brief-assistant-heading > div {
-  min-width: 0;
+/* Brief Modal Transitions */
+.brief-modal-enter-active,
+.brief-modal-leave-active {
+  transition: opacity 200ms ease;
 }
 
-.brief-assistant-footer {
-  justify-content: flex-end;
+.brief-modal-enter-from,
+.brief-modal-leave-to {
+  opacity: 0;
 }
 
-.brief-assistant-footer .submit-btn {
-  width: auto;
+.brief-modal-enter-active .brief-modal-card {
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 220ms ease;
 }
 
-.brief-assistant-heading h3 {
-  margin: 0.25rem 0 0;
-  color: #fff;
-  font-size: 1.05rem;
+.brief-modal-leave-active .brief-modal-card {
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.brief-modal-enter-from .brief-modal-card,
+.brief-modal-leave-to .brief-modal-card {
+  transform: scale(0.95) translateY(10px);
+  opacity: 0;
 }
 
 .brief-refined-prompt {
@@ -588,9 +789,10 @@ async function refineSelectedSuggestions(): Promise<void> {
 }
 
 .submit-btn.generating {
-  border-color: rgba(99, 102, 241, 0.25);
+  border-color: rgba(0, 240, 255, 0.25);
   pointer-events: none;
-  background: transparent;
+  background: rgba(13, 16, 26, 0.85);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.35), 0 0 32px rgba(255, 0, 127, 0.25);
 }
 
 .submit-btn.generating::before {
@@ -601,21 +803,18 @@ async function refineSelectedSuggestions(): Promise<void> {
   padding: 2.5px;
   background: conic-gradient(
     from var(--border-angle, 0deg),
-    transparent 0%,
-    #6366f1 18%,
-    #f472b6 36%,
-    #ffffff 48%,
-    transparent 52%,
-    #6366f1 68%,
-    #f472b6 86%,
-    #ffffff 98%,
-    transparent 100%
+    #00f0ff 0%,
+    #7000ff 20%,
+    #ff007f 40%,
+    #ffbe0b 60%,
+    #00ff87 80%,
+    #00f0ff 100%
   );
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
-  animation: spin-border 1.6s linear infinite;
+  animation: spin-border 3.6s linear infinite;
   z-index: 1;
 }
 
@@ -659,6 +858,18 @@ async function refineSelectedSuggestions(): Promise<void> {
   .preset-row,
   .preset-row.three-fields {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 540px) {
+  .premise-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .develop-idea-btn {
+    position: static;
+    align-self: flex-end;
   }
 }
 </style>

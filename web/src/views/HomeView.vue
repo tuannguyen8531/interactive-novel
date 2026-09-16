@@ -216,7 +216,7 @@ function getTemplateIcon(id: string): string {
             </button>
           </div>
 
-          <p v-if="world.premise" class="world-premise">{{ world.premise }}</p>
+          <p class="world-premise" :title="world.premise || ''">{{ world.premise }}</p>
 
           <div class="playthroughs-list">
             <div
@@ -552,7 +552,7 @@ function getTemplateIcon(id: string): string {
 /* Saved Worlds Grid */
 .saved-worlds-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
 }
 
@@ -565,6 +565,7 @@ function getTemplateIcon(id: string): string {
   border-radius: var(--radius-lg);
   padding: 1.35rem;
   backdrop-filter: blur(16px);
+  height: 100%;
 }
 
 .world-card-top {
@@ -572,6 +573,7 @@ function getTemplateIcon(id: string): string {
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.5rem;
+  min-height: 3.2rem;
 }
 
 .world-meta {
@@ -587,6 +589,13 @@ function getTemplateIcon(id: string): string {
   font-size: 1.15rem;
   font-weight: 700;
   color: #fff;
+  display: -webkit-box;
+  line-clamp: 1;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 .world-premise {
@@ -594,9 +603,17 @@ function getTemplateIcon(id: string): string {
   font-size: 0.82rem;
   color: var(--muted);
   line-height: 1.45;
+  display: -webkit-box;
+  line-clamp: 5;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 6rem;
 }
 
 .playthroughs-list {
+  margin-top: auto;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -671,5 +688,11 @@ function getTemplateIcon(id: string): string {
   color: #ffffff;
   box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
   transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .saved-worlds-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
