@@ -39,6 +39,10 @@ export const useSettingsStore = defineStore('settings', () => {
     storyLanguage.value = applied.story_language ?? 'en'
   }
 
+  async function deletePreset(name: string): Promise<string[]> {
+    return api.deleteSettingsPreset(name)
+  }
+
   async function testProvider(): Promise<void> {
     await provider.test()
   }
@@ -46,6 +50,7 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     savePreset,
     applyPreset,
+    deletePreset,
     mode,
     allowCloud,
     storyLanguage,

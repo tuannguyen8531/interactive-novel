@@ -499,9 +499,19 @@ async function refineSelectedSuggestions(): Promise<void> {
 }
 
 .preset-row {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+}
+
+.preset-row:first-child {
+  z-index: 10;
+}
+
+.preset-row:has(.is-open),
+.preset-row:focus-within {
+  z-index: 25;
 }
 
 .preset-row.three-fields {

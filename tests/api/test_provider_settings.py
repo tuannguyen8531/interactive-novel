@@ -164,6 +164,7 @@ async def test_named_presets_persist_and_apply_without_changing_settings_on_save
         original = _payload()
         await client.put("/api/providers/settings", json=original)
         assert (await client.post("/api/providers/presets", json={"name": "Local", "settings": original})).status_code == 200
+        assert (await client.get("/api/providers/presets/active")).json() == "Local"
         cloud = _payload()
         cloud["targets"]["cloud"] = {
             "name": "cloud",
@@ -175,9 +176,9 @@ async def test_named_presets_persist_and_apply_without_changing_settings_on_save
         cloud.update(mode="fast", allow_cloud=True, story_language="vi")
         response = await client.post("/api/providers/presets", json={"name": " Gemini ", "settings": cloud})
         assert response.json() == ["Gemini", "Local"]
+        assert (await client.post("/api/providers/presets", json={"name": "Gemini", "settings": cloud})).status_code == 200
         assert gateway.reconfigure.await_count == 1
         assert (await client.get("/api/providers/settings")).json()["allow_cloud"] is False
-        assert (await client.post("/api/providers/presets", json={"name": "Gemini", "settings": original})).status_code == 409
         assert (await client.post("/api/providers/presets", json={"name": "   ", "settings": original})).status_code == 422
         cloud["targets"]["cloud"]["api_key"] = "secret"
         assert (await client.post("/api/providers/presets", json={"name": "Secret", "settings": cloud})).status_code == 422
@@ -187,6 +188,13 @@ async def test_named_presets_persist_and_apply_without_changing_settings_on_save
         assert applied.json()["story_language"] == "vi"
         assert applied.json()["allow_cloud"] is True
         assert (await store.get()) == applied.json()
+        assert (await client.get("/api/providers/presets/active")).json() == "Gemini"
+        assert (await client.request("DELETE", "/api/providers/presets", json={"name": "Gemini"})).json() == ["Local"]
+        assert (await client.get("/api/providers/presets/active")).json() is None
+        assert (await client.get("/api/providers/settings")).json()["allow_cloud"] is True
+        assert (await client.request("DELETE", "/api/providers/presets", json={"name": "Missing"})).status_code == 404
+        cloud["targets"]["cloud"].pop("api_key")
+        await client.post("/api/providers/presets", json={"name": "Gemini", "settings": cloud})
         restored = await client.post("/api/providers/presets/apply", json={"name": "Local"})
         assert restored.json()["allow_cloud"] is False
         assert "cloud" not in restored.json()["targets"]

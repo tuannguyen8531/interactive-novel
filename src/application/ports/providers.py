@@ -98,5 +98,7 @@ class ProviderPresetStore(Protocol):
 
     async def put(self, name: str, snapshot: dict[str, object]) -> None: ...
 
+    async def delete(self, name: str) -> bool: ...
+
 
 __all__ = ["ProviderGateway", "ProviderPort", "ProviderPresetStore", "ProviderSettingsStore"]

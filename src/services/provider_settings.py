@@ -61,7 +61,9 @@ class JsonProviderPresetStore:
         self._directory.mkdir(parents=True, exist_ok=True)
         path = self._path(name)
         if path.exists():
-            raise FileExistsError(path)
+            stored_name, _ = self._read(path)
+            if stored_name != name:
+                raise FileExistsError(path)
         temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
         try:
             temporary.write_text(
@@ -71,6 +73,16 @@ class JsonProviderPresetStore:
             os.replace(temporary, path)
         finally:
             temporary.unlink(missing_ok=True)
+
+    async def delete(self, name: str) -> bool:
+        path = self._path(name)
+        if not path.is_file():
+            return False
+        stored_name, _ = self._read(path)
+        if stored_name != name:
+            return False
+        path.unlink()
+        return True
 
     def _path(self, name: str) -> Path:
         normalized = unicodedata.normalize("NFKD", name)

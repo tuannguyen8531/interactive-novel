@@ -44,9 +44,10 @@ class InMemoryProviderPresetStore:
         return None if snapshot is None else dict(snapshot)
 
     async def put(self, name: str, snapshot: dict[str, object]) -> None:
-        if name in self._presets:
-            raise FileExistsError(name)
         self._presets[name] = dict(snapshot)
+
+    async def delete(self, name: str) -> bool:
+        return self._presets.pop(name, None) is not None
 
 
 class ProviderSettingsApplicationService:
@@ -86,19 +87,32 @@ class ProviderSettingsApplicationService:
     async def list_presets(self) -> list[str]:
         return await self._presets_store.list_names()
 
+    async def active_preset(self) -> str | None:
+        active = await self._store.get()
+        if active is None:
+            return None
+        for name in await self._presets_store.list_names():
+            if await self._presets_store.get(name) == active:
+                return name
+        return None
+
     async def save_preset(self, name: str, config: ProviderRoutingConfig) -> list[str]:
         name = name.strip()
         if not name or len(name) > 80:
             raise ApplicationValidationError("Preset name must contain 1–80 characters.")
         async with self._presets_lock:
-            if name in await self._presets_store.list_names():
-                raise ResourceConflictError("A preset with this name already exists. Choose another name.")
             try:
                 await self._presets_store.put(name, config.snapshot().as_dict())
             except FileExistsError as error:
                 raise ResourceConflictError("Another preset produces the same file name. Choose another name.") from error
             except ValueError as error:
                 raise ApplicationValidationError(str(error)) from error
+            return await self._presets_store.list_names()
+
+    async def delete_preset(self, name: str) -> list[str]:
+        async with self._presets_lock:
+            if not await self._presets_store.delete(name):
+                raise ResourceNotFoundError("Settings preset not found.")
             return await self._presets_store.list_names()
 
     async def apply_preset(self, name: str) -> ProviderConfigSnapshot:

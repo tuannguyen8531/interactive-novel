@@ -1,20 +1,48 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { useSettingsStore } from '@/stores/settings'
 import type { BackupRecord, ProviderTarget } from '@/api/types'
 import ProviderModelField from '@/components/ProviderModelField.vue'
+import EditableCombobox from '@/components/EditableCombobox.vue'
 import VnBadge from '@/components/vn/VnBadge.vue'
 import VnSelect from '@/components/vn/VnSelect.vue'
 import VnConfirmModal from '@/components/vn/VnConfirmModal.vue'
 
 const settings = useSettingsStore()
 const presetNames = ref<string[]>([])
-const selectedPreset = ref('')
-const presetName = ref('')
+const presetName = ref('Custom')
+const presetOptions = computed(() =>
+  presetNames.value.map((name) => ({ value: name, label: name }))
+)
+let trackPresetChanges = false
+const presetToDelete = ref<string | null>(null)
 const presetBusy = ref(false)
 const presetError = ref<string | null>(null)
 const presetMessage = ref<string | null>(null)
+let presetMessageTimer: ReturnType<typeof setTimeout> | null = null
+
+function showPresetMessage(message: string, durationMs = 3500): void {
+  clearPresetMessage()
+  presetMessage.value = message
+  presetMessageTimer = setTimeout(() => {
+    presetMessage.value = null
+    presetMessageTimer = null
+  }, durationMs)
+}
+
+function clearPresetMessage(): void {
+  if (presetMessageTimer) {
+    clearTimeout(presetMessageTimer)
+    presetMessageTimer = null
+  }
+  presetMessage.value = null
+}
+
+onBeforeUnmount(() => {
+  clearPresetMessage()
+})
+
 const presetDisabled = computed(() => presetBusy.value || settings.loading || settings.testing || saving.value)
 const saved = ref(false)
 const saving = ref(false)
@@ -98,33 +126,67 @@ const ollamaAccountText = computed(() => {
   return 'Unavailable'
 })
 
+watch(
+  () => [settings.mode, settings.allowCloud, settings.storyLanguage, settings.providerSettings],
+  () => {
+    if (trackPresetChanges) presetName.value = 'Custom'
+  },
+  { deep: true }
+)
+
 onMounted(async () => {
-  await Promise.all([
-    settings.load(),
-    loadPresets(),
-    refreshOllamaAccount(),
-    refreshData()
-  ])
+  await settings.load()
+  await loadPresets()
+  trackPresetChanges = true
+  await Promise.all([refreshOllamaAccount(), refreshData()])
 })
 
 async function loadPresets(): Promise<void> {
   try {
-    presetNames.value = await api.listSettingsPresets()
+    const [names, active] = await Promise.all([
+      api.listSettingsPresets(),
+      api.getActiveSettingsPreset()
+    ])
+    presetNames.value = names
+    presetName.value = active ?? 'Custom'
   } catch (cause) {
     presetError.value = errorText(cause)
+  }
+}
+
+async function refreshPresetName(): Promise<void> {
+  presetName.value = await api.getActiveSettingsPreset() ?? 'Custom'
+}
+
+async function applyNamedPreset(name: string): Promise<void> {
+  trackPresetChanges = false
+  try {
+    await settings.applyPreset(name)
+    await nextTick()
+    presetName.value = name
+  } finally {
+    trackPresetChanges = true
   }
 }
 
 async function savePreset(): Promise<void> {
   presetBusy.value = true
   presetError.value = null
-  presetMessage.value = null
+  clearPresetMessage()
   const name = presetName.value.trim()
+  const updating = presetNames.value.includes(name)
   try {
     presetNames.value = await settings.savePreset(name)
-    selectedPreset.value = name
     presetName.value = ''
-    presetMessage.value = `Saved “${name}”. Your running settings have not changed.`
+    if (updating) {
+      await applyNamedPreset(name)
+      saved.value = false
+      await refreshOllamaAccount()
+      showPresetMessage(`Updated and applied “${name}”.`)
+    } else {
+      await refreshPresetName()
+      showPresetMessage(`Saved “${name}”. Your running settings have not changed.`)
+    }
   } catch (cause) {
     presetError.value = errorText(cause)
   } finally {
@@ -133,14 +195,33 @@ async function savePreset(): Promise<void> {
 }
 
 async function applyPreset(): Promise<void> {
+  const name = presetName.value
   presetBusy.value = true
   presetError.value = null
-  presetMessage.value = null
+  clearPresetMessage()
   try {
-    await settings.applyPreset(selectedPreset.value)
+    await applyNamedPreset(name)
     saved.value = false
-    presetMessage.value = `Applied “${selectedPreset.value}”.`
+    showPresetMessage(`Applied “${name}”.`)
     await refreshOllamaAccount()
+  } catch (cause) {
+    presetError.value = errorText(cause)
+  } finally {
+    presetBusy.value = false
+  }
+}
+
+async function confirmDeletePreset(): Promise<void> {
+  if (!presetToDelete.value) return
+  presetBusy.value = true
+  presetError.value = null
+  clearPresetMessage()
+  const name = presetToDelete.value
+  try {
+    presetNames.value = await settings.deletePreset(name)
+    presetToDelete.value = null
+    await refreshPresetName()
+    showPresetMessage(`Deleted “${name}”. Your running settings have not changed.`)
   } catch (cause) {
     presetError.value = errorText(cause)
   } finally {
@@ -223,8 +304,11 @@ function errorText(cause: unknown): string {
 async function save(): Promise<void> {
   saved.value = false
   saving.value = true
+  trackPresetChanges = false
   try {
     await settings.save()
+    await nextTick()
+    await refreshPresetName()
     saved.value = true
     setTimeout(() => {
       saved.value = false
@@ -232,18 +316,24 @@ async function save(): Promise<void> {
   } catch {
     saved.value = false
   } finally {
+    trackPresetChanges = true
     saving.value = false
   }
 }
 
 async function testConnection(): Promise<void> {
+  trackPresetChanges = false
   try {
     // Silently save any pending draft edits so the backend tests the current form inputs
     await settings.save()
     if (settings.error) return
+    await refreshPresetName()
     await settings.testProvider()
   } catch {
     // The store exposes the API error below the form.
+  } finally {
+    await nextTick()
+    trackPresetChanges = true
   }
 }
 
@@ -376,20 +466,42 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
 
     <div v-else-if="settings.providerSettings" class="settings-content-flow">
       <section class="card settings-card">
-        <div>
-          <h3>Settings Presets</h3>
-          <p class="muted small-copy">Save the current form: models, role routes, fallbacks, generation mode, cloud access, and story language. Apply replaces current edits and switches the running configuration immediately.</p>
+        <div class="preset-title-row">
+          <div>
+            <h3>Settings Presets</h3>
+            <p class="muted small-copy">Choose an existing preset or type a new name. Any settings change marks the form as Custom.</p>
+          </div>
+          <button
+            type="button"
+            class="secondary"
+            :disabled="presetDisabled || !presetName.trim() || presetName === 'Custom'"
+            @click="savePreset"
+          >
+            {{ presetNames.includes(presetName.trim()) ? 'Update Preset' : 'Save Current as Preset' }}
+          </button>
         </div>
         <div class="preset-controls">
-          <VnSelect v-model="selectedPreset" :options="presetNames" placeholder="Choose a preset" aria-label="Settings preset" :disabled="presetDisabled" />
-          <button type="button" :disabled="presetDisabled || !selectedPreset" @click="applyPreset">Apply</button>
+          <EditableCombobox
+            v-model="presetName"
+            label="Settings preset name"
+            placeholder="Custom"
+            :options="presetOptions"
+            :disabled="presetDisabled"
+            empty-text="No matching presets — type a name to save as a new preset."
+          />
+          <button type="button" :disabled="presetDisabled || !presetNames.includes(presetName)" @click="applyPreset">Apply</button>
+          <button type="button" class="danger" :disabled="presetDisabled || !presetNames.includes(presetName)" @click="presetToDelete = presetName">Delete</button>
         </div>
-        <form class="preset-controls" @submit.prevent="savePreset">
-          <input v-model="presetName" aria-label="New preset name" placeholder="Preset name, e.g. Gemini" maxlength="80" required :disabled="presetDisabled" />
-          <button type="submit" class="secondary" :disabled="presetDisabled || !presetName.trim()">Save Current as Preset</button>
-        </form>
-        <p v-if="presetError" class="error-box" role="alert">{{ presetError }}</p>
-        <p v-if="presetMessage" class="notice-box" role="status">{{ presetMessage }}</p>
+        <div v-if="presetError" class="error-box preset-feedback-box" role="alert">
+          <span>⚠️ {{ presetError }}</span>
+          <button type="button" class="notice-close" aria-label="Dismiss error" @click="presetError = null">✕</button>
+        </div>
+        <Transition name="notice-fade">
+          <div v-if="presetMessage" class="notice-box preset-feedback-box" role="status" aria-live="polite">
+            <span>✓ {{ presetMessage }}</span>
+            <button type="button" class="notice-close" aria-label="Dismiss notice" @click="clearPresetMessage">✕</button>
+          </div>
+        </Transition>
       </section>
       <!-- SECTION 1: Narrative & Privacy Policy -->
       <section class="card settings-card policy-section">
@@ -823,6 +935,18 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
 
     <!-- Confirm Restore Database Backup Modal -->
     <VnConfirmModal
+      :open="Boolean(presetToDelete)"
+      title="Delete Settings Preset?"
+      :message="presetToDelete ? `Delete “${presetToDelete}”? The running settings will remain unchanged.` : ''"
+      confirm-text="Delete Preset"
+      cancel-text="Cancel"
+      variant="danger"
+      :busy="presetBusy"
+      @confirm="confirmDeletePreset"
+      @cancel="presetToDelete = null"
+    />
+
+    <VnConfirmModal
       :open="Boolean(backupToRestore)"
       title="Restore Database Backup?"
       :message="backupToRestore ? `Are you sure you want to restore snapshot “${backupToRestore.name}”? All current database content and active progress will be replaced.` : ''"
@@ -838,14 +962,56 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
 
 <style scoped>
 .preset-controls {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  align-items: center;
+}
+
+.preset-controls:has(.is-open),
+.preset-controls:focus-within {
+  z-index: 40;
 }
 
 .preset-controls > :first-child {
   flex: 1;
-  min-width: 12rem;
+  min-width: 14rem;
+}
+
+.preset-feedback-box {
+  margin: 0 !important;
+  margin-top: -0.35rem !important;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.notice-fade-enter-active,
+.notice-fade-leave-active {
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.notice-fade-enter-from,
+.notice-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.preset-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.preset-title-row h3 {
+  margin-top: 0;
+}
+
+.preset-title-row > button {
+  white-space: nowrap;
 }
 
 .providers-page {
@@ -941,6 +1107,7 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
 }
 
 .settings-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -949,6 +1116,20 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   backdrop-filter: blur(16px);
+}
+
+/* Earlier cards stack over later cards so dropdown menus never get obscured by lower cards */
+.settings-card:nth-child(1) { z-index: 20; }
+.settings-card:nth-child(2) { z-index: 15; }
+.settings-card:nth-child(3) { z-index: 10; }
+.settings-card:nth-child(4) { z-index: 5; }
+.settings-card:nth-child(5) { z-index: 1; }
+
+.settings-card:has(.is-open),
+.settings-card:has(.editable-combobox.is-open),
+.settings-card:has(.vn-select.is-open),
+.settings-card:focus-within {
+  z-index: 50;
 }
 
 .card-header-row {

@@ -6,12 +6,21 @@ export interface ComboboxOption {
   label: string
 }
 
-const props = defineProps<{
-  modelValue: string
-  options: ComboboxOption[]
-  label: string
-  placeholder?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: string
+    options: ComboboxOption[]
+    label: string
+    placeholder?: string
+    disabled?: boolean
+    emptyText?: string
+  }>(),
+  {
+    placeholder: undefined,
+    disabled: false,
+    emptyText: 'No matching presets — keep typing to use a custom value.',
+  }
+)
 
 const emit = defineEmits<{
   (event: 'update:modelValue', value: string): void
@@ -34,12 +43,14 @@ const filteredOptions = computed(() => {
 })
 
 function showOptions(filter = ''): void {
+  if (props.disabled) return
   query.value = filter
   highlightedIndex.value = -1
   open.value = true
 }
 
 function toggleOptions(): void {
+  if (props.disabled) return
   if (open.value) {
     open.value = false
     return
@@ -55,6 +66,7 @@ function updateValue(event: Event): void {
 }
 
 function handleFocus(): void {
+  if (props.disabled) return
   if (suppressNextFocusOpen.value) {
     suppressNextFocusOpen.value = false
     return
@@ -89,6 +101,7 @@ function moveHighlight(offset: number): void {
 }
 
 function handleKeydown(event: KeyboardEvent): void {
+  if (props.disabled) return
   if (event.key === 'ArrowDown') {
     event.preventDefault()
     moveHighlight(1)
@@ -115,13 +128,21 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeWhenOutsi
 </script>
 
 <template>
-  <div ref="root" class="editable-combobox">
+  <div
+    ref="root"
+    class="editable-combobox"
+    :class="{
+      'is-open': open,
+      'is-disabled': disabled,
+    }"
+  >
     <input
       ref="input"
       type="text"
       autocomplete="off"
       :value="modelValue"
       :placeholder="placeholder"
+      :disabled="disabled"
       role="combobox"
       aria-autocomplete="list"
       :aria-label="label"
@@ -134,11 +155,12 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeWhenOutsi
     <button
       class="combobox-toggle"
       type="button"
+      :disabled="disabled"
       :aria-label="`Show ${label.toLocaleLowerCase()} options`"
       :aria-expanded="open"
       @click="toggleOptions"
     >
-      ▾
+      <span class="toggle-arrow" :class="{ 'is-flipped': open }">▾</span>
     </button>
     <ul v-if="open" :id="listboxId" class="combobox-options" role="listbox">
       <li v-for="(option, index) in filteredOptions" :key="option.value" role="presentation">
@@ -153,7 +175,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeWhenOutsi
           <span v-if="option.value === modelValue" class="selected-check">✓</span>
         </button>
       </li>
-      <li v-if="!filteredOptions.length" class="empty-options">No matching presets — keep typing to use a custom tone.</li>
+      <li v-if="!filteredOptions.length" class="empty-options">{{ emptyText }}</li>
     </ul>
   </div>
 </template>
@@ -163,6 +185,10 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeWhenOutsi
   position: relative;
   width: 100%;
   min-width: 0;
+}
+
+.editable-combobox.is-open {
+  z-index: 80;
 }
 
 input {
@@ -184,6 +210,11 @@ input:focus {
   border-color: var(--brand);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
   background: rgba(18, 22, 34, 0.95);
+}
+
+input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 input::placeholder {
@@ -209,14 +240,30 @@ input::placeholder {
   align-items: center;
   justify-content: center;
   transition: all 160ms ease;
+  user-select: none;
 }
 
-.combobox-toggle:hover {
+.combobox-toggle:hover:not(:disabled) {
   transform: none;
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
   box-shadow: none;
   filter: none;
+}
+
+.combobox-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.toggle-arrow {
+  display: inline-block;
+  transition: transform 160ms ease;
+}
+
+.toggle-arrow.is-flipped {
+  transform: rotate(180deg);
 }
 
 .combobox-toggle:active {
@@ -225,7 +272,7 @@ input::placeholder {
 
 .combobox-options {
   position: absolute;
-  z-index: 50;
+  z-index: 100;
   top: calc(100% + 0.4rem);
   right: 0;
   left: 0;

@@ -154,8 +154,11 @@ In Settings, use **Save Current as Preset** to name and save the current form
 without changing the running configuration. Select a saved name and **Apply**
 to switch all model targets, role routes and fallbacks, generation mode, cloud
 access, and story language immediately. Applying replaces unsaved form edits;
-save those as another preset first if needed. Duplicate names are rejected.
+save those as another preset first if needed.
 Each preset persists as its own file under `runtime/presets/`; for example,
 `Local 1` becomes `runtime/presets/local-1.json`. Include this directory with
 `runtime/settings.json` when backing up configuration. Credentials remain in
-environment variables; presets contain only their variable names.
+environment variables; presets contain only their variable names. Saving an
+existing name updates and immediately applies that preset. Deleting a preset
+leaves the active settings unchanged; the selector then shows a custom
+configuration unless another preset matches.

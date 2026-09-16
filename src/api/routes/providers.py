@@ -42,6 +42,11 @@ async def list_presets(services: ApplicationContainer = _services_dependency):
     return await services.provider_settings.list_presets()
 
 
+@router.get("/presets/active")
+async def active_preset(services: ApplicationContainer = _services_dependency):
+    return await services.provider_settings.active_preset()
+
+
 @router.post("/presets")
 async def save_preset(payload: ProviderPresetRequest, services: ApplicationContainer = _services_dependency):
     return await services.provider_settings.save_preset(payload.name, _routing_config(payload.settings))
@@ -50,6 +55,11 @@ async def save_preset(payload: ProviderPresetRequest, services: ApplicationConta
 @router.post("/presets/apply")
 async def apply_preset(payload: ProviderPresetNameRequest, services: ApplicationContainer = _services_dependency):
     return public_json(await services.provider_settings.apply_preset(payload.name))
+
+
+@router.delete("/presets")
+async def delete_preset(payload: ProviderPresetNameRequest, services: ApplicationContainer = _services_dependency):
+    return await services.provider_settings.delete_preset(payload.name)
 
 
 def _routing_config(payload: ProviderSettingsRequest) -> ProviderRoutingConfig:

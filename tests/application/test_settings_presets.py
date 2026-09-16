@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.application.contracts.providers import ProviderRoute, ProviderRoutingConfig, ProviderTarget
+from src.application.contracts.providers import ExecutionMode, ProviderRoute, ProviderRoutingConfig, ProviderTarget
 from src.application.errors import ResourceConflictError, ResourceNotFoundError
 from src.application.services.provider_settings import ProviderSettingsApplicationService
 from src.services.provider_settings import JsonProviderPresetStore, JsonProviderSettingsStore
@@ -23,15 +23,27 @@ async def test_presets_survive_restart_and_restore_full_config(tmp_path):
     assert (tmp_path / "presets" / "local.json").is_file()
     gateway.reconfigure.assert_not_awaited()
     assert await store.get() is None
-    with pytest.raises(ResourceConflictError):
-        await service.save_preset("Local", config)
     service = ProviderSettingsApplicationService(store, gateway=gateway, presets_store=presets)
     assert await service.list_presets() == ["Local"]
     assert await service.apply_preset("Local") == config.snapshot()
     assert await store.get() == config.snapshot().as_dict()
+    assert await service.active_preset() == "Local"
     gateway.reconfigure.assert_awaited_once()
+
+    updated = ProviderRoutingConfig(
+        targets=config.targets,
+        role_routes=config.role_routes,
+        mode=ExecutionMode.FAST,
+    )
+    await service.save_preset("Local", updated)
+    assert await service.active_preset() is None
+    assert (await service.apply_preset("Local")).mode is ExecutionMode.FAST
+    assert await service.delete_preset("Local") == []
+    assert await service.active_preset() is None
     with pytest.raises(ResourceNotFoundError):
         await service.apply_preset("Missing")
+    with pytest.raises(ResourceNotFoundError):
+        await service.delete_preset("Missing")
 
 
 @pytest.mark.asyncio

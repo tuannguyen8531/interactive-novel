@@ -7,8 +7,11 @@ import { useProviderStore } from '@/stores/provider'
 
 vi.mock('@/api/client', () => ({
   api: {
+    listSettingsPresets: vi.fn(),
+    getActiveSettingsPreset: vi.fn(),
     saveSettingsPreset: vi.fn(),
     applySettingsPreset: vi.fn(),
+    deleteSettingsPreset: vi.fn(),
     getProviderSettings: vi.fn(),
     updateProviderSettings: vi.fn(),
     testProviderConnection: vi.fn(),
@@ -66,6 +69,8 @@ describe('provider store', () => {
     expect(store.allowCloud).toBe(false)
     expect(store.storyLanguage).toBe('en')
     expect(store.providerSettings).toEqual(fixture())
+    vi.mocked(api.deleteSettingsPreset).mockResolvedValue([])
+    await expect(store.deletePreset('Local')).resolves.toEqual([])
   })
 
   it('edits targets and role routing while keeping secrets environment-only', async () => {

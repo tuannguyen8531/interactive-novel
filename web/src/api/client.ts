@@ -240,10 +240,13 @@ export const api = {
   jobEventsUrl: (jobId: string): string =>
     `${BASE_URL}/api/jobs/${encodeURIComponent(jobId)}/events`,
   listSettingsPresets: (): Promise<string[]> => request<string[]>('/api/providers/presets'),
+  getActiveSettingsPreset: (): Promise<string | null> => request<string | null>('/api/providers/presets/active'),
   saveSettingsPreset: (name: string, settings: Record<string, unknown>): Promise<string[]> =>
     request<string[]>('/api/providers/presets', jsonBody({ name, settings })),
   applySettingsPreset: (name: string): Promise<ProviderSettings> =>
     request<ProviderSettings>('/api/providers/presets/apply', jsonBody({ name })),
+  deleteSettingsPreset: (name: string): Promise<string[]> =>
+    request<string[]>('/api/providers/presets', { method: 'DELETE', body: JSON.stringify({ name }) }),
   getProviderSettings: (): Promise<ProviderSettings | null> => request<ProviderSettings | null>('/api/providers/settings'),
   updateProviderSettings: (payload: Record<string, unknown>): Promise<ProviderSettings> =>
     request<ProviderSettings>('/api/providers/settings', jsonPut(payload)),
