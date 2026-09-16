@@ -416,14 +416,7 @@ async function refineSelectedSuggestions(): Promise<void> {
 }
 
 .stepper-wrapper {
-  position: sticky;
-  top: 4rem;
-  z-index: 20;
-  margin-bottom: 0.5rem;
-  padding: 0.5rem 0;
-  background: rgba(9, 10, 15, 0.85);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0.25rem 0;
 }
 
 .builder-layout {

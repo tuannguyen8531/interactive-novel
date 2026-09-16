@@ -42,10 +42,9 @@ const emit = defineEmits<{
   width: 100%;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 1rem;
-  backdrop-filter: blur(12px);
 }
 
 .step-item {

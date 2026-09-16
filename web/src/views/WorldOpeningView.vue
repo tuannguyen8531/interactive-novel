@@ -132,12 +132,7 @@ function goToEarlierStep(index = 1): void {
 }
 
 .stepper-wrapper {
-  position: sticky;
-  top: 4rem;
-  z-index: 20;
-  padding: 0.5rem 0;
-  background: rgba(9, 10, 15, 0.85);
-  backdrop-filter: blur(16px);
+  padding: 0.25rem 0;
 }
 
 .opening-layout {
