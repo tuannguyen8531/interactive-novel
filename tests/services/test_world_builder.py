@@ -114,7 +114,7 @@ async def test_provider_world_guide_uses_world_builder_route_and_structured_cont
     assert provider.request.role == AIPromptRole.WORLD_BUILDER
     assert provider.request.logical_roles == (AIPromptRole.WORLD_GUIDE,)
     assert provider.request.temperature == 0.5
-    assert provider.request.max_output_tokens == 2_000
+    assert provider.request.max_output_tokens == 5_000
     assert provider.request.metadata["output_schema_version"] == "world-brief-suggestion"
     assert '"template": "fantasy_adventure"' in provider.request.user_prompt
     assert '"tone": "quiet, bittersweet"' in provider.request.user_prompt

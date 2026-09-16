@@ -20,6 +20,7 @@ from src.application.contracts.providers import (
 )
 
 from .base import BaseProvider
+from .structured import with_inline_json_schema
 
 
 class OllamaProvider(BaseProvider):
@@ -54,7 +55,7 @@ class OllamaProvider(BaseProvider):
         model = request.model or self.model
         user_prompt = request.user_prompt
         if request.structured_schema is not None and _is_cloud_model(model):
-            user_prompt = _with_inline_json_schema(user_prompt, request.structured_schema.json_schema)
+            user_prompt = with_inline_json_schema(user_prompt, request.structured_schema.json_schema)
         payload: dict[str, Any] = {
             "model": model,
             "messages": [
@@ -216,18 +217,6 @@ def _int(value: Any) -> int | None:
 def _is_cloud_model(model: str) -> bool:
     normalized = model.strip().lower()
     return normalized.endswith(":cloud") or normalized.endswith("-cloud")
-
-
-def _with_inline_json_schema(prompt: str, schema: Mapping[str, Any]) -> str:
-    """Ground cloud models with the schema that Ollama Cloud cannot enforce."""
-
-    serialized = json.dumps(dict(schema), ensure_ascii=False, separators=(",", ":"))
-    return (
-        f"{prompt.rstrip()}\n\n"
-        "Required response JSON Schema (follow every required field and nested definition):\n"
-        f"{serialized}\n\n"
-        "Return one JSON object only. Do not add fields absent from the schema."
-    )
 
 
 __all__ = ["OllamaProvider"]

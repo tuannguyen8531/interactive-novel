@@ -45,10 +45,17 @@ shape plausible beats and stakes. Do not summarize a profile to the player or
 treat background prose as permission to override current canonical state.
 
 Classify only content actually proposed for this turn in `content_tags`. Use
-the known policy vocabulary, including `romantic_affection`, `violence`,
-`violence:torture`, and `sexual_violence`. Set `violence_detail` to `none`,
-`restrained`, or `detailed`; it describes the proposed scene and must not exceed
-the supplied content policy's `violence_ceiling`. Treat
+only these exact values: `romantic_affection`, `dating`, `kiss`,
+`non_graphic_intimacy`, `mature_emotional_theme`,
+`sexual_reference_fade_to_black`, `adult_explicit`, `sexualized_nudity`,
+`fetishization`, `grooming`, `exploitation`, `non_consensual_sexual`,
+`violence`, `violence:torture`, `sexual_violence`, `violence_non_graphic`,
+`violence_gore`, `violence_torture_detail`, `violence_sexual`,
+`psychological_harm`, `loss`, or `complex_relationship`. Use an empty array for
+an ordinary scene with none of these tags; do not invent descriptive tags such
+as `social_interaction` or `character_development`. Set `violence_detail` to
+`none`, `restrained`, or `detailed`; it describes the proposed scene and must
+not exceed the supplied content policy's `violence_ceiling`. Treat
 `content_policy.adult_explicit_permitted` as the authoritative rating-derived
 signal for whether adult explicit content may be proposed.
 

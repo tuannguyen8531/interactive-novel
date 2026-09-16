@@ -61,6 +61,16 @@ def test_schema_error_has_field_diagnostic() -> None:
     assert "planner contract validation failed" in str(error_info.value)
 
 
+def test_planner_rejects_unknown_content_tag() -> None:
+    payload = copy.deepcopy(_fixtures()["planner"])
+    payload["content_tags"] = ["social_interaction"]
+
+    with pytest.raises(AIContractValidationError) as error_info:
+        AIContractRegistry().parse(AIPromptRole.PLANNER, payload)
+
+    assert any(item.path == "content_tags.0" for item in error_info.value.diagnostics)
+
+
 def test_invalid_json_has_safe_diagnostic() -> None:
     with pytest.raises(AIContractValidationError) as error_info:
         AIContractRegistry().parse_json(AIPromptRole.WRITER, "not-json-with-secret")

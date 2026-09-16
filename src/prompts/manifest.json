@@ -17,11 +17,11 @@
   },
   "planner": {
     "template": "planner.md",
-    "semantic_version": "1.6.0",
+    "semantic_version": "1.7.0",
     "input_contract": "role-input",
     "output_schema_version": "turn-plan",
     "required_variables": ["input_json"],
-    "changelog": "Ground story time in explicit 24-hour clock context and distinguish elapsed minutes from HHMM."
+    "changelog": "Restrict content tags to the deterministic policy vocabulary."
   },
   "simulator": {
     "template": "simulator.md",

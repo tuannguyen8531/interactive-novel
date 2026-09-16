@@ -13,6 +13,7 @@ from typing import Annotated, Any, ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from src.domain.content import ContentTag
 from src.domain.language import StoryLanguage
 
 
@@ -264,7 +265,7 @@ class TurnPlan(VersionedOutput):
     possible_outcomes: tuple[OutcomeCandidate, ...] = Field(min_length=1)
     pacing_note: str = Field(min_length=1)
     safety_constraints: tuple[str, ...] = Field(default_factory=tuple)
-    content_tags: tuple[str, ...] = Field(default_factory=tuple)
+    content_tags: tuple[ContentTag, ...] = Field(default_factory=tuple)
     violence_detail: ViolenceCeilingValue = ViolenceCeilingValue.NONE
 
 

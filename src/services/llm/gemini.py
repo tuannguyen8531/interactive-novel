@@ -19,6 +19,7 @@ from src.application.contracts.providers import (
 )
 
 from .base import BaseProvider
+from .structured import with_inline_json_schema
 
 
 class GeminiProvider(BaseProvider):
@@ -54,8 +55,16 @@ class GeminiProvider(BaseProvider):
         return {"x-goog-api-key": self._api_key("GEMINI_API_KEY")}
 
     def _generate_payload(self, request: ProviderRequest) -> dict[str, Any]:
+        structured_schema = request.structured_schema
+        prompt_only_schema = structured_schema is not None and structured_schema.name in {
+            "simulator_output",
+            "world_builder_output",
+        }
+        user_prompt = request.user_prompt
+        if structured_schema is not None and prompt_only_schema and structured_schema.json_schema:
+            user_prompt = with_inline_json_schema(user_prompt, structured_schema.json_schema)
         payload: dict[str, Any] = {
-            "contents": [{"role": "user", "parts": [{"text": request.user_prompt}]}],
+            "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
             "generationConfig": {},
         }
         if request.system_prompt.strip():
@@ -65,10 +74,11 @@ class GeminiProvider(BaseProvider):
             generation_config["temperature"] = request.temperature
         if request.max_output_tokens is not None:
             generation_config["maxOutputTokens"] = request.max_output_tokens
-        if request.structured_schema is not None:
+        if structured_schema is not None:
             generation_config["responseMimeType"] = "application/json"
-            if request.structured_schema.json_schema:
-                generation_config["responseJsonSchema"] = dict(request.structured_schema.json_schema)
+            generation_config["thinkingConfig"] = {"thinkingBudget": 0}
+            if not prompt_only_schema and structured_schema.json_schema:
+                generation_config["responseJsonSchema"] = dict(structured_schema.json_schema)
         return payload
 
     def _model_url(self, model: str, action: str) -> str:

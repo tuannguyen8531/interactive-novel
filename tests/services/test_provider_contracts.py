@@ -203,8 +203,35 @@ async def test_gemini_structured_output_uses_json_schema_field() -> None:
     generation_config = captured["generationConfig"]
     assert result.data == {"item": {"name": "fixture"}}
     assert generation_config["responseMimeType"] == "application/json"
+    assert generation_config["thinkingConfig"] == {"thinkingBudget": 0}
     assert generation_config["responseJsonSchema"] == schema.json_schema
     assert "responseSchema" not in generation_config
+
+
+@pytest.mark.parametrize("schema_name", ["world_builder_output", "simulator_output"])
+async def test_gemini_uses_json_mode_without_oversized_schema(schema_name: str) -> None:
+    captured: dict[str, Any] = {}
+    schema = StructuredSchema(
+        name=schema_name,
+        json_schema={"type": "object", "properties": {"ok": {"type": "boolean"}}},
+        validator=lambda payload: payload,
+    )
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(200, json=_text_payload("gemini", '{"ok": true}'))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await _provider("gemini", client).generate_structured(_request(structured=schema), schema)
+
+    generation_config = captured["generationConfig"]
+    assert result.data == {"ok": True}
+    assert generation_config["responseMimeType"] == "application/json"
+    assert generation_config["thinkingConfig"] == {"thinkingBudget": 0}
+    assert "responseJsonSchema" not in generation_config
+    prompt = captured["contents"][0]["parts"][0]["text"]
+    assert "Required response JSON Schema" in prompt
+    assert '"ok":{"type":"boolean"}' in prompt
 
 
 @pytest.mark.parametrize("provider", [name for name, _ in PROVIDERS])

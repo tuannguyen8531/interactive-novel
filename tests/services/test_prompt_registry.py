@@ -85,6 +85,13 @@ def test_simulator_prompt_requires_authoritative_ids_and_clock_progress() -> Non
     assert "directly engages the group" in prompt.content
 
 
+def test_planner_prompt_forbids_invented_content_tags() -> None:
+    content = PromptRegistry().get(AIPromptRole.PLANNER).content
+
+    assert "do not invent descriptive tags" in content
+    assert "`social_interaction`" in content
+
+
 def test_writer_prompt_requires_a_playable_scene_and_interactive_handoff() -> None:
     prompt = PromptRegistry().get(AIPromptRole.WRITER)
 

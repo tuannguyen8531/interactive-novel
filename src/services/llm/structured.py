@@ -4,11 +4,24 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from typing import Any
 
 from src.application.contracts.providers import StructuredOutputError, StructuredSchema
 
 _TRAILING_COMMA = re.compile(r",(\s*[}\]])")
+
+
+def with_inline_json_schema(prompt: str, schema: Mapping[str, Any]) -> str:
+    """Ground a JSON-mode model when its native schema constraint is unavailable."""
+
+    serialized = json.dumps(dict(schema), ensure_ascii=False, separators=(",", ":"))
+    return (
+        f"{prompt.rstrip()}\n\n"
+        "Required response JSON Schema (follow every required field and nested definition):\n"
+        f"{serialized}\n\n"
+        "Return one JSON object only. Do not add fields absent from the schema."
+    )
 
 
 def _without_code_fence(text: str) -> str:
@@ -23,11 +36,45 @@ def _without_code_fence(text: str) -> str:
     return "\n".join(lines).strip()
 
 
+def _repair_escaped_whitespace(value: str) -> str:
+    result: list[str] = []
+    in_string = False
+    escaped = False
+    index = 0
+    whitespace = {"n": "\n", "r": "\r", "t": "\t"}
+    while index < len(value):
+        character = value[index]
+        if in_string:
+            result.append(character)
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            index += 1
+            continue
+        if character == '"':
+            in_string = True
+        elif character == "\\" and index + 1 < len(value) and value[index + 1] in whitespace:
+            result.append(whitespace[value[index + 1]])
+            index += 2
+            continue
+        result.append(character)
+        index += 1
+    return "".join(result)
+
+
 def _decode_json(value: str) -> Any:
     decoder = json.JSONDecoder()
     try:
         return json.loads(value)
     except json.JSONDecodeError:
+        value = _repair_escaped_whitespace(value)
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            pass
         repaired = _TRAILING_COMMA.sub(r"\1", value)
         if repaired != value:
             try:
@@ -58,4 +105,4 @@ def parse_structured_text(text: str, schema: StructuredSchema, *, provider: str)
     return schema.validate(payload, provider=provider)
 
 
-__all__ = ["parse_structured_text"]
+__all__ = ["parse_structured_text", "with_inline_json_schema"]

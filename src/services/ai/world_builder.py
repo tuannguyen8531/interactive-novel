@@ -184,7 +184,7 @@ class ProviderWorldDraftGenerator:
             physical_call_id=physical_call_id,
             logical_roles=(AIPromptRole.WORLD_GUIDE,),
             temperature=0.5,
-            max_output_tokens=2_000,
+            max_output_tokens=5_000,
             metadata={
                 "logical_role": AIPromptRole.WORLD_GUIDE.value,
                 "prompt_version": definition.semantic_version,

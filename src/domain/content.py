@@ -33,6 +33,31 @@ class ContentDecision(StrEnum):
     DENY = "deny"
 
 
+class ContentTag(StrEnum):
+    ROMANTIC_AFFECTION = "romantic_affection"
+    DATING = "dating"
+    KISS = "kiss"
+    NON_GRAPHIC_INTIMACY = "non_graphic_intimacy"
+    MATURE_EMOTIONAL_THEME = "mature_emotional_theme"
+    SEXUAL_REFERENCE_FADE_TO_BLACK = "sexual_reference_fade_to_black"
+    ADULT_EXPLICIT = "adult_explicit"
+    SEXUALIZED_NUDITY = "sexualized_nudity"
+    FETISHIZATION = "fetishization"
+    GROOMING = "grooming"
+    EXPLOITATION = "exploitation"
+    NON_CONSENSUAL_SEXUAL = "non_consensual_sexual"
+    VIOLENCE = "violence"
+    VIOLENCE_TORTURE = "violence:torture"
+    SEXUAL_VIOLENCE = "sexual_violence"
+    VIOLENCE_NON_GRAPHIC = "violence_non_graphic"
+    VIOLENCE_GORE = "violence_gore"
+    VIOLENCE_TORTURE_DETAIL = "violence_torture_detail"
+    VIOLENCE_SEXUAL = "violence_sexual"
+    PSYCHOLOGICAL_HARM = "psychological_harm"
+    LOSS = "loss"
+    COMPLEX_RELATIONSHIP = "complex_relationship"
+
+
 class ConsentState(StrEnum):
     NOT_DISCUSSED = "not_discussed"
     REQUESTED = "requested"
@@ -49,31 +74,7 @@ CONSENT_TRANSITIONS: dict[ConsentState, set[ConsentState]] = {
     ConsentState.WITHDRAWN: {ConsentState.REQUESTED},
 }
 
-KNOWN_CONTENT_TAGS = {
-    "romantic_affection",
-    "dating",
-    "kiss",
-    "non_graphic_intimacy",
-    "mature_emotional_theme",
-    "sexual_reference_fade_to_black",
-    "adult_explicit",
-    "sexualized_nudity",
-    "fetishization",
-    "grooming",
-    "exploitation",
-    "non_consensual_sexual",
-    "violence",
-    "violence:torture",
-    "sexual_violence",
-    # Legacy tags remain readable for persisted scene artifacts.
-    "violence_non_graphic",
-    "violence_gore",
-    "violence_torture_detail",
-    "violence_sexual",
-    "psychological_harm",
-    "loss",
-    "complex_relationship",
-}
+KNOWN_CONTENT_TAGS = {tag.value for tag in ContentTag}
 
 
 @dataclass(frozen=True, slots=True)
@@ -311,6 +312,7 @@ __all__ = [
     "ConsentState",
     "ContentDecision",
     "ContentPolicy",
+    "ContentTag",
     "PolicyDecision",
     "Rating",
     "SceneSpec",
