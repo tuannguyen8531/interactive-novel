@@ -174,6 +174,18 @@ export interface WorldBriefSuggestion {
   questions: CreativeQuestion[]
 }
 
+export interface PlayerMoveSuggestion {
+  kind: 'act' | 'speak' | 'observe' | 'think'
+  text: string
+}
+
+export interface OpeningPreview {
+  source_draft_hash: string
+  scene_id: string
+  narrative_text: string
+  suggested_actions: PlayerMoveSuggestion[]
+}
+
 export interface WorldConfirmation {
   world: WorldRecord
   playthrough: PlaythroughRecord

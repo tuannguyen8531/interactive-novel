@@ -642,6 +642,15 @@ class NarrativeDraft(VersionedOutput):
     suggested_actions: tuple[PlayerMoveSuggestion, ...] = Field(default_factory=tuple, max_length=4)
 
 
+class OpeningPreview(AIModel):
+    """Transient opening prose bound to the exact WorldSeed it was written for."""
+
+    source_draft_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    scene_id: str = Field(min_length=1)
+    narrative_text: str = Field(min_length=1)
+    suggested_actions: tuple[PlayerMoveSuggestion, ...] = Field(min_length=1, max_length=4)
+
+
 class CritiqueIssue(AIModel):
     issue_id: str = Field(min_length=1)
     category: str = Field(min_length=1)
@@ -869,6 +878,7 @@ __all__ = [
     "LocationSeed",
     "LLMRunTrace",
     "NarrativeDraft",
+    "OpeningPreview",
     "NPCReaction",
     "ObservationProposal",
     "OutcomeCandidate",

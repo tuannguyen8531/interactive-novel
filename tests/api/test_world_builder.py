@@ -10,7 +10,7 @@ import httpx
 import pytest
 
 from src.api.factory import create_app
-from src.application.contracts.ai import WorldBriefSuggestion, WorldSeed
+from src.application.contracts.ai import OpeningPreview, PlayerMoveSuggestion, WorldBriefSuggestion, WorldSeed
 from src.application.contracts.persistence import BranchRecord, PlaythroughRecord, TurnRecord, WorldRecord, utc_now
 from src.application.contracts.providers import StructuredOutputError
 from src.application.services.world_drafts import WorldConfirmation
@@ -66,7 +66,21 @@ class _WorldDraftService:
         assert seed.role == self.seed.role
         return seed
 
-    async def confirm_world_bundle(self, seed: WorldSeed, *, world_id: str | None = None) -> WorldConfirmation:
+    async def generate_opening_preview(self, seed: WorldSeed) -> OpeningPreview:
+        return OpeningPreview(
+            source_draft_hash="a" * 64,
+            scene_id=seed.opening_scene.scene_id,
+            narrative_text="A generated opening scene.",
+            suggested_actions=(PlayerMoveSuggestion(kind="observe", text="I look around."),),
+        )
+
+    async def confirm_world_bundle(
+        self,
+        seed: WorldSeed,
+        *,
+        opening_preview: OpeningPreview | None = None,
+        world_id: str | None = None,
+    ) -> WorldConfirmation:
         assert seed.role == self.seed.role
         self.confirmations += 1
         world = WorldRecord.new(world_id=world_id or "world-confirmed", name=seed.title)
@@ -146,11 +160,16 @@ async def test_world_builder_endpoints_generate_review_and_confirm_without_raw_d
         edited = dict(generated.json())
         edited["title"] = "Edited Courtyard"
         validated = await client.post("/api/world-drafts/validate", json={"draft": edited})
-        confirmed = await client.post("/api/world-drafts/confirm", json={"draft": edited, "world_id": "world-api"})
+        opening = await client.post("/api/world-drafts/opening", json={"draft": edited})
+        confirmed = await client.post(
+            "/api/world-drafts/confirm",
+            json={"draft": edited, "opening_preview": opening.json(), "world_id": "world-api"},
+        )
 
     assert generated.status_code == 200
     assert validated.status_code == 200
     assert validated.json()["title"] == "Edited Courtyard"
+    assert opening.json()["narrative_text"] == "A generated opening scene."
     assert confirmed.status_code == 201
     assert confirmed.json()["world"]["id"] == "world-api"
     assert confirmed.json()["opening_scene"]["scene_id"] == "opening-scene"

@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from src.application.contracts.ai import RatingValue, ViolenceCeilingValue, WorldSeed
+from src.application.contracts.ai import OpeningPreview, RatingValue, ViolenceCeilingValue, WorldSeed
 from src.application.contracts.persistence import JSONValue
 from src.domain.language import StoryLanguage
 
@@ -70,7 +70,14 @@ class WorldDraftRequest(BaseModel):
     """Edited WorldSeed sent back for deterministic validation or confirmation."""
 
     draft: WorldSeed
+    opening_preview: OpeningPreview | None = None
     world_id: str | None = Field(default=None, min_length=1, max_length=160)
+
+
+class WorldDraftOpeningRequest(BaseModel):
+    """Validated WorldSeed used to write a transient opening preview."""
+
+    draft: WorldSeed
 
 
 class PlaythroughCreateRequest(BaseModel):
@@ -245,6 +252,7 @@ __all__ = [
     "UndoBranchRequest",
     "WorldCreateRequest",
     "WorldDraftGenerateRequest",
+    "WorldDraftOpeningRequest",
     "WorldDraftAssistRequest",
     "WorldDraftRequest",
 ]

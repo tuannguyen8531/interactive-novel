@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass, replace
 from inspect import signature
@@ -10,6 +12,8 @@ from uuid import uuid4
 
 from src.application.contracts.ai import (
     CharacterSeed,
+    NarrativeDraft,
+    OpeningPreview,
     RatingValue,
     SceneSpec,
     ViolenceCeilingValue,
@@ -185,6 +189,31 @@ class WorldDraftApplicationService:
         self._validate_scene_fingerprint_references(validated)
         return validated
 
+    async def generate_opening_preview(self, seed: WorldSeed) -> OpeningPreview:
+        """Write a transient opening scene for review without creating a world."""
+        validated = self.validate_world_draft(seed)
+        if self._generator is None:
+            raise ApplicationValidationError("Opening preview generator is not configured.")
+        generator_method = cast(
+            Callable[[WorldSeed], Awaitable[NarrativeDraft]],
+            getattr(self._generator, "generate_opening_preview", None),
+        )
+        if not callable(generator_method):
+            raise ApplicationValidationError("Opening preview generator is not configured.")
+        draft = await generator_method(validated)
+        if not isinstance(draft, NarrativeDraft):
+            raise ApplicationValidationError("Opening preview generator returned an invalid narrative.")
+        if draft.scene_id != validated.opening_scene.scene_id:
+            raise ApplicationValidationError("Opening preview does not match the world draft scene.")
+        if not draft.suggested_actions:
+            raise ApplicationValidationError("Opening preview must include at least one suggested action.")
+        return OpeningPreview(
+            source_draft_hash=_world_draft_hash(validated),
+            scene_id=draft.scene_id,
+            narrative_text=draft.narrative_text,
+            suggested_actions=draft.suggested_actions,
+        )
+
     async def confirm_world(self, seed: WorldSeed, *, world_id: str | None = None) -> WorldRecord:
         """Legacy world-only confirmation kept for older callers."""
         validated = assign_canonical_uuids(self.validate_world_draft(seed))
@@ -201,11 +230,18 @@ class WorldDraftApplicationService:
         self,
         seed: WorldSeed,
         *,
+        opening_preview: OpeningPreview | None = None,
         world_id: str | None = None,
         provider_config_snapshot: dict[str, Any] | None = None,
     ) -> WorldConfirmation:
         """Atomically create the world and its playable opening branch."""
-        validated = assign_canonical_uuids(self.validate_world_draft(seed))
+        validated_draft = self.validate_world_draft(seed)
+        if opening_preview is not None:
+            if opening_preview.source_draft_hash != _world_draft_hash(validated_draft):
+                raise ApplicationValidationError("Opening preview is out of date. Generate it again before confirming.")
+            if opening_preview.scene_id != validated_draft.opening_scene.scene_id:
+                raise ApplicationValidationError("Opening preview does not match the world draft scene.")
+        validated = assign_canonical_uuids(validated_draft)
         template = self._require_template(validated.template_id)
         world, characters = _build_world_records(validated, template=template, world_id=world_id)
         player = validated.player_character
@@ -221,6 +257,7 @@ class WorldDraftApplicationService:
             validated,
             playthrough=playthrough,
             branch=branch,
+            opening_preview=opening_preview,
         )
 
         async with self._uow_factory() as uow:
@@ -292,6 +329,7 @@ def _build_opening_bundle(
     *,
     playthrough: PlaythroughRecord,
     branch: BranchRecord,
+    opening_preview: OpeningPreview | None = None,
     turn_id: str | None = None,
     event_id: str | None = None,
     turn_run_id: str | None = None,
@@ -436,7 +474,9 @@ def _build_opening_bundle(
         provenance={"source_type": "world_seed", "source_id": seed.run_id, "run_id": seed.run_id},
     )
     participant_names = ", ".join(known_names[item] for item in participants)
-    if seed.story_language is StoryLanguage.VIETNAMESE:
+    if opening_preview is not None:
+        narrative = opening_preview.narrative_text
+    elif seed.story_language is StoryLanguage.VIETNAMESE:
         narrative = f"{seed.title} bắt đầu tại {location.name}. {seed.premise}\n\nCó mặt: {participant_names}."
     else:
         narrative = f"{seed.title} begins in {location.name}. {seed.premise}\n\nPresent: {participant_names}."
@@ -466,6 +506,11 @@ def _build_opening_bundle(
             "world_seed_run_id": seed.run_id,
             "opening_scene": seed.opening_scene.model_dump(mode="json"),
         },
+        suggested_actions=(
+            tuple(item.model_dump(mode="json") for item in opening_preview.suggested_actions)
+            if opening_preview is not None
+            else ()
+        ),
         turn_id=turn_id,
         character_states=character_states,
         events=(event,),
@@ -479,6 +524,12 @@ def _build_opening_bundle(
         hooks=hooks,
         derived_job_types=(),
     )
+
+
+def _world_draft_hash(seed: WorldSeed) -> str:
+    payload = seed.model_dump(mode="json", exclude={"physical_call_id", "config_snapshot_id"})
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _belief_records(

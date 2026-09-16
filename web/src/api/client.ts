@@ -21,6 +21,7 @@ import type {
   TurnJobView,
   ViolenceCeiling,
   WorldConfirmation,
+  OpeningPreview,
   WorldBriefSuggestion,
   WorldRecord,
   WorldSeed,
@@ -146,8 +147,13 @@ export const api = {
   }): Promise<WorldBriefSuggestion> => request<WorldBriefSuggestion>('/api/world-drafts/assist', jsonBody(payload)),
   validateWorldDraft: (draft: WorldSeed): Promise<WorldSeed> =>
     request<WorldSeed>('/api/world-drafts/validate', jsonBody({ draft })),
-  confirmWorldDraft: (draft: WorldSeed, worldId?: string): Promise<WorldConfirmation> =>
-    request<WorldConfirmation>('/api/world-drafts/confirm', jsonBody({ draft, world_id: worldId })),
+  generateOpeningPreview: (draft: WorldSeed): Promise<OpeningPreview> =>
+    request<OpeningPreview>('/api/world-drafts/opening', jsonBody({ draft })),
+  confirmWorldDraft: (draft: WorldSeed, openingPreview?: OpeningPreview, worldId?: string): Promise<WorldConfirmation> =>
+    request<WorldConfirmation>(
+      '/api/world-drafts/confirm',
+      jsonBody({ draft, opening_preview: openingPreview, world_id: worldId })
+    ),
   listPlaythroughs: (worldId?: string): Promise<PlaythroughRecord[]> =>
     request<PlaythroughRecord[]>(`/api/playthroughs${query({ world_id: worldId })}`),
   getPlaythrough: (playthroughId: string): Promise<PlaythroughRecord> =>

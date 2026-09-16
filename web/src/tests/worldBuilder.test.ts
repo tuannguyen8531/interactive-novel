@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
 import { api } from '@/api/client'
-import type { WorldBriefSuggestion, WorldConfirmation, WorldSeed } from '@/api/types'
+import type { OpeningPreview, WorldBriefSuggestion, WorldConfirmation, WorldSeed } from '@/api/types'
 import { useWorldBuilder } from '@/composables/worldBuilder'
 
 function seed(): WorldSeed {
@@ -104,6 +104,16 @@ const confirmation = (draft: WorldSeed): WorldConfirmation =>
     opening_turn: { id: 'turn-1' }
   }) as unknown as WorldConfirmation
 
+const openingPreview = (draft: WorldSeed): OpeningPreview => ({
+  source_draft_hash: 'a'.repeat(64),
+  scene_id: draft.opening_scene.scene_id,
+  narrative_text: 'The library doors open onto an unfinished conversation.',
+  suggested_actions: [
+    { kind: 'act', text: 'I step inside.' },
+    { kind: 'speak', text: 'I ask what happened.' }
+  ]
+})
+
 function brief(overrides: Partial<WorldBriefSuggestion> = {}): WorldBriefSuggestion {
   return {
     schema_version: 'world-brief-suggestion',
@@ -138,6 +148,7 @@ describe('world builder composable', () => {
     const draft = seed()
     vi.spyOn(api, 'generateWorldDraft').mockResolvedValue(draft)
     vi.spyOn(api, 'validateWorldDraft').mockImplementation(async (value) => value)
+    vi.spyOn(api, 'generateOpeningPreview').mockImplementation(async (value) => openingPreview(value))
     vi.spyOn(api, 'confirmWorldDraft').mockImplementation(async (value) => confirmation(value))
     const store = reactive(useWorldBuilder())
 
@@ -145,12 +156,18 @@ describe('world builder composable', () => {
     expect(store.stage).toBe('review')
     store.draft!.title = 'Edited Courtyard'
     await store.validate()
+    await store.generateOpening()
+    expect(store.stage).toBe('opening')
+    expect(store.confirmation).toBeNull()
+    const confirmationId = store.confirmationId
     const result = await store.confirm()
 
     expect(result.playthrough.id).toBe('playthrough-1')
     expect(store.createdWorld?.id).toBe('world-1')
     expect(store.stage).toBe('confirmed')
     expect(vi.mocked(api.confirmWorldDraft).mock.calls[0][0].title).toBe('Edited Courtyard')
+    expect(vi.mocked(api.confirmWorldDraft).mock.calls[0][1]?.narrative_text).toContain('library doors')
+    expect(vi.mocked(api.confirmWorldDraft).mock.calls[0][2]).toBe(confirmationId)
   })
 
   it('discards a draft without calling confirmation', () => {

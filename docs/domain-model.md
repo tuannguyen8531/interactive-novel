@@ -251,8 +251,11 @@ afternoon 12–18, evening 18–22). These periods do not model astronomical day
 Writer and Critic also receive the approved duration and end time, including
 midnight crossings. Prompts require temporal consistency with these values;
 semantic lighting consistency is checked by AI, not a deterministic sunlight
-rule. The World Builder preview displays the converted opening time before
-confirmation. Existing saves are not reinterpreted or migrated by this change.
+rule. The World Builder opening preview displays the converted opening time
+before confirmation. Its prose and suggested actions are transient until the
+user confirms the world. Confirmation stores them as the root branch's opening
+turn with zero duration; the first player action remains move 1. Existing saves
+are not reinterpreted or migrated by this change.
 
 Branches inherit the clock at the fork and then advance independently. UTC
 timestamps are audit data only.

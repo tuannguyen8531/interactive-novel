@@ -1,8 +1,9 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ApiError, api } from '@/api/client'
 import type {
   BinaryGender,
   ContentRating,
+  OpeningPreview,
   StoryTemplate,
   ViolenceCeiling,
   WorldBriefSuggestion,
@@ -12,10 +13,15 @@ import type {
   WorldSeed
 } from '@/api/types'
 
-export type WorldBuilderStage = 'prompt' | 'review' | 'confirmed'
+export type WorldBuilderStage = 'prompt' | 'review' | 'opening' | 'confirmed'
 
 const MIN_NPC_PROFILES = 1
 const MAX_NPC_PROFILES = 3
+const SESSION_KEY = 'interactive-novel.world-builder.v1'
+
+function newConfirmationId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `world-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
 
 export function characterIdFromName(name: string): string {
   const slug = name
@@ -70,17 +76,22 @@ export function useWorldBuilder() {
   const playerGender = ref<BinaryGender>('male')
   const stage = ref<WorldBuilderStage>('prompt')
   const draft = ref<WorldSeed | null>(null)
+  const openingPreview = ref<OpeningPreview | null>(null)
+  const confirmationId = ref<string | null>(null)
   const confirmation = ref<WorldConfirmation | null>(null)
   const generating = ref(false)
   const validating = ref(false)
   const confirming = ref(false)
+  const generatingOpening = ref(false)
   const assisting = ref(false)
   const briefSuggestion = ref<WorldBriefSuggestion | null>(null)
   const selectedAnswers = ref<Record<string, string>>({})
   const error = ref<string | null>(null)
   const validationMessages = ref<string[]>([])
 
-  const loading = computed(() => assisting.value || generating.value || validating.value || confirming.value)
+  const loading = computed(
+    () => assisting.value || generating.value || validating.value || generatingOpening.value || confirming.value
+  )
   const hasSelectedAnswers = computed(() =>
     Object.values(selectedAnswers.value).some((answer) => answer.trim().length > 0)
   )
@@ -314,6 +325,8 @@ export function useWorldBuilder() {
         player_gender: playerGender.value
       })
       draft.value = generated
+      openingPreview.value = null
+      confirmationId.value = null
       confirmation.value = null
       stage.value = 'review'
       return generated
@@ -400,6 +413,8 @@ export function useWorldBuilder() {
     try {
       const validated = await api.validateWorldDraft(draft.value)
       draft.value = validated
+      openingPreview.value = null
+      confirmationId.value = null
       return validated
     } catch (cause) {
       error.value = errorText(cause)
@@ -410,13 +425,40 @@ export function useWorldBuilder() {
     }
   }
 
+  async function generateOpening(): Promise<OpeningPreview> {
+    if (!draft.value) throw new Error('No world draft is ready for an opening preview.')
+    if (loading.value) throw new Error('Another world-builder operation is already in progress.')
+    const source = JSON.stringify(draft.value)
+    generatingOpening.value = true
+    error.value = null
+    validationMessages.value = []
+    try {
+      const preview = await api.generateOpeningPreview(draft.value)
+      if (!draft.value || JSON.stringify(draft.value) !== source) {
+        throw new Error('The world changed while its opening was being written. Please continue again.')
+      }
+      openingPreview.value = preview
+      confirmationId.value = newConfirmationId()
+      stage.value = 'opening'
+      return preview
+    } catch (cause) {
+      error.value = errorText(cause)
+      validationMessages.value = [error.value]
+      throw cause
+    } finally {
+      generatingOpening.value = false
+    }
+  }
+
   async function confirm(): Promise<WorldConfirmation> {
     if (!draft.value) throw new Error('No world draft is ready for confirmation.')
+    if (!openingPreview.value) throw new Error('Generate and review the opening before beginning the story.')
     confirming.value = true
     error.value = null
     validationMessages.value = []
     try {
-      const result = await api.confirmWorldDraft(draft.value)
+      confirmationId.value ??= newConfirmationId()
+      const result = await api.confirmWorldDraft(draft.value, openingPreview.value, confirmationId.value)
       confirmation.value = result
       stage.value = 'confirmed'
       return result
@@ -431,12 +473,53 @@ export function useWorldBuilder() {
 
   function cancelDraft(): void {
     draft.value = null
+    openingPreview.value = null
+    confirmationId.value = null
     confirmation.value = null
     briefSuggestion.value = null
     selectedAnswers.value = {}
     validationMessages.value = []
     error.value = null
     stage.value = 'prompt'
+  }
+
+  function restoreSession(): void {
+    if (typeof window === 'undefined') return
+    const saved = window.sessionStorage.getItem(SESSION_KEY)
+    if (!saved) return
+    try {
+      const value = JSON.parse(saved) as {
+        stage?: WorldBuilderStage
+        draft?: WorldSeed | null
+        openingPreview?: OpeningPreview | null
+        confirmationId?: string | null
+      }
+      if (value.draft && ['review', 'opening'].includes(value.stage ?? '')) {
+        draft.value = value.draft
+        openingPreview.value = value.openingPreview ?? null
+        confirmationId.value = value.confirmationId ?? null
+        stage.value = value.stage === 'opening' && value.openingPreview ? 'opening' : 'review'
+      }
+    } catch {
+      window.sessionStorage.removeItem(SESSION_KEY)
+    }
+  }
+
+  function persistSession(): void {
+    if (typeof window === 'undefined') return
+    if (!draft.value || !['review', 'opening'].includes(stage.value)) {
+      window.sessionStorage.removeItem(SESSION_KEY)
+      return
+    }
+    window.sessionStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        stage: stage.value,
+        draft: draft.value,
+        openingPreview: openingPreview.value,
+        confirmationId: confirmationId.value
+      })
+    )
   }
 
   function reset(): void {
@@ -447,6 +530,7 @@ export function useWorldBuilder() {
     violencePreset.value = 'none'
     playerGender.value = 'male'
     cancelDraft()
+    if (typeof window !== 'undefined') window.sessionStorage.removeItem(SESSION_KEY)
   }
 
   return {
@@ -459,11 +543,14 @@ export function useWorldBuilder() {
     playerGender,
     stage,
     draft,
+    openingPreview,
+    confirmationId,
     confirmation,
     createdWorld,
     generating,
     validating,
     confirming,
+    generatingOpening,
     assisting,
     briefSuggestion,
     selectedAnswers,
@@ -489,9 +576,12 @@ export function useWorldBuilder() {
     selectAnswer,
     refineSelectedSuggestions,
     validate,
+    generateOpening,
     confirm,
     cancelDraft,
-    reset
+    reset,
+    restoreSession,
+    persistSession
   }
 }
 
@@ -505,7 +595,11 @@ let shared: WorldBuilder | null = null
  * to reset the state back to defaults.
  */
 export function useSharedWorldBuilder(): WorldBuilder {
-  if (!shared) shared = useWorldBuilder()
+  if (!shared) {
+    shared = useWorldBuilder()
+    shared.restoreSession()
+    watch([shared.stage, shared.draft, shared.openingPreview], shared.persistSession, { deep: true })
+  }
   return shared
 }
 

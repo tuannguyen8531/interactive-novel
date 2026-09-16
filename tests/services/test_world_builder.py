@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from src.application.contracts.ai import AIPromptRole, WorldBriefSuggestion, WorldSeed
+from src.application.contracts.ai import AIPromptRole, NarrativeDraft, WorldBriefSuggestion, WorldSeed
 from src.application.contracts.providers import ProviderResponse, StructuredResponse
 from src.domain.language import StoryLanguage
 from src.services.ai.world_builder import ProviderWorldDraftGenerator
@@ -121,3 +121,20 @@ async def test_provider_world_guide_uses_world_builder_route_and_structured_cont
     assert '"story_language": "vi"' in provider.request.user_prompt
     assert '"rating"' not in provider.request.user_prompt
     assert '"violence_ceiling"' not in provider.request.user_prompt
+
+
+@pytest.mark.asyncio
+async def test_provider_writes_opening_preview_with_the_writer_contract() -> None:
+    seed = WorldSeed.model_validate(json.loads(FIXTURE.read_text(encoding="utf-8"))["world_builder"])
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["writer"]
+    payload["scene_id"] = seed.opening_scene.scene_id
+    provider = _Provider(payload)
+    generator = ProviderWorldDraftGenerator(provider)  # type: ignore[arg-type]
+
+    result = await generator.generate_opening_preview(seed)
+
+    assert isinstance(result, NarrativeDraft)
+    assert result.suggested_actions
+    assert provider.request.role == AIPromptRole.WRITER
+    assert provider.request.metadata["opening_preview"] is True
+    assert '"approved_duration_minutes": 0' in provider.request.user_prompt

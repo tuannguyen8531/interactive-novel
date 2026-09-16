@@ -131,6 +131,17 @@ canon prose. Preflight groups related coverage and cross-reference errors into
 one diagnostic set so a single structured-output repair can fix the complete
 payload instead of failing one invariant at a time.
 
+World creation has three transient stages: describe, review the WorldSeed, and
+review the generated opening. Continuing from WorldSeed review calls Writer
+with the validated opening `SceneSpec`, public participant profiles, location,
+content boundaries, and a zero-duration clock interval. It returns prose and
+suggested actions without creating canonical records. The preview carries a
+hash of the validated WorldSeed; confirmation rejects it after any world edit.
+Confirmation then stores that exact prose and those actions in the existing
+zero-duration opening turn in the same transaction as the world, playthrough,
+root branch, and other opening artifacts. No provider call occurs while
+confirming.
+
 Writer receives `SceneSpec`, authorized evidence, bounded public character
 profiles, and the canonical story language. The scene uses the accepted
 Simulator outcome and visible reactions, never Planner candidate beats. Writer

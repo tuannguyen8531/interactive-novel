@@ -19,6 +19,10 @@ onMounted(async () => {
     await router.replace({ name: 'world-review' })
     return
   }
+  if (builder.stage === 'opening' && builder.draft && builder.openingPreview) {
+    await router.replace({ name: 'world-opening' })
+    return
+  }
   // Reset to prompt stage when arriving fresh
   if (builder.stage !== 'prompt') {
     resetSharedWorldBuilder()
@@ -29,7 +33,7 @@ onMounted(async () => {
 const wizardSteps = [
   { id: 'describe', label: '1. Premise & Theme', description: 'Describe your story world' },
   { id: 'review', label: '2. Cast & Continuity', description: 'Review characters and lore' },
-  { id: 'ready', label: '3. Launch Story', description: 'Begin your visual novel' }
+  { id: 'ready', label: '3. Opening Scene', description: 'Preview the beginning' }
 ]
 
 const selectedTemplate = computed(() => builder.templates.find((item) => item.id === builder.templateId))

@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from src.application.contracts.ai import (
     AIPromptRole,
+    NarrativeDraft,
     RatingValue,
     ViolenceCeilingValue,
     WorldBriefSuggestion,
@@ -212,6 +213,106 @@ class ProviderWorldDraftGenerator:
         )
         if not isinstance(result, WorldBriefSuggestion):
             raise TypeError("World guide contract returned a non-WorldBriefSuggestion response.")
+        return result
+
+    async def generate_opening_preview(self, seed: WorldSeed) -> NarrativeDraft:
+        """Write the playable opening without creating canonical game state."""
+        definition = self._prompts.get(AIPromptRole.WRITER)
+        run_id = str(uuid4())
+        physical_call_id = str(uuid4())
+        scene = seed.opening_scene.model_copy(update={"guard_approved": True})
+        characters = (seed.player_character, *seed.npc_profiles)
+        location = seed.locations[0]
+        context = {
+            "story_language": seed.story_language.value,
+            "world": {
+                "title": seed.title,
+                "premise": seed.premise,
+                "genre": seed.genre,
+                "tone": seed.tone,
+                "content_boundaries": seed.content_boundaries.model_dump(mode="json"),
+            },
+            "character_profiles": [
+                {
+                    "character_id": character.character_id,
+                    "name": character.name,
+                    "age": character.age,
+                    "gender": character.gender,
+                    "role": character.role,
+                    "background": character.background,
+                    "voice": character.voice,
+                    "traits": list(character.traits),
+                    "values": list(character.values),
+                }
+                for character in characters
+                if character.character_id in scene.participants
+            ],
+            "locations": [item.model_dump(mode="json") for item in seed.locations],
+            "scene_locations": {
+                "before": {character_id: location.location_id for character_id in scene.participants},
+                "after": {character_id: location.location_id for character_id in scene.participants},
+            },
+            "current_locations": {character_id: location.location_id for character_id in scene.participants},
+            "clock": {
+                "approved_start": scene.world_time,
+                "approved_end": scene.world_time,
+                "approved_duration_minutes": 0,
+            },
+            "revision_feedback": {},
+        }
+        request = ProviderRequest(
+            system_prompt=(
+                "You are the Writer preparing a transient opening preview. Return only a strict JSON object. "
+                "Do not advance time or invent state changes. "
+                f"{_language_instruction(seed.story_language)}"
+            ),
+            user_prompt=definition.render(
+                {
+                    "input_json": json.dumps(
+                        {"scene_spec": scene.model_dump(mode="json"), "context": context},
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                    "language_guidance": self._prompts.read_language_guidance(seed.story_language.value),
+                }
+            ),
+            role=AIPromptRole.WRITER,
+            physical_call_id=physical_call_id,
+            logical_roles=(AIPromptRole.WRITER,),
+            temperature=0.6,
+            max_output_tokens=4_000,
+            metadata={
+                "prompt_version": definition.semantic_version,
+                "output_schema_version": definition.output_schema_version,
+                "template_hash": definition.template_hash,
+                "story_language": seed.story_language.value,
+                "opening_preview": True,
+            },
+        )
+        response = await self._provider.generate_structured(
+            request,
+            self._contracts.structured_schema(
+                AIPromptRole.WRITER,
+                authoritative_metadata={
+                    "schema_version": definition.output_schema_version,
+                    "role": AIPromptRole.WRITER.value,
+                    "run_id": run_id,
+                    "prompt_version": definition.semantic_version,
+                    "physical_call_id": physical_call_id,
+                },
+            ),
+        )
+        result = (
+            response.data
+            if isinstance(response.data, NarrativeDraft)
+            else self._contracts.parse(AIPromptRole.WRITER, response.data)
+        )
+        if not isinstance(result, NarrativeDraft):
+            raise TypeError("Writer contract returned a non-NarrativeDraft response.")
+        if result.scene_id != scene.scene_id:
+            raise TypeError("Writer contract returned a preview for a different opening scene.")
+        if not result.suggested_actions:
+            raise TypeError("Writer contract returned an opening without suggested actions.")
         return result
 
 

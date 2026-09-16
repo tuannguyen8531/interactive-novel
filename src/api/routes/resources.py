@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from inspect import signature
-from typing import cast
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
@@ -22,6 +22,7 @@ from src.api.schemas import (
     WorldCreateRequest,
     WorldDraftAssistRequest,
     WorldDraftGenerateRequest,
+    WorldDraftOpeningRequest,
     WorldDraftRequest,
 )
 from src.api.serialization import public_json
@@ -111,15 +112,24 @@ async def validate_world_draft(
     return public_json(draft)
 
 
+@router.post("/world-drafts/opening")
+async def generate_world_draft_opening(
+    payload: WorldDraftOpeningRequest,
+    services: ApplicationContainer = _services_dependency,
+):
+    preview = await services.world_drafts.generate_opening_preview(payload.draft)
+    return public_json(preview)
+
+
 @router.post("/world-drafts/confirm", status_code=status.HTTP_201_CREATED)
 async def confirm_world_draft(
     payload: WorldDraftRequest,
     services: ApplicationContainer = _services_dependency,
 ):
-    confirmation = await services.world_drafts.confirm_world_bundle(
-        payload.draft,
-        world_id=payload.world_id,
-    )
+    kwargs: dict[str, Any] = {"world_id": payload.world_id}
+    if payload.opening_preview is not None:
+        kwargs["opening_preview"] = payload.opening_preview
+    confirmation = await services.world_drafts.confirm_world_bundle(payload.draft, **kwargs)
     return public_json(confirmation)
 
 

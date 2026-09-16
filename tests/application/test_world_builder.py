@@ -10,7 +10,7 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
-from src.application.contracts.ai import ClaimReference, WorldBriefSuggestion, WorldSeed
+from src.application.contracts.ai import ClaimReference, NarrativeDraft, WorldBriefSuggestion, WorldSeed
 from src.application.contracts.persistence import BranchRecord, TurnRecord, utc_now
 from src.application.errors import ApplicationValidationError
 from src.application.ports.persistence import UowFactory
@@ -237,6 +237,11 @@ class _Generator:
     async def assist_world_prompt(self, prompt: str, **kwargs: Any) -> Any:
         raise AssertionError("assist is not used by this fixture")
 
+    async def generate_opening_preview(self, seed: WorldSeed) -> NarrativeDraft:
+        payload = json.loads(FIXTURE.read_text(encoding="utf-8"))["writer"]
+        payload["scene_id"] = seed.opening_scene.scene_id
+        return NarrativeDraft.model_validate(payload)
+
 
 class _GuideGenerator:
     def __init__(self, suggestion: WorldBriefSuggestion) -> None:
@@ -316,6 +321,36 @@ async def test_world_builder_keeps_generated_draft_transient_until_confirmed() -
     assert store.worlds == {}
     assert store.characters == {}
     assert store.playthroughs == {}
+
+
+@pytest.mark.asyncio
+async def test_opening_preview_is_transient_and_confirmed_verbatim() -> None:
+    store = _State()
+    service = WorldDraftApplicationService(_factory(store), generator=_Generator(_seed()))
+
+    preview = await service.generate_opening_preview(_seed())
+
+    assert preview.narrative_text
+    assert preview.suggested_actions
+    assert store.worlds == {}
+    assert store.playthroughs == {}
+
+    await service.confirm_world_bundle(_seed(), opening_preview=preview)
+
+    assert store.bundle is not None
+    assert store.bundle.final_narrative == preview.narrative_text
+    assert store.bundle.suggested_actions == tuple(action.model_dump(mode="json") for action in preview.suggested_actions)
+    assert store.bundle.duration_minutes == 0
+
+
+@pytest.mark.asyncio
+async def test_confirmation_rejects_an_opening_preview_for_an_edited_world() -> None:
+    service = WorldDraftApplicationService(_factory(_State()), generator=_Generator(_seed()))
+    preview = await service.generate_opening_preview(_seed())
+    edited = _seed().model_copy(update={"title": "A Different World"})
+
+    with pytest.raises(ApplicationValidationError, match="out of date"):
+        await service.confirm_world_bundle(edited, opening_preview=preview)
 
 
 @pytest.mark.asyncio

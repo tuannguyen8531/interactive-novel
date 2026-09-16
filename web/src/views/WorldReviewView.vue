@@ -15,13 +15,15 @@ onUnmounted(() => { active = false })
 onMounted(() => {
   if (!builder.draft) {
     void router.replace({ name: 'world-builder' })
+  } else if (builder.stage === 'opening' && builder.openingPreview) {
+    void router.replace({ name: 'world-opening' })
   }
 })
 
 const wizardSteps = [
   { id: 'describe', label: '1. Premise & Theme', description: 'Describe your story world' },
   { id: 'review', label: '2. Cast & Continuity', description: 'Review characters and lore' },
-  { id: 'ready', label: '3. Launch Story', description: 'Begin your visual novel' }
+  { id: 'ready', label: '3. Opening Scene', description: 'Preview the beginning' }
 ]
 
 const characters = computed(() =>
@@ -57,14 +59,13 @@ async function validate(): Promise<void> {
   }
 }
 
-async function confirm(): Promise<void> {
+async function continueToOpening(): Promise<void> {
   try {
-    const result = await builder.confirm()
+    await builder.generateOpening()
     if (!active) return
-    resetSharedWorldBuilder()
-    await router.push({ name: 'play', params: { playthroughId: result.playthrough.id } })
+    await router.push({ name: 'world-opening' })
   } catch {
-    // Confirmation errors stay on the editable draft.
+    // Generation errors stay on the editable draft.
   }
 }
 
@@ -107,7 +108,7 @@ function getInitials(name: string): string {
     </div>
 
     <!-- Review Form -->
-    <form class="review-layout" @submit.prevent="confirm">
+    <form class="review-layout" @submit.prevent="continueToOpening">
       <section class="review-main">
         <!-- World Core Information -->
         <div class="card">
@@ -328,10 +329,10 @@ function getInitials(name: string): string {
           <button
             type="submit"
             class="submit-btn"
-            :class="{ generating: builder.confirming }"
+            :class="{ generating: builder.generatingOpening }"
             :disabled="builder.loading || builder.contentWarnings.length > 0"
           >
-            {{ builder.confirming ? 'Initializing Session…' : 'Begin Story →' }}
+            {{ builder.generatingOpening ? 'Writing Opening…' : 'Continue →' }}
           </button>
         </div>
       </aside>
