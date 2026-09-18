@@ -732,8 +732,8 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
               </div>
 
               <!-- Cloud-specific configuration (Gemini, OpenRouter) -->
-              <div v-else class="field-row two-cols">
-                <div class="form-item">
+              <div v-else class="field-row three-cols">
+                <div class="form-item span-2">
                   <label class="item-label">
                     API Key Variable Name
                     <span class="sub-hint">(Environment variable in .env)</span>
@@ -1501,6 +1501,10 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.8fr);
 }
 
+.span-2 {
+  grid-column: span 2;
+}
+
 .form-item {
   display: flex;
   flex-direction: column;
@@ -1916,6 +1920,10 @@ function formatProviderName(provider: ProviderTarget['provider']): string {
   .field-row.two-cols,
   .field-row.three-cols {
     grid-template-columns: 1fr;
+  }
+
+  .span-2 {
+    grid-column: span 1;
   }
 
   .add-target-toolbar {
