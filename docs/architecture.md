@@ -214,6 +214,7 @@ runtime/
 │   ├── telemetry.jsonl  # opt-in, secret-free profiling
 │   └── feedback.jsonl   # explicit alpha feedback
 ├── exports/
+│   └── <backup-name>/game.db.backup  # at most three managed database backups
 ├── presets/          # named provider settings
 └── settings.json     # active non-secret UI/provider choices
 ```

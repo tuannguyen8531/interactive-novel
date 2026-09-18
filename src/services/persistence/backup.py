@@ -81,12 +81,14 @@ class DatabaseBackupService:
             with sqlite3.connect(source) as source_connection, sqlite3.connect(temporary) as target_connection:
                 source_connection.backup(target_connection)
                 target_connection.execute("PRAGMA wal_checkpoint(FULL)")
+                target_connection.execute("PRAGMA journal_mode=DELETE")
             os.replace(temporary, destination)
+            _remove_sqlite_sidecars(destination)
         except sqlite3.DatabaseError as error:
             raise BackupOperationError(f"SQLite backup failed: {type(error).__name__}") from error
         finally:
-            if temporary.exists():
-                temporary.unlink()
+            _remove_sqlite_sidecars(temporary)
+            temporary.unlink(missing_ok=True)
 
     def _report(self, source: Path, destination: Path) -> DatabaseBackupReport:
         integrity = self.integrity_check(destination)
@@ -111,6 +113,11 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _remove_sqlite_sidecars(path: Path) -> None:
+    for suffix in ("-wal", "-shm", "-journal"):
+        path.with_name(f"{path.name}{suffix}").unlink(missing_ok=True)
 
 
 __all__ = ["BackupOperationError", "DatabaseBackupService"]

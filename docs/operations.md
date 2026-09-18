@@ -55,6 +55,11 @@ Create a consistent backup through the SQLite online-backup API:
 uv run backup create --output runtime/exports/game.db.backup
 ```
 
+Backups created from the **Data** page/API are stored as
+`runtime/exports/<backup-name>/game.db.backup`. The application keeps only the
+three newest managed backup directories and removes older ones after a new
+backup has been verified.
+
 Restore to an explicitly selected path:
 
 ```bash
@@ -76,9 +81,11 @@ commit path. Import rejects an existing ID, so remove the old world before
 restoring that same bundle. The corresponding UI is **Data → Import bundle**.
 
 The **Data** page can also create, list, and restore backups. The API accepts
-only safe filenames inside `runtime/exports`; arbitrary filesystem paths are
+only safe backup names inside `runtime/exports`; arbitrary filesystem paths are
 rejected. During restore, turn workers stop, the connection pool closes, the
-file is replaced atomically, and new workers start afterward.
+file is replaced atomically, and new workers start afterward. The CLI command
+above remains a direct, explicitly selected one-off backup and is not managed
+by the three-backup retention policy.
 
 ## Providers, telemetry, and security
 

@@ -68,12 +68,30 @@ async function confirmDeleteWorld(): Promise<void> {
   }
 }
 
+function exportNameSlug(value: string): string {
+  return (
+    value
+      .replaceAll('Đ', 'D')
+      .replaceAll('đ', 'd')
+      .normalize('NFKD')
+      .replace(/\p{M}+/gu, '')
+      .toLocaleLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'story'
+  )
+}
+
+function exportTimestamp(now: Date): string {
+  const pad = (value: number, length = 2): string => String(value).padStart(length, '0')
+  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}-${pad(now.getMilliseconds(), 3)}`
+}
+
 async function exportPlaythrough(playthrough: PlaythroughRecord, world: WorldRecord): Promise<void> {
   const blob = await api.downloadExportBundle(playthrough.id)
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `${world.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'story'}-${playthrough.id.slice(0, 8)}.json`
+  link.download = `${exportNameSlug(world.name)}-${exportTimestamp(new Date())}.json`
   link.click()
   URL.revokeObjectURL(url)
 }

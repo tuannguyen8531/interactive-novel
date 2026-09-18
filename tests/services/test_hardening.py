@@ -132,6 +132,21 @@ def test_database_backup_restore_and_integrity_are_verified(tmp_path: Path) -> N
     assert service.integrity_check(backup).ok is True
 
 
+def test_database_backup_removes_wal_sidecars(tmp_path: Path) -> None:
+    source = tmp_path / "game.db"
+    backup = tmp_path / "exports" / "game.db.backup"
+    with sqlite3.connect(source) as connection:
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("CREATE TABLE facts (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
+        connection.execute("INSERT INTO facts (value) VALUES ('canonical')")
+
+    DatabaseBackupService(source).create_backup(backup)
+
+    assert not backup.with_name(f"{backup.name}-wal").exists()
+    assert not backup.with_name(f"{backup.name}-shm").exists()
+    assert not list(backup.parent.glob(f".{backup.name}.*.tmp-*"))
+
+
 @pytest.mark.asyncio
 async def test_runtime_operations_lists_backups_and_rejects_unsafe_paths(tmp_path: Path) -> None:
     source = tmp_path / "runtime" / "game.db"
@@ -146,8 +161,33 @@ async def test_runtime_operations_lists_backups_and_rejects_unsafe_paths(tmp_pat
 
     assert report.integrity.ok is True
     assert backups[0]["name"] == "manual.db.backup"
+    assert (tmp_path / "runtime" / "exports" / "manual.db.backup" / "game.db.backup").is_file()
     with pytest.raises(ApplicationValidationError):
         await operations.create_backup("../outside.db.backup")
+
+
+@pytest.mark.asyncio
+async def test_runtime_operations_retains_three_backup_directories(tmp_path: Path) -> None:
+    source = tmp_path / "runtime" / "game.db"
+    source.parent.mkdir(parents=True)
+    with sqlite3.connect(source) as connection:
+        connection.execute("CREATE TABLE facts (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
+        connection.execute("INSERT INTO facts (value) VALUES ('canonical')")
+    operations = RuntimeOperationsApplicationService(source, tmp_path / "runtime" / "exports")
+
+    for index in range(4):
+        await operations.create_backup(f"backup-{index}.db.backup")
+        if index == 0:
+            archive = tmp_path / "runtime" / "exports" / "backup-0.db.backup"
+            (archive / "game.db.backup-wal").touch()
+            (archive / ".game.db.backup.old.tmp-shm").touch()
+
+    backups = await operations.list_backups()
+    exports = tmp_path / "runtime" / "exports"
+
+    assert len(backups) == 3
+    assert not (exports / "backup-0.db.backup").exists()
+    assert all((exports / str(record["name"]) / "game.db.backup").is_file() for record in backups)
 
 
 def test_export_bundle_detects_tampering() -> None:
